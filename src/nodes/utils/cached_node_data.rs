@@ -8,12 +8,22 @@ pub struct CachedNodeData {
     /// the output of this node
     pub output: Option<f64>,
 
+    /// the outputs of the operands
+    pub operand_outputs: Option<Arc<Vec<f64>>>,
+
     /// $$
     /// \frac{\partial E}{\partial f}
     /// $$
     ///
     /// - $E$: the out-most function of the entire network
     pub global_gradient: Option<f64>,
+
+    /// $$
+    /// (\frac{\partial E}{\partial h_i} \cdot \frac{\partial h_i}{\partial f})
+    /// $$
+    ///
+    /// - $h_i$: the $i$-th immediate successor of $f$
+    pub global_gradient_entries: Vec<f64>,
 
     /// $$
     /// \frac{\partial f}{\partial z}
@@ -41,7 +51,9 @@ impl CachedNodeData {
     pub fn new() -> CachedNodeData {
         Self {
             output: None,
+            operand_outputs: None,
             global_gradient: None,
+            global_gradient_entries: Vec::new(),
             local_operand_gradient: None,
             local_parameter_gradient: None,
             global_parameter_gradient: None,
@@ -50,7 +62,9 @@ impl CachedNodeData {
 
     pub fn reset(&mut self) {
         self.output = None;
+        self.operand_outputs = None;
         self.global_gradient = None;
+        self.global_gradient_entries = Vec::new();
         self.local_operand_gradient = None;
         self.local_parameter_gradient = None;
         self.global_parameter_gradient = None;

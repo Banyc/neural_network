@@ -24,8 +24,8 @@ impl NodeComputation for SigmoidNodeComputation {
         _parameters: &Vec<f64>,
         operand_outputs: &Vec<f64>,
     ) -> Vec<f64> {
-        let sigmoid = sigmoid(operand_outputs[0]);
-        vec![(1.0 - sigmoid) * sigmoid]
+        assert_eq!(operand_outputs.len(), 1);
+        vec![sigmoid_derivative(operand_outputs[0])]
     }
 
     fn compute_local_parameter_gradient(
@@ -40,4 +40,9 @@ impl NodeComputation for SigmoidNodeComputation {
 fn sigmoid(x: f64) -> f64 {
     let exp = x.exp();
     exp / (exp + 1.0)
+}
+
+fn sigmoid_derivative(x: f64) -> f64 {
+    let sigmoid = sigmoid(x);
+    (1.0 - sigmoid) * sigmoid
 }

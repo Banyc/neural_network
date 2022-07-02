@@ -1,6 +1,8 @@
+use std::sync::{Arc, Mutex};
+
 use super::node::{GeneralNode, NodeComputation};
 
-pub fn relu_node(operand: GeneralNode) -> GeneralNode {
+pub fn relu_node(operand: Arc<Mutex<GeneralNode>>) -> GeneralNode {
     let computation = ReluNodeComputation {};
     let node = GeneralNode::new(vec![operand], Box::new(computation), Vec::new());
     node

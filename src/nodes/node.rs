@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use super::utils::cached_node_data::CachedNodeData;
 
@@ -23,9 +23,8 @@ pub trait NodeComputation {
 
 pub struct GeneralNode {
     parameters: Vec<f64>,
-    operands: Vec<GeneralNode>,
-    // successors: Vec<GeneralNode>,
-    // operand_indices_to_successors: Vec<usize>,
+    operands: Vec<Arc<Mutex<GeneralNode>>>,
+    successor_len: usize,
     cache: CachedNodeData,
     computation: Box<dyn NodeComputation>,
 }
@@ -45,22 +44,21 @@ impl GeneralNode {
             self.cache.output.is_none(),
             self.cache.operand_outputs.is_none()
         );
-        // assert_eq!(
-        //     self.successors.len(),
-        //     self.operand_indices_to_successors.len()
-        // );
     }
 
     pub fn new(
-        operands: Vec<GeneralNode>,
+        operands: Vec<Arc<Mutex<GeneralNode>>>,
         computation: Box<dyn NodeComputation>,
         parameters: Vec<f64>,
     ) -> GeneralNode {
+        for operand in &operands {
+            let mut operand = operand.lock().unwrap();
+            operand.increment_successor_len();
+        }
         let this = Self {
             parameters,
             operands,
-            // successors: Vec::new(),
-            // operand_indices_to_successors: Vec::new(),
+            successor_len: 0,
             cache: CachedNodeData::new(),
             computation,
         };
@@ -68,11 +66,16 @@ impl GeneralNode {
         this
     }
 
+    pub fn increment_successor_len(&mut self) {
+        self.successor_len += 1;
+    }
+
     pub fn evaluate(&mut self, inputs: &Vec<f64>) -> f64 {
         self.cache.output.get_or_insert_with(|| {
             assert!(self.cache.operand_outputs.is_none());
             let mut operand_outputs = Vec::new();
             for operand in self.operands.iter_mut() {
+                let mut operand = operand.lock().unwrap();
                 operand_outputs.push(operand.evaluate(&inputs));
             }
             let ret = self
@@ -86,10 +89,17 @@ impl GeneralNode {
         self.cache.output.unwrap()
     }
 
-    pub fn backpropagate(&mut self, step_size: f64) {
+    pub fn backpropagate(&mut self, step_size: f64) -> Result<(), BackpropagationError> {
+        if self.successor_len > self.cache.global_gradient_entries.len() {
+            return Err(
+                BackpropagationError::NotReceivingEnoughGlobalGradientEntriesFromSuccessors,
+            );
+        }
+        assert_eq!(self.successor_len, self.cache.global_gradient_entries.len());
         self.distribute_global_gradient_entries_to_operands();
         self.do_gradient_descent_step(step_size);
         self.cache.reset();
+        Ok(())
     }
 
     fn do_gradient_descent_step(&mut self, step_size: f64) {
@@ -103,7 +113,8 @@ impl GeneralNode {
     fn distribute_global_gradient_entries_to_operands(&mut self) {
         for i in 0..self.operands.len() {
             let gradient_entry = self.global_gradient() * self.local_operand_gradient()[i];
-            self.operands[i].add_global_gradient_entry(gradient_entry);
+            let mut operand = self.operands[i].lock().unwrap();
+            operand.add_global_gradient_entry(gradient_entry);
         }
         self.check_rep();
     }
@@ -138,7 +149,7 @@ impl GeneralNode {
     /// - $E$: the out-most function of the entire network
     fn global_gradient(&mut self) -> f64 {
         self.cache.global_gradient.get_or_insert_with(|| {
-            // TODO: assert successor_len = global_gradient_entries.len()
+            assert_eq!(self.successor_len, self.cache.global_gradient_entries.len());
             self.cache.global_gradient_entries.iter().sum()
         });
         self.check_rep();
@@ -188,4 +199,8 @@ impl GeneralNode {
             None => None,
         }
     }
+}
+
+pub enum BackpropagationError {
+    NotReceivingEnoughGlobalGradientEntriesFromSuccessors,
 }

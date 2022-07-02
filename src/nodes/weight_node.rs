@@ -1,8 +1,10 @@
+use std::sync::{Arc, Mutex};
+
 use rand::Rng;
 
 use super::node::{GeneralNode, NodeComputation};
 
-pub fn weight_node(operands: Vec<GeneralNode>) -> GeneralNode {
+pub fn weight_node(operands: Vec<Arc<Mutex<GeneralNode>>>) -> GeneralNode {
     let computation = WeightNodeComputation {};
     let mut weights = Vec::new();
     let op_len = operands.len();

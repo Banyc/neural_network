@@ -1,6 +1,8 @@
+use std::sync::{Arc, Mutex};
+
 use super::node::{GeneralNode, NodeComputation};
 
-pub fn bias_node(operand: GeneralNode) -> GeneralNode {
+pub fn bias_node(operand: Arc<Mutex<GeneralNode>>) -> GeneralNode {
     let computation = BiasNodeComputation {};
     let node = GeneralNode::new(vec![operand], Box::new(computation), vec![0.0]);
     node

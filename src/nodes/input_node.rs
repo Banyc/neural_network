@@ -6,7 +6,7 @@ pub fn input_node(input_index: usize) -> GeneralNode {
     node
 }
 
-pub struct InputNodeComputation {
+struct InputNodeComputation {
     input_index: usize,
 }
 

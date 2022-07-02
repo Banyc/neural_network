@@ -12,7 +12,7 @@ struct BiasNodeComputation {}
 
 impl NodeComputation for BiasNodeComputation {
     fn compute_output(
-        &self,
+        &mut self,
         parameters: &Vec<f64>,
         operand_outputs: &Vec<f64>,
         _inputs: &Vec<f64>,
@@ -37,6 +37,8 @@ impl NodeComputation for BiasNodeComputation {
     ) -> Vec<f64> {
         vec![1.0]
     }
+
+    fn reset(&mut self) {}
 }
 
 fn bias(x: f64, b: f64) -> f64 {

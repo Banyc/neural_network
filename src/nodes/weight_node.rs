@@ -22,7 +22,7 @@ struct WeightNodeComputation {}
 
 impl NodeComputation for WeightNodeComputation {
     fn compute_output(
-        &self,
+        &mut self,
         parameters: &Vec<f64>,
         operand_outputs: &Vec<f64>,
         _inputs: &Vec<f64>,
@@ -47,6 +47,8 @@ impl NodeComputation for WeightNodeComputation {
     ) -> Vec<f64> {
         derivative_of_w(operand_outputs)
     }
+
+    fn reset(&mut self) {}
 }
 
 fn weight(x: &Vec<f64>, w: &Vec<f64>) -> f64 {

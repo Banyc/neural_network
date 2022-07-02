@@ -12,7 +12,7 @@ struct SigmoidNodeComputation {}
 
 impl NodeComputation for SigmoidNodeComputation {
     fn compute_output(
-        &self,
+        &mut self,
         _parameters: &Vec<f64>,
         operand_outputs: &Vec<f64>,
         _inputs: &Vec<f64>,
@@ -37,6 +37,8 @@ impl NodeComputation for SigmoidNodeComputation {
     ) -> Vec<f64> {
         Vec::new()
     }
+
+    fn reset(&mut self) {}
 }
 
 fn sigmoid(x: f64) -> f64 {

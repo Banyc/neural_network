@@ -12,7 +12,7 @@ struct InputNodeComputation {
 
 impl NodeComputation for InputNodeComputation {
     fn compute_output(
-        &self,
+        &mut self,
         _parameters: &Vec<f64>,
         _operand_outputs: &Vec<f64>,
         inputs: &Vec<f64>,
@@ -35,4 +35,6 @@ impl NodeComputation for InputNodeComputation {
     ) -> Vec<f64> {
         Vec::new()
     }
+
+    fn reset(&mut self) {}
 }

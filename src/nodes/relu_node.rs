@@ -12,7 +12,7 @@ struct ReluNodeComputation {}
 
 impl NodeComputation for ReluNodeComputation {
     fn compute_output(
-        &self,
+        &mut self,
         _parameters: &Vec<f64>,
         operand_outputs: &Vec<f64>,
         _inputs: &Vec<f64>,
@@ -37,6 +37,8 @@ impl NodeComputation for ReluNodeComputation {
     ) -> Vec<f64> {
         Vec::new()
     }
+
+    fn reset(&mut self) {}
 }
 
 fn relu(x: f64) -> f64 {

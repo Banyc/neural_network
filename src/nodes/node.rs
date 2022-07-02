@@ -4,7 +4,7 @@ use super::utils::cached_node_data::CachedNodeData;
 
 pub trait NodeComputation {
     fn compute_output(
-        &mut self,
+        &self,
         parameters: &Vec<f64>,
         operand_outputs: &Vec<f64>,
         inputs: &Vec<f64>,
@@ -19,7 +19,6 @@ pub trait NodeComputation {
         parameters: &Vec<f64>,
         operand_outputs: &Vec<f64>,
     ) -> Vec<f64>;
-    fn reset(&mut self);
 }
 
 pub struct GeneralNode {
@@ -100,7 +99,6 @@ impl GeneralNode {
         self.distribute_global_gradient_entries_to_operands();
         self.do_gradient_descent_step(step_size);
         self.cache.reset();
-        self.computation.reset();
         Ok(())
     }
 

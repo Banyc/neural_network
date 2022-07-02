@@ -152,7 +152,12 @@ impl GeneralNode {
     fn global_gradient(&mut self) -> f64 {
         self.cache.global_gradient.get_or_insert_with(|| {
             assert_eq!(self.successor_len, self.cache.global_gradient_entries.len());
-            self.cache.global_gradient_entries.iter().sum()
+            if self.successor_len == 0 {
+                // this is the root node
+                1.0
+            } else {
+                self.cache.global_gradient_entries.iter().sum()
+            }
         });
         self.check_rep();
         self.cache.global_gradient.unwrap()

@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::VecDeque,
+    sync::{Arc, Mutex},
+};
 
 use super::utils::cached_node_data::CachedNodeData;
 
@@ -89,7 +92,7 @@ impl GeneralNode {
         self.cache.output.unwrap()
     }
 
-    pub fn backpropagate(&mut self, step_size: f64) -> Result<(), BackpropagationError> {
+    pub fn do_backpropagation_step(&mut self, step_size: f64) -> Result<(), BackpropagationError> {
         if self.successor_len > self.cache.global_gradient_entries.len() {
             return Err(
                 BackpropagationError::NotReceivingEnoughGlobalGradientEntriesFromSuccessors,
@@ -202,6 +205,26 @@ impl GeneralNode {
         match &self.cache.operand_outputs {
             Some(x) => Some(Arc::clone(&x)),
             None => None,
+        }
+    }
+}
+
+pub fn do_backpropagation(root_note: &Arc<Mutex<GeneralNode>>, step_size: f64) {
+    let f = |n: &mut GeneralNode| {
+        let _ = n.do_backpropagation_step(step_size);
+    };
+    bfs_operands(root_note, f);
+}
+
+fn bfs_operands(root_node: &Arc<Mutex<GeneralNode>>, f: impl Fn(&mut GeneralNode) -> ()) {
+    let mut q = VecDeque::new();
+    q.push_back(Arc::clone(root_node));
+
+    while let Some(n) = q.pop_front() {
+        let mut n = n.lock().unwrap();
+        f(&mut n);
+        for op in &n.operands {
+            q.push_back(Arc::clone(op));
         }
     }
 }

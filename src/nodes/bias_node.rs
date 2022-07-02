@@ -23,9 +23,8 @@ impl NodeComputation for BiasNodeComputation {
     fn compute_local_operand_gradient(
         &self,
         _parameters: &Vec<f64>,
-        operand_outputs: &Vec<f64>,
+        _operand_outputs: &Vec<f64>,
     ) -> Vec<f64> {
-        assert_eq!(operand_outputs.len(), 1);
         vec![bias_derivative()]
     }
 

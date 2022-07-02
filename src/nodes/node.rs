@@ -22,12 +22,12 @@ pub trait NodeComputation {
 }
 
 pub struct GeneralNode {
-    pub parameters: Vec<f64>,
-    pub operands: Vec<GeneralNode>,
-    // pub successors: Vec<GeneralNode>,
-    // pub operand_indices_to_successors: Vec<usize>,
-    pub cache: CachedNodeData,
-    pub computation: Box<dyn NodeComputation>,
+    parameters: Vec<f64>,
+    operands: Vec<GeneralNode>,
+    // successors: Vec<GeneralNode>,
+    // operand_indices_to_successors: Vec<usize>,
+    cache: CachedNodeData,
+    computation: Box<dyn NodeComputation>,
 }
 
 impl GeneralNode {

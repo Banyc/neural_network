@@ -253,6 +253,13 @@ pub fn clone_node_batch(nodes: &Vec<Arc<Mutex<GeneralNode>>>) -> Vec<Arc<Mutex<G
     cloned_nodes
 }
 
+pub fn reset_caches_on_all_nodes(root_note: &Arc<Mutex<GeneralNode>>) {
+    let f = |n: &mut GeneralNode| {
+        n.cache.reset();
+    };
+    bfs_operands(root_note, f);
+}
+
 pub fn do_gradient_descent_step_on_all_nodes(root_note: &Arc<Mutex<GeneralNode>>, step_size: f64) {
     let f = |n: &mut GeneralNode| {
         match n.do_gradient_descent_step(step_size) {

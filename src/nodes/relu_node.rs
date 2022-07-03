@@ -49,3 +49,57 @@ fn relu_derivative(x: f64) -> f64 {
         _ => 0.0,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{Arc, Mutex};
+
+    use super::super::{input_node::input_node, relu_node::relu_node};
+
+    #[test]
+    fn evaluate_negative() {
+        let input_node = input_node(0);
+        let mut relu = relu_node(Arc::new(Mutex::new(input_node)));
+        let ret = relu.evaluate(&vec![-2.0]);
+        assert!(ret >= 0.0);
+        assert!(ret <= 0.0);
+    }
+
+    #[test]
+    fn evaluate_positive() {
+        let input_node = input_node(0);
+        let mut relu = relu_node(Arc::new(Mutex::new(input_node)));
+        let ret = relu.evaluate(&vec![3.0]);
+        assert!(ret >= 3.0);
+        assert!(ret <= 3.0);
+    }
+
+    #[test]
+    fn local_operand_gradient_positive() {
+        let input_node = input_node(0);
+        let mut relu = relu_node(Arc::new(Mutex::new(input_node)));
+        relu.evaluate(&vec![3.0]);
+        let ret = relu.local_operand_gradient().unwrap();
+        assert!(ret[0] >= 1.0);
+        assert!(ret[0] <= 1.0);
+    }
+
+    #[test]
+    fn local_operand_gradient_negative() {
+        let input_node = input_node(0);
+        let mut relu = relu_node(Arc::new(Mutex::new(input_node)));
+        relu.evaluate(&vec![-3.0]);
+        let ret = relu.local_operand_gradient().unwrap();
+        assert!(ret[0] >= 0.0);
+        assert!(ret[0] <= 0.0);
+    }
+
+    #[test]
+    fn local_parameter_gradient_empty() {
+        let input_node = input_node(0);
+        let mut relu = relu_node(Arc::new(Mutex::new(input_node)));
+        relu.evaluate(&vec![3.0]);
+        let ret = relu.local_parameter_gradient().unwrap();
+        assert_eq!(ret.len(), 0);
+    }
+}

@@ -11,6 +11,22 @@ pub struct NeuralNetwork {
 }
 
 impl NeuralNetwork {
+    fn check_rep(&self) {}
+
+    pub fn new(
+        terminal_node: Arc<Mutex<GeneralNode>>,
+        error_node: Arc<Mutex<GeneralNode>>,
+        step_size: f64,
+    ) -> NeuralNetwork {
+        let this = NeuralNetwork {
+            terminal_node,
+            error_node,
+            step_size,
+        };
+        this.check_rep();
+        this
+    }
+
     pub fn backpropagation_step(&self, inputs: &Vec<f64>) {
         {
             let mut error_node = self.error_node.lock().unwrap();

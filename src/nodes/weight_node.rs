@@ -4,18 +4,32 @@ use rand::Rng;
 
 use super::node::{GeneralNode, NodeComputation};
 
-pub fn weight_node(operands: Vec<Arc<Mutex<GeneralNode>>>) -> GeneralNode {
-    let computation = WeightNodeComputation {};
-    let mut weights = Vec::new();
-    let op_len = operands.len();
-    let weight_bound = 1.0 / (op_len as f64).sqrt();
-    let mut rng = rand::thread_rng();
-    for _ in 0..op_len {
-        let weight: f64 = rng.gen_range(-weight_bound..weight_bound);
-        weights.push(weight);
+pub fn weight_node(
+    operands: Vec<Arc<Mutex<GeneralNode>>>,
+    mut weights: Option<Vec<f64>>,
+) -> Result<GeneralNode, WeightNodeError> {
+    if let Some(weights) = &weights {
+        if operands.len() != weights.len() {
+            return Err(WeightNodeError::ParameterSizeNotMatched);
+        }
     }
+    let computation = WeightNodeComputation {};
+    let weights = match weights.take() {
+        Some(x) => x,
+        None => {
+            let mut weights = Vec::new();
+            let op_len = operands.len();
+            let weight_bound = 1.0 / (op_len as f64).sqrt();
+            let mut rng = rand::thread_rng();
+            for _ in 0..op_len {
+                let weight: f64 = rng.gen_range(-weight_bound..weight_bound);
+                weights.push(weight);
+            }
+            weights
+        }
+    };
     let node = GeneralNode::new(operands, Box::new(computation), weights);
-    node
+    Ok(node)
 }
 
 struct WeightNodeComputation {}
@@ -27,8 +41,7 @@ impl NodeComputation for WeightNodeComputation {
         operand_outputs: &Vec<f64>,
         _inputs: &Vec<f64>,
     ) -> f64 {
-        assert_eq!(operand_outputs.len(), 1);
-        assert_eq!(parameters.len(), 1);
+        assert_eq!(operand_outputs.len(), parameters.len());
         weight(operand_outputs, parameters)
     }
 
@@ -64,4 +77,46 @@ fn weight_derivative(w: &Vec<f64>) -> Vec<f64> {
 
 fn derivative_of_w(x: &Vec<f64>) -> Vec<f64> {
     x.clone()
+}
+
+#[derive(Debug)]
+pub enum WeightNodeError {
+    ParameterSizeNotMatched,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{super::input_node::input_node_batch, weight_node};
+
+    #[test]
+    fn evaluate() {
+        let input_nodes = input_node_batch(3);
+        let inputs = vec![1.0, 2.0, 3.0];
+        let initial_weights = vec![3.0, 2.0, 1.0];
+        let mut weight_node = weight_node(input_nodes, Some(initial_weights)).unwrap();
+        let ret = weight_node.evaluate(&inputs);
+        assert_eq!(ret, 3.0 * 1.0 + 2.0 * 2.0 + 1.0 * 3.0);
+    }
+
+    #[test]
+    fn local_operand_gradient() {
+        let input_nodes = input_node_batch(3);
+        let inputs = vec![1.0, 2.0, 3.0];
+        let initial_weights = vec![3.0, 2.0, 1.0];
+        let mut weight_node = weight_node(input_nodes, Some(initial_weights)).unwrap();
+        weight_node.evaluate(&inputs);
+        let ret = weight_node.local_operand_gradient().unwrap();
+        assert_eq!(ret.as_ref(), &vec![3.0, 2.0, 1.0]);
+    }
+
+    #[test]
+    fn local_parameter_gradient() {
+        let input_nodes = input_node_batch(3);
+        let inputs = vec![1.0, 2.0, 3.0];
+        let initial_weights = vec![3.0, 2.0, 1.0];
+        let mut weight_node = weight_node(input_nodes, Some(initial_weights)).unwrap();
+        weight_node.evaluate(&inputs);
+        let ret = weight_node.local_parameter_gradient().unwrap();
+        assert_eq!(ret.as_ref(), &vec![1.0, 2.0, 3.0]);
+    }
 }

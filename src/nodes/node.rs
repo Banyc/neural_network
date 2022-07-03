@@ -69,23 +69,20 @@ impl GeneralNode {
         this
     }
 
+    /// Every time overwrite cache
     pub fn evaluate(&mut self, inputs: &Vec<f64>) -> f64 {
-        self.cache.output.get_or_insert_with(|| {
-            assert!(self.cache.operand_outputs.is_none());
-            let mut operand_outputs = Vec::new();
-            for operand in self.operands.iter_mut() {
-                let mut operand = operand.lock().unwrap();
-                operand_outputs.push(operand.evaluate(&inputs));
-            }
-            let ret = self
-                .computation
-                .compute_output(&self.parameters, &operand_outputs, inputs);
-            self.cache.operand_outputs = Some(Arc::new(operand_outputs));
-            ret
-        });
+        let mut operand_outputs = Vec::new();
+        for operand in self.operands.iter_mut() {
+            let mut operand = operand.lock().unwrap();
+            operand_outputs.push(operand.evaluate(&inputs));
+        }
+        let output = self
+            .computation
+            .compute_output(&self.parameters, &operand_outputs, inputs);
+        self.cache.operand_outputs = Some(Arc::new(operand_outputs));
+        self.cache.output = Some(output);
         self.check_rep();
-        assert!(self.cache.operand_outputs.is_some());
-        self.cache.output.unwrap()
+        output
     }
 
     pub fn do_gradient_descent_step(&mut self, step_size: f64) -> Result<(), BackpropagationError> {

@@ -252,6 +252,10 @@ impl GeneralNode {
             None => None,
         }
     }
+
+    pub fn output(&self) -> Option<f64> {
+        self.cache.output
+    }
 }
 
 pub fn clone_node_batch(nodes: &Vec<Arc<Mutex<GeneralNode>>>) -> Vec<Arc<Mutex<GeneralNode>>> {
@@ -262,6 +266,7 @@ pub fn clone_node_batch(nodes: &Vec<Arc<Mutex<GeneralNode>>>) -> Vec<Arc<Mutex<G
     cloned_nodes
 }
 
+/// Inefficient: same node might be visited more than once
 pub fn reset_caches_on_all_nodes(root_note: &Arc<Mutex<GeneralNode>>) {
     let f = |n: &mut GeneralNode| {
         n.cache.reset();

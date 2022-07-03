@@ -67,10 +67,7 @@ impl NeuralNetwork {
         let mut errors = 0;
         for inputs in dataset {
             let eval = self.evaluate(&inputs);
-            if eval >= 0.5 && inputs[self.label_index] >= 0.5
-                || eval < 0.5 && inputs[self.label_index] < 0.5
-            {
-            } else {
+            if (eval - inputs[self.label_index]).abs() >= 0.5 {
                 errors += 1;
             }
         }

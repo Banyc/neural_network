@@ -30,7 +30,7 @@ impl NeuralNetwork {
             let dataset_index: usize = rng.gen_range(0..dataset.len());
             self.backpropagation_step(&dataset[dataset_index].inputs);
             if i % (max_steps / 10) == 0 {
-                println!("{}%", 100 * i / max_steps);
+                println!("{:.2}%", (100 * i) as f64 / max_steps as f64);
             }
         }
     }

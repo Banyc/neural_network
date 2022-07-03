@@ -2,9 +2,13 @@ use std::sync::{Arc, Mutex};
 
 use super::node::{GeneralNode, NodeComputation};
 
-pub fn bias_node(operand: Arc<Mutex<GeneralNode>>) -> GeneralNode {
+pub fn bias_node(operand: Arc<Mutex<GeneralNode>>, bias: Option<f64>) -> GeneralNode {
     let computation = BiasNodeComputation {};
-    let node = GeneralNode::new(vec![operand], Box::new(computation), vec![0.0]);
+    let bias = match bias {
+        Some(x) => x,
+        None => 0.0,
+    };
+    let node = GeneralNode::new(vec![operand], Box::new(computation), vec![bias]);
     node
 }
 

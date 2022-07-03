@@ -33,23 +33,30 @@ impl NeuralNetwork {
     }
 
     pub fn backpropagation_step(&self, inputs: &Vec<f64>) {
-        self.compute_error_(inputs);
+        self.compute_error(inputs);
         do_gradient_descent_step_on_all_nodes(&self.error_node, self.step_size);
     }
 
-    pub fn evaluate(&self, inputs: &Vec<f64>) -> f64 {
-        let ret = {
-            let mut terminal_node = self.terminal_node.lock().unwrap();
-            terminal_node.evaluate(inputs)
-        };
+    pub fn evaluate_and_reset_caches(&self, inputs: &Vec<f64>) -> f64 {
+        let ret = self.evaluate(inputs);
         reset_caches_on_all_nodes(&self.terminal_node);
         ret
     }
 
-    pub fn compute_error(&self, inputs: &Vec<f64>) -> f64 {
-        let ret = self.compute_error_(inputs);
+    pub fn evaluate(&self, inputs: &Vec<f64>) -> f64 {
+        let mut terminal_node = self.terminal_node.lock().unwrap();
+        terminal_node.evaluate(inputs)
+    }
+
+    pub fn compute_error_and_reset_caches(&self, inputs: &Vec<f64>) -> f64 {
+        let ret = self.compute_error(inputs);
         reset_caches_on_all_nodes(&self.error_node);
         ret
+    }
+
+    pub fn compute_error(&self, inputs: &Vec<f64>) -> f64 {
+        let mut error_node = self.error_node.lock().unwrap();
+        error_node.evaluate(inputs)
     }
 
     pub fn train(&self, dataset: &Vec<Vec<f64>>, max_steps: usize) {
@@ -66,16 +73,11 @@ impl NeuralNetwork {
     pub fn errors_on_dataset(&self, dataset: &Vec<Vec<f64>>) -> f64 {
         let mut errors = 0;
         for inputs in dataset {
-            let eval = self.evaluate(&inputs);
+            let eval = self.evaluate_and_reset_caches(&inputs);
             if (eval - inputs[self.label_index]).abs() >= 0.5 {
                 errors += 1;
             }
         }
         errors as f64 / dataset.len() as f64
-    }
-
-    fn compute_error_(&self, inputs: &Vec<f64>) -> f64 {
-        let mut error_node = self.error_node.lock().unwrap();
-        error_node.evaluate(inputs)
     }
 }

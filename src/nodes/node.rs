@@ -47,6 +47,10 @@ impl GeneralNode {
             self.cache.output.is_none(),
             self.cache.operand_outputs.is_none()
         );
+        assert!(self.cache.global_gradient_entries.len() <= self.successor_len);
+        if self.cache.global_gradient.is_some() {
+            assert_eq!(self.cache.global_gradient_entries.len(), self.successor_len);
+        }
     }
 
     pub fn new(
@@ -98,15 +102,17 @@ impl GeneralNode {
         self.distribute_global_gradient_entries_to_operands();
         self.adjust_parameters(step_size);
         self.cache.reset();
+        self.check_rep();
         Ok(())
     }
 
     fn increment_successor_len(&mut self) {
         self.successor_len += 1;
+        self.check_rep();
     }
 
     fn adjust_parameters(&mut self, step_size: f64) {
-        let gradient = self.global_parameter_gradient();
+        let gradient = self.global_parameter_gradient().unwrap();
         for (i, gradient_entry) in gradient.iter().enumerate() {
             self.parameters[i] -= step_size * *gradient_entry;
         }
@@ -114,12 +120,14 @@ impl GeneralNode {
     }
 
     fn distribute_global_gradient_entries_to_operands(&mut self) {
+        let local_operand_gradient = self.local_operand_gradient().unwrap();
+        let global_gradient = self.global_gradient().unwrap();
         if self.cache.has_distributed_global_gradient_entries {
             panic!();
         }
         self.cache.has_distributed_global_gradient_entries = true;
         for i in 0..self.operands.len() {
-            let gradient_entry = self.global_gradient() * self.local_operand_gradient()[i];
+            let gradient_entry = global_gradient * local_operand_gradient[i];
             let mut operand = self.operands[i].lock().unwrap();
             operand.add_global_gradient_entry(gradient_entry);
         }
@@ -129,6 +137,7 @@ impl GeneralNode {
     fn add_global_gradient_entry(&mut self, gradient_entry: f64) {
         assert!(self.cache.global_gradient.is_none());
         self.cache.global_gradient_entries.push(gradient_entry);
+        self.check_rep();
     }
 
     /// $$
@@ -136,9 +145,10 @@ impl GeneralNode {
     /// $$
     ///
     /// - $z$: the non-tunable operands of $f$
-    fn local_operand_gradient(&mut self) -> Arc<Vec<f64>> {
-        // TODO: throw error if None
-        let operand_outputs = self.operand_outputs().unwrap();
+    pub fn local_operand_gradient(&mut self) -> Result<Arc<Vec<f64>>, LocalOperandGradientError> {
+        let operand_outputs = self
+            .operand_outputs()
+            .ok_or(LocalOperandGradientError::NoEvaluationOutputCaches)?;
         self.cache.local_operand_gradient.get_or_insert_with(|| {
             Arc::new(
                 self.computation
@@ -146,7 +156,9 @@ impl GeneralNode {
             )
         });
         self.check_rep();
-        Arc::clone(self.cache.local_operand_gradient.as_ref().unwrap())
+        Ok(Arc::clone(
+            self.cache.local_operand_gradient.as_ref().unwrap(),
+        ))
     }
 
     /// $$
@@ -154,7 +166,10 @@ impl GeneralNode {
     /// $$
     ///
     /// - $E$: the out-most function of the entire network
-    fn global_gradient(&mut self) -> f64 {
+    pub fn global_gradient(&mut self) -> Result<f64, GlobalGradientError> {
+        if self.successor_len != self.cache.global_gradient_entries.len() {
+            return Err(GlobalGradientError::NotReceivingEnoughGlobalGradientEntriesFromSuccessors);
+        }
         self.cache.global_gradient.get_or_insert_with(|| {
             assert_eq!(self.successor_len, self.cache.global_gradient_entries.len());
             if self.successor_len == 0 {
@@ -165,7 +180,7 @@ impl GeneralNode {
             }
         });
         self.check_rep();
-        self.cache.global_gradient.unwrap()
+        Ok(self.cache.global_gradient.unwrap())
     }
 
     /// $$
@@ -173,9 +188,12 @@ impl GeneralNode {
     /// $$
     ///
     /// - $w$: the tunable parameters of $f$
-    fn local_parameter_gradient(&mut self) -> Arc<Vec<f64>> {
-        // TODO: throw error if None
-        let operand_outputs = self.operand_outputs().unwrap();
+    pub fn local_parameter_gradient(
+        &mut self,
+    ) -> Result<Arc<Vec<f64>>, LocalParameterGradientError> {
+        let operand_outputs = self
+            .operand_outputs()
+            .ok_or(LocalParameterGradientError::NoEvaluationOutputCaches)?;
         self.cache.local_parameter_gradient.get_or_insert_with(|| {
             Arc::new(
                 self.computation
@@ -183,7 +201,9 @@ impl GeneralNode {
             )
         });
         self.check_rep();
-        Arc::clone(self.cache.local_parameter_gradient.as_ref().unwrap())
+        Ok(Arc::clone(
+            self.cache.local_parameter_gradient.as_ref().unwrap(),
+        ))
     }
 
     /// $$
@@ -191,9 +211,15 @@ impl GeneralNode {
     /// $$
     ///
     /// - $w$: the tunable parameters of $f$
-    fn global_parameter_gradient(&mut self) -> Arc<Vec<f64>> {
-        let local_parameter_gradient = self.local_parameter_gradient();
-        let global_gradient = self.global_gradient();
+    pub fn global_parameter_gradient(
+        &mut self,
+    ) -> Result<Arc<Vec<f64>>, GlobalParameterGradientError> {
+        let local_parameter_gradient = self
+            .local_parameter_gradient()
+            .map_err(|e| GlobalParameterGradientError::LocalParameterGradientError(e))?;
+        let global_gradient = self
+            .global_gradient()
+            .map_err(|e| GlobalParameterGradientError::GlobalGradientError(e))?;
         self.cache.global_parameter_gradient.get_or_insert_with(|| {
             let mut gradient_entries = Vec::new();
             for local_parameter_gradient_entry in local_parameter_gradient.iter() {
@@ -202,10 +228,12 @@ impl GeneralNode {
             Arc::new(gradient_entries)
         });
         self.check_rep();
-        Arc::clone(self.cache.global_parameter_gradient.as_ref().unwrap())
+        Ok(Arc::clone(
+            self.cache.global_parameter_gradient.as_ref().unwrap(),
+        ))
     }
 
-    fn operand_outputs(&self) -> Option<Arc<Vec<f64>>> {
+    pub fn operand_outputs(&self) -> Option<Arc<Vec<f64>>> {
         match &self.cache.operand_outputs {
             Some(x) => Some(Arc::clone(&x)),
             None => None,
@@ -242,5 +270,26 @@ fn bfs_operands(root_node: &Arc<Mutex<GeneralNode>>, f: impl Fn(&mut GeneralNode
 
 pub enum GradientDescentError {
     NotReceivingEnoughGlobalGradientEntriesFromSuccessors,
+    NoEvaluationOutputCaches,
+}
+
+#[derive(Debug)]
+pub enum GlobalGradientError {
+    NotReceivingEnoughGlobalGradientEntriesFromSuccessors,
+}
+
+#[derive(Debug)]
+pub enum GlobalParameterGradientError {
+    GlobalGradientError(GlobalGradientError),
+    LocalParameterGradientError(LocalParameterGradientError),
+}
+
+#[derive(Debug)]
+pub enum LocalParameterGradientError {
+    NoEvaluationOutputCaches,
+}
+
+#[derive(Debug)]
+pub enum LocalOperandGradientError {
     NoEvaluationOutputCaches,
 }

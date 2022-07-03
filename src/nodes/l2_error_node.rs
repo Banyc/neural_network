@@ -20,7 +20,7 @@ impl NodeComputation for L2ErrorNodeComputation {
         operand_outputs: &Vec<f64>,
         _inputs: &Vec<f64>,
     ) -> f64 {
-        assert_eq!(operand_outputs.len(), 1);
+        assert_eq!(operand_outputs.len(), 2);
         l2_error(operand_outputs[0], operand_outputs[1])
     }
 

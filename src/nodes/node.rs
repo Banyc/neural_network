@@ -69,10 +69,6 @@ impl GeneralNode {
         this
     }
 
-    pub fn increment_successor_len(&mut self) {
-        self.successor_len += 1;
-    }
-
     pub fn evaluate(&mut self, inputs: &Vec<f64>) -> f64 {
         self.cache.output.get_or_insert_with(|| {
             assert!(self.cache.operand_outputs.is_none());
@@ -92,7 +88,7 @@ impl GeneralNode {
         self.cache.output.unwrap()
     }
 
-    pub fn do_backpropagation_step(&mut self, step_size: f64) -> Result<(), BackpropagationError> {
+    pub fn do_gradient_descent_step(&mut self, step_size: f64) -> Result<(), BackpropagationError> {
         if self.successor_len > self.cache.global_gradient_entries.len() {
             return Err(
                 BackpropagationError::NotReceivingEnoughGlobalGradientEntriesFromSuccessors,
@@ -100,12 +96,16 @@ impl GeneralNode {
         }
         assert_eq!(self.successor_len, self.cache.global_gradient_entries.len());
         self.distribute_global_gradient_entries_to_operands();
-        self.do_gradient_descent_step(step_size);
+        self.adjust_parameters(step_size);
         self.cache.reset();
         Ok(())
     }
 
-    fn do_gradient_descent_step(&mut self, step_size: f64) {
+    fn increment_successor_len(&mut self) {
+        self.successor_len += 1;
+    }
+
+    fn adjust_parameters(&mut self, step_size: f64) {
         let gradient = self.global_parameter_gradient();
         for (i, gradient_entry) in gradient.iter().enumerate() {
             self.parameters[i] -= step_size * *gradient_entry;
@@ -209,9 +209,9 @@ impl GeneralNode {
     }
 }
 
-pub fn do_backpropagation(root_note: &Arc<Mutex<GeneralNode>>, step_size: f64) {
+pub fn do_gradient_descent_step_on_all_nodes(root_note: &Arc<Mutex<GeneralNode>>, step_size: f64) {
     let f = |n: &mut GeneralNode| {
-        let _ = n.do_backpropagation_step(step_size);
+        let _ = n.do_gradient_descent_step(step_size);
     };
     bfs_operands(root_note, f);
 }

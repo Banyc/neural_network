@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use rand::Rng;
 
-use super::nodes::node::{do_backpropagation, GeneralNode};
+use super::nodes::node::{do_gradient_descent_step_on_all_nodes, GeneralNode};
 
 pub struct NeuralNetwork {
     terminal_node: Arc<Mutex<GeneralNode>>,
@@ -16,7 +16,7 @@ impl NeuralNetwork {
             let mut error_node = self.error_node.lock().unwrap();
             error_node.evaluate(inputs);
         }
-        do_backpropagation(&self.error_node, self.step_size);
+        do_gradient_descent_step_on_all_nodes(&self.error_node, self.step_size);
     }
 
     pub fn evaluate(&self, inputs: &Vec<f64>) -> f64 {

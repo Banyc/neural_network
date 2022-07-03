@@ -93,6 +93,16 @@ impl GeneralNode {
         self.cache.output.unwrap()
     }
 
+    pub fn do_gradient_descent_step_and_reset_cache(
+        &mut self,
+        step_size: f64,
+    ) -> Result<(), GradientDescentError> {
+        self.do_gradient_descent_step(step_size)?;
+        self.cache.reset();
+        self.check_rep();
+        Ok(())
+    }
+
     pub fn do_gradient_descent_step(&mut self, step_size: f64) -> Result<(), GradientDescentError> {
         if self.successor_len > self.cache.global_gradient_entries.len() {
             return Err(
@@ -105,7 +115,6 @@ impl GeneralNode {
         assert_eq!(self.successor_len, self.cache.global_gradient_entries.len());
         self.distribute_global_gradient_entries_to_operands();
         self.adjust_parameters(step_size);
-        self.cache.reset();
         self.check_rep();
         Ok(())
     }
@@ -260,7 +269,24 @@ pub fn reset_caches_on_all_nodes(root_note: &Arc<Mutex<GeneralNode>>) {
     bfs_operands(root_note, f);
 }
 
-pub fn do_gradient_descent_step_on_all_nodes(root_note: &Arc<Mutex<GeneralNode>>, step_size: f64) {
+pub fn do_gradient_descent_steps_and_reset_caches_on_all_nodes(
+    root_note: &Arc<Mutex<GeneralNode>>,
+    step_size: f64,
+) {
+    let f = |n: &mut GeneralNode| {
+        match n.do_gradient_descent_step_and_reset_cache(step_size) {
+            Ok(_) => (),
+            Err(e) => match e {
+                GradientDescentError::NotReceivingEnoughGlobalGradientEntriesFromSuccessors => (),
+                // haven't evaluate before gradient descent
+                GradientDescentError::NoEvaluationOutputCaches => panic!(),
+            },
+        };
+    };
+    bfs_operands(root_note, f);
+}
+
+pub fn do_gradient_descent_steps_on_all_nodes(root_note: &Arc<Mutex<GeneralNode>>, step_size: f64) {
     let f = |n: &mut GeneralNode| {
         match n.do_gradient_descent_step(step_size) {
             Ok(_) => (),

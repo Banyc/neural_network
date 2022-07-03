@@ -3,7 +3,8 @@ use std::sync::{Arc, Mutex};
 use rand::Rng;
 
 use super::nodes::node::{
-    do_gradient_descent_step_on_all_nodes, reset_caches_on_all_nodes, GeneralNode,
+    do_gradient_descent_steps_and_reset_caches_on_all_nodes,
+    do_gradient_descent_steps_on_all_nodes, reset_caches_on_all_nodes, GeneralNode,
 };
 
 pub struct NeuralNetwork {
@@ -32,9 +33,14 @@ impl NeuralNetwork {
         this
     }
 
+    pub fn backpropagation_step_and_reset_caches(&self, inputs: &Vec<f64>) {
+        self.compute_error(inputs);
+        do_gradient_descent_steps_and_reset_caches_on_all_nodes(&self.error_node, self.step_size);
+    }
+
     pub fn backpropagation_step(&self, inputs: &Vec<f64>) {
         self.compute_error(inputs);
-        do_gradient_descent_step_on_all_nodes(&self.error_node, self.step_size);
+        do_gradient_descent_steps_on_all_nodes(&self.error_node, self.step_size);
     }
 
     pub fn evaluate_and_reset_caches(&self, inputs: &Vec<f64>) -> f64 {
@@ -63,7 +69,7 @@ impl NeuralNetwork {
         let mut rng = rand::thread_rng();
         for i in 0..max_steps {
             let dataset_index: usize = rng.gen_range(0..dataset.len());
-            self.backpropagation_step(&dataset[dataset_index]);
+            self.backpropagation_step_and_reset_caches(&dataset[dataset_index]);
             if i % (max_steps / 10) == 0 {
                 println!("{:.2}%", (100 * i) as f64 / max_steps as f64);
             }

@@ -245,6 +245,14 @@ impl GeneralNode {
     }
 }
 
+pub fn clone_node_batch(nodes: &Vec<Arc<Mutex<GeneralNode>>>) -> Vec<Arc<Mutex<GeneralNode>>> {
+    let mut cloned_nodes = Vec::new();
+    for node in nodes {
+        cloned_nodes.push(Arc::clone(node));
+    }
+    cloned_nodes
+}
+
 pub fn do_gradient_descent_step_on_all_nodes(root_note: &Arc<Mutex<GeneralNode>>, step_size: f64) {
     let f = |n: &mut GeneralNode| {
         match n.do_gradient_descent_step(step_size) {

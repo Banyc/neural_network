@@ -85,11 +85,14 @@ impl GeneralNode {
         output
     }
 
-    pub fn do_gradient_descent_step(&mut self, step_size: f64) -> Result<(), BackpropagationError> {
+    pub fn do_gradient_descent_step(&mut self, step_size: f64) -> Result<(), GradientDescentError> {
         if self.successor_len > self.cache.global_gradient_entries.len() {
             return Err(
-                BackpropagationError::NotReceivingEnoughGlobalGradientEntriesFromSuccessors,
+                GradientDescentError::NotReceivingEnoughGlobalGradientEntriesFromSuccessors,
             );
+        }
+        if self.cache.output.is_none() || self.cache.operand_outputs.is_none() {
+            return Err(GradientDescentError::NoEvaluationOutputCaches);
         }
         assert_eq!(self.successor_len, self.cache.global_gradient_entries.len());
         self.distribute_global_gradient_entries_to_operands();
@@ -111,6 +114,10 @@ impl GeneralNode {
     }
 
     fn distribute_global_gradient_entries_to_operands(&mut self) {
+        if self.cache.has_distributed_global_gradient_entries {
+            panic!();
+        }
+        self.cache.has_distributed_global_gradient_entries = true;
         for i in 0..self.operands.len() {
             let gradient_entry = self.global_gradient() * self.local_operand_gradient()[i];
             let mut operand = self.operands[i].lock().unwrap();
@@ -208,7 +215,14 @@ impl GeneralNode {
 
 pub fn do_gradient_descent_step_on_all_nodes(root_note: &Arc<Mutex<GeneralNode>>, step_size: f64) {
     let f = |n: &mut GeneralNode| {
-        let _ = n.do_gradient_descent_step(step_size);
+        match n.do_gradient_descent_step(step_size) {
+            Ok(_) => (),
+            Err(e) => match e {
+                GradientDescentError::NotReceivingEnoughGlobalGradientEntriesFromSuccessors => (),
+                // haven't evaluate before gradient descent
+                GradientDescentError::NoEvaluationOutputCaches => panic!(),
+            },
+        };
     };
     bfs_operands(root_note, f);
 }
@@ -226,6 +240,7 @@ fn bfs_operands(root_node: &Arc<Mutex<GeneralNode>>, f: impl Fn(&mut GeneralNode
     }
 }
 
-pub enum BackpropagationError {
+pub enum GradientDescentError {
     NotReceivingEnoughGlobalGradientEntriesFromSuccessors,
+    NoEvaluationOutputCaches,
 }

@@ -45,6 +45,9 @@ pub struct CachedNodeData {
     ///
     /// - $w$: the tunable parameters of $f$
     pub global_parameter_gradient: Option<Arc<Vec<f64>>>,
+
+    /// Prevent from distributing it more than once
+    pub has_distributed_global_gradient_entries: bool,
 }
 
 impl CachedNodeData {
@@ -57,6 +60,7 @@ impl CachedNodeData {
             local_operand_gradient: None,
             local_parameter_gradient: None,
             global_parameter_gradient: None,
+            has_distributed_global_gradient_entries: false,
         }
     }
 
@@ -68,5 +72,6 @@ impl CachedNodeData {
         self.local_operand_gradient = None;
         self.local_parameter_gradient = None;
         self.global_parameter_gradient = None;
+        self.has_distributed_global_gradient_entries = false;
     }
 }

@@ -256,6 +256,10 @@ impl GeneralNode {
     pub fn output(&self) -> Option<f64> {
         self.cache.output
     }
+
+    pub fn parameters(&self) -> &Vec<f64> {
+        &self.parameters
+    }
 }
 
 pub fn clone_node_batch(nodes: &Vec<Arc<Mutex<GeneralNode>>>) -> Vec<Arc<Mutex<GeneralNode>>> {

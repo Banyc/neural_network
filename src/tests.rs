@@ -264,3 +264,69 @@ fn learn_xor_sigmoid() {
     let ret = network.errors_on_dataset(&dataset);
     assert_eq!(ret, 0.0);
 }
+
+#[test]
+fn learn_xor_relu() {
+    let label_index = 2;
+    let input_nodes = input_node_batch(label_index);
+    let first_layer = {
+        let mut layer = Vec::new();
+        for _ in 0..10 {
+            let linear_node = linear_node(clone_node_batch(&input_nodes), None, None).unwrap();
+            layer.push(Arc::new(Mutex::new(linear_node)));
+        }
+        layer
+    };
+    let first_layer_relu = {
+        let mut layer = Vec::new();
+        for node in first_layer {
+            let relu_node = relu_node(node);
+            layer.push(Arc::new(Mutex::new(relu_node)));
+        }
+        layer
+    };
+    let second_layer = {
+        let mut layer = Vec::new();
+        for _ in 0..10 {
+            let linear_node = linear_node(clone_node_batch(&first_layer_relu), None, None).unwrap();
+            layer.push(Arc::new(Mutex::new(linear_node)));
+        }
+        layer
+    };
+    let second_layer_relu = {
+        let mut layer = Vec::new();
+        for node in second_layer {
+            let relu_node = relu_node(node);
+            layer.push(Arc::new(Mutex::new(relu_node)));
+        }
+        layer
+    };
+    let linear_output = linear_node(second_layer_relu, None, None).unwrap();
+    let output = sigmoid_node(Arc::new(Mutex::new(linear_output)));
+    let output = Arc::new(Mutex::new(output));
+    let label_node = input_node(label_index);
+    let error_node = l2_error_node(Arc::clone(&output), Arc::new(Mutex::new(label_node)));
+    let step_size = 0.05;
+    let network = NeuralNetwork::new(
+        output,
+        Arc::new(Mutex::new(error_node)),
+        label_index,
+        step_size,
+    );
+
+    let dataset = vec![
+        vec![0.0, 0.0, 0.0],
+        vec![0.0, 1.0, 1.0],
+        vec![1.0, 0.0, 1.0],
+        vec![1.0, 1.0, 0.0],
+    ];
+
+    let max_steps = 5_000;
+    network.train(&dataset, max_steps);
+    for inputs in &dataset {
+        let ret = network.evaluate_and_reset_caches(inputs);
+        assert!((ret - inputs[label_index]).abs() < 0.1);
+    }
+    let ret = network.errors_on_dataset(&dataset);
+    assert_eq!(ret, 0.0);
+}

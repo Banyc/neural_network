@@ -86,7 +86,8 @@ fn errors_on_dataset() {
 
 #[test]
 fn gradients() {
-    let input_nodes = input_node_batch(2);
+    let label_index = 2;
+    let input_nodes = input_node_batch(label_index);
     let initial_weights = vec![2.0, 1.0];
     let weight_node = weight_node(input_nodes, Some(initial_weights)).unwrap();
     let weight_node = Arc::new(Mutex::new(weight_node));
@@ -95,11 +96,16 @@ fn gradients() {
     let bias_node = Arc::new(Mutex::new(bias_node));
     let relu_node = relu_node(Arc::clone(&bias_node));
     let relu_node = Arc::new(Mutex::new(relu_node));
-    let label_node = input_node(2);
+    let label_node = input_node(label_index);
     let label_node = Arc::new(Mutex::new(label_node));
     let error_node = l2_error_node(Arc::clone(&relu_node), label_node);
     let error_node = Arc::new(Mutex::new(error_node));
-    let network = NeuralNetwork::new(Arc::clone(&relu_node), Arc::clone(&error_node), 2, 1e-2);
+    let network = NeuralNetwork::new(
+        Arc::clone(&relu_node),
+        Arc::clone(&error_node),
+        label_index,
+        1e-2,
+    );
 
     let inputs = vec![2.0, -2.0, 1.0];
 
@@ -178,7 +184,8 @@ fn gradients() {
 
 #[test]
 fn backpropagation_step() {
-    let input_nodes = input_node_batch(2);
+    let label_index = 2;
+    let input_nodes = input_node_batch(label_index);
     let initial_weights = vec![2.0, 1.0];
     let weight_node = weight_node(input_nodes, Some(initial_weights)).unwrap();
     let weight_node = Arc::new(Mutex::new(weight_node));
@@ -187,7 +194,7 @@ fn backpropagation_step() {
     let bias_node = Arc::new(Mutex::new(bias_node));
     let relu_node = relu_node(Arc::clone(&bias_node));
     let relu_node = Arc::new(Mutex::new(relu_node));
-    let label_node = input_node(2);
+    let label_node = input_node(label_index);
     let label_node = Arc::new(Mutex::new(label_node));
     let error_node = l2_error_node(Arc::clone(&relu_node), label_node);
     let error_node = Arc::new(Mutex::new(error_node));
@@ -195,7 +202,7 @@ fn backpropagation_step() {
     let network = NeuralNetwork::new(
         Arc::clone(&relu_node),
         Arc::clone(&error_node),
-        2,
+        label_index,
         step_size,
     );
 
@@ -215,7 +222,6 @@ fn backpropagation_step() {
 
 #[test]
 fn learn_xor_sigmoid() {
-    // let mut rng = rand::thread_rng();
     let label_index = 2;
     let input_nodes = input_node_batch(label_index);
     let linear_node_1 = linear_node(clone_node_batch(&input_nodes), None, None).unwrap();
@@ -232,9 +238,15 @@ fn learn_xor_sigmoid() {
     let linear_output = linear_node(sigmoid_nodes, None, None).unwrap();
     let output = sigmoid_node(Arc::new(Mutex::new(linear_output)));
     let output = Arc::new(Mutex::new(output));
-    let label_node = input_node(2);
+    let label_node = input_node(label_index);
     let error_node = l2_error_node(Arc::clone(&output), Arc::new(Mutex::new(label_node)));
-    let network = NeuralNetwork::new(output, Arc::new(Mutex::new(error_node)), label_index, 0.5);
+    let step_size = 0.5;
+    let network = NeuralNetwork::new(
+        output,
+        Arc::new(Mutex::new(error_node)),
+        label_index,
+        step_size,
+    );
 
     let dataset = vec![
         vec![0.0, 0.0, 0.0],

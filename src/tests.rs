@@ -221,6 +221,81 @@ fn backpropagation_step() {
 }
 
 #[test]
+fn backpropagation_step2() {
+    let label_index = 1;
+    let input_nodes = input_node_batch(label_index);
+    let initial_weights1 = vec![2.0];
+    let weight_node1 = weight_node(input_nodes, Some(initial_weights1)).unwrap();
+    let weight_node1 = Arc::new(Mutex::new(weight_node1));
+    let initial_weights2 = vec![3.0];
+    let weight_node2 =
+        weight_node(vec![Arc::clone(&weight_node1)], Some(initial_weights2)).unwrap();
+    let weight_node2 = Arc::new(Mutex::new(weight_node2));
+    let label_node = input_node(label_index);
+    let label_node = Arc::new(Mutex::new(label_node));
+    let error_node = l2_error_node(Arc::clone(&weight_node2), label_node);
+    let error_node = Arc::new(Mutex::new(error_node));
+    let step_size = 0.5;
+    let network = NeuralNetwork::new(
+        Arc::clone(&weight_node2),
+        Arc::clone(&error_node),
+        label_index,
+        step_size,
+    );
+
+    let inputs = vec![2.0, 1.0];
+    network.backpropagation_step(&inputs);
+
+    {
+        let mut error_node = error_node.lock().unwrap();
+        assert_eq!(error_node.global_gradient().unwrap(), 1.0);
+        assert_eq!(error_node.output().unwrap(), 121.0);
+        assert_eq!(
+            error_node.local_operand_gradient().unwrap().as_ref(),
+            &vec![22.0, -22.0]
+        );
+    }
+
+    {
+        let mut weight_node = weight_node2.lock().unwrap();
+        assert_eq!(weight_node.output().unwrap(), 12.0);
+        assert_eq!(weight_node.parameters(), &vec![-41.0]); // 3 - 0.5 * 88
+        assert_eq!(weight_node.global_gradient().unwrap(), 22.0);
+        assert_eq!(
+            weight_node.local_parameter_gradient().unwrap().as_ref(),
+            &vec![4.0]
+        );
+        assert_eq!(
+            weight_node.global_parameter_gradient().unwrap().as_ref(),
+            &vec![88.0]
+        );
+        assert_eq!(
+            weight_node.local_operand_gradient().unwrap().as_ref(),
+            &vec![3.0]
+        );
+    }
+
+    {
+        let mut weight_node = weight_node1.lock().unwrap();
+        assert_eq!(weight_node.output().unwrap(), 4.0);
+        assert_eq!(weight_node.parameters(), &vec![-64.0]); // 2 - 0.5 * 121
+        assert_eq!(weight_node.global_gradient().unwrap(), 66.0);
+        assert_eq!(
+            weight_node.local_parameter_gradient().unwrap().as_ref(),
+            &vec![2.0]
+        );
+        assert_eq!(
+            weight_node.global_parameter_gradient().unwrap().as_ref(),
+            &vec![132.0]
+        );
+        assert_eq!(
+            weight_node.local_operand_gradient().unwrap().as_ref(),
+            &vec![2.0]
+        );
+    }
+}
+
+#[test]
 fn learn_xor_sigmoid() {
     let label_index = 2;
     let input_nodes = input_node_batch(label_index);

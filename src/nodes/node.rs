@@ -80,7 +80,7 @@ impl GeneralNode {
             let ret = self
                 .computation
                 .compute_output(&self.parameters, &operand_outputs, inputs);
-            self.cache.operand_outputs = Some(Arc::new(operand_outputs));
+            self.cache.operand_outputs = Some(operand_outputs.into());
             ret
         });
         self.check_rep();
@@ -153,15 +153,16 @@ impl GeneralNode {
     /// $$
     ///
     /// - $z$: the non-tunable operands of $f$
-    pub fn local_operand_gradient(&mut self) -> Result<Arc<Vec<f64>>, LocalOperandGradientError> {
+    pub fn local_operand_gradient(&mut self) -> Result<Arc<[f64]>, LocalOperandGradientError> {
         let operand_outputs = self
             .operand_outputs()
             .ok_or(LocalOperandGradientError::NoEvaluationOutputCaches)?;
         if self.cache.local_operand_gradient.is_none() {
-            self.cache.local_operand_gradient = Some(Arc::new(
+            self.cache.local_operand_gradient = Some(
                 self.computation
-                    .compute_local_operand_gradient(&self.parameters, operand_outputs),
-            ));
+                    .compute_local_operand_gradient(&self.parameters, operand_outputs)
+                    .into(),
+            );
         }
         self.check_rep();
         Ok(Arc::clone(
@@ -196,17 +197,16 @@ impl GeneralNode {
     /// $$
     ///
     /// - $w$: the tunable parameters of $f$
-    pub fn local_parameter_gradient(
-        &mut self,
-    ) -> Result<Arc<Vec<f64>>, LocalParameterGradientError> {
+    pub fn local_parameter_gradient(&mut self) -> Result<Arc<[f64]>, LocalParameterGradientError> {
         let operand_outputs = self
             .operand_outputs()
             .ok_or(LocalParameterGradientError::NoEvaluationOutputCaches)?;
         if self.cache.local_parameter_gradient.is_none() {
-            self.cache.local_parameter_gradient = Some(Arc::new(
+            self.cache.local_parameter_gradient = Some(
                 self.computation
-                    .compute_local_parameter_gradient(&self.parameters, operand_outputs.as_ref()),
-            ));
+                    .compute_local_parameter_gradient(&self.parameters, operand_outputs.as_ref())
+                    .into(),
+            );
         }
         self.check_rep();
         Ok(Arc::clone(
@@ -221,7 +221,7 @@ impl GeneralNode {
     /// - $w$: the tunable parameters of $f$
     pub fn global_parameter_gradient(
         &mut self,
-    ) -> Result<Arc<Vec<f64>>, GlobalParameterGradientError> {
+    ) -> Result<Arc<[f64]>, GlobalParameterGradientError> {
         let local_parameter_gradient = self
             .local_parameter_gradient()
             .map_err(GlobalParameterGradientError::LocalParameterGradientError)?;
@@ -233,7 +233,7 @@ impl GeneralNode {
             for local_parameter_gradient_entry in local_parameter_gradient.iter() {
                 gradient_entries.push(global_gradient * *local_parameter_gradient_entry);
             }
-            Arc::new(gradient_entries)
+            gradient_entries.into()
         });
         self.check_rep();
         Ok(Arc::clone(
@@ -241,7 +241,7 @@ impl GeneralNode {
         ))
     }
 
-    pub fn operand_outputs(&self) -> Option<&Arc<Vec<f64>>> {
+    pub fn operand_outputs(&self) -> Option<&Arc<[f64]>> {
         self.cache.operand_outputs.as_ref()
     }
 

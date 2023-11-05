@@ -9,7 +9,7 @@ pub struct CachedNodeData {
     pub output: Option<f64>,
 
     /// the outputs of the operands
-    pub operand_outputs: Option<Arc<Vec<f64>>>,
+    pub operand_outputs: Option<Arc<[f64]>>,
 
     /// $$
     /// \frac{\partial E}{\partial f}
@@ -30,21 +30,21 @@ pub struct CachedNodeData {
     /// $$
     ///
     /// - $z$: the non-tunable operands of $f$
-    pub local_operand_gradient: Option<Arc<Vec<f64>>>,
+    pub local_operand_gradient: Option<Arc<[f64]>>,
 
     /// $$
     /// \frac{\partial f}{\partial w}
     /// $$
     ///
     /// - $w$: the tunable parameters of $f$
-    pub local_parameter_gradient: Option<Arc<Vec<f64>>>,
+    pub local_parameter_gradient: Option<Arc<[f64]>>,
 
     /// $$
     /// \frac{\partial E}{\partial w}
     /// $$
     ///
     /// - $w$: the tunable parameters of $f$
-    pub global_parameter_gradient: Option<Arc<Vec<f64>>>,
+    pub global_parameter_gradient: Option<Arc<[f64]>>,
 
     /// Prevent from distributing it more than once
     pub has_distributed_global_gradient_entries: bool,

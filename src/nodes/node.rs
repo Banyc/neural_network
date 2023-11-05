@@ -6,21 +6,16 @@ use std::{
 use super::utils::cached_node_data::CachedNodeData;
 
 pub trait NodeComputation {
-    fn compute_output(
-        &self,
-        parameters: &Vec<f64>,
-        operand_outputs: &Vec<f64>,
-        inputs: &Vec<f64>,
-    ) -> f64;
+    fn compute_output(&self, parameters: &[f64], operand_outputs: &[f64], inputs: &[f64]) -> f64;
     fn compute_local_operand_gradient(
         &self,
-        parameters: &Vec<f64>,
-        operand_outputs: &Vec<f64>,
+        parameters: &[f64],
+        operand_outputs: &[f64],
     ) -> Vec<f64>;
     fn compute_local_parameter_gradient(
         &self,
-        parameters: &Vec<f64>,
-        operand_outputs: &Vec<f64>,
+        parameters: &[f64],
+        operand_outputs: &[f64],
     ) -> Vec<f64>;
 }
 
@@ -29,7 +24,7 @@ pub struct GeneralNode {
     operands: Vec<Arc<Mutex<GeneralNode>>>,
     successor_len: usize,
     cache: CachedNodeData,
-    computation: Box<dyn NodeComputation>,
+    computation: Box<dyn NodeComputation + Sync + Send>,
 }
 
 impl GeneralNode {
@@ -55,7 +50,7 @@ impl GeneralNode {
 
     pub fn new(
         operands: Vec<Arc<Mutex<GeneralNode>>>,
-        computation: Box<dyn NodeComputation>,
+        computation: Box<dyn NodeComputation + Sync + Send>,
         parameters: Vec<f64>,
     ) -> GeneralNode {
         for operand in &operands {
@@ -74,13 +69,13 @@ impl GeneralNode {
     }
 
     /// The output is cached until reset
-    pub fn evaluate(&mut self, inputs: &Vec<f64>) -> f64 {
+    pub fn evaluate(&mut self, inputs: &[f64]) -> f64 {
         self.cache.output.get_or_insert_with(|| {
             assert!(self.cache.operand_outputs.is_none());
             let mut operand_outputs = Vec::new();
             for operand in self.operands.iter_mut() {
                 let mut operand = operand.lock().unwrap();
-                operand_outputs.push(operand.evaluate(&inputs));
+                operand_outputs.push(operand.evaluate(inputs));
             }
             let ret = self
                 .computation
@@ -229,10 +224,10 @@ impl GeneralNode {
     ) -> Result<Arc<Vec<f64>>, GlobalParameterGradientError> {
         let local_parameter_gradient = self
             .local_parameter_gradient()
-            .map_err(|e| GlobalParameterGradientError::LocalParameterGradientError(e))?;
+            .map_err(GlobalParameterGradientError::LocalParameterGradientError)?;
         let global_gradient = self
             .global_gradient()
-            .map_err(|e| GlobalParameterGradientError::GlobalGradientError(e))?;
+            .map_err(GlobalParameterGradientError::GlobalGradientError)?;
         self.cache.global_parameter_gradient.get_or_insert_with(|| {
             let mut gradient_entries = Vec::new();
             for local_parameter_gradient_entry in local_parameter_gradient.iter() {
@@ -247,10 +242,7 @@ impl GeneralNode {
     }
 
     pub fn operand_outputs(&self) -> Option<Arc<Vec<f64>>> {
-        match &self.cache.operand_outputs {
-            Some(x) => Some(Arc::clone(&x)),
-            None => None,
-        }
+        self.cache.operand_outputs.as_ref().map(Arc::clone)
     }
 
     pub fn output(&self) -> Option<f64> {
@@ -262,7 +254,7 @@ impl GeneralNode {
     }
 }
 
-pub fn clone_node_batch(nodes: &Vec<Arc<Mutex<GeneralNode>>>) -> Vec<Arc<Mutex<GeneralNode>>> {
+pub fn clone_node_batch(nodes: &[Arc<Mutex<GeneralNode>>]) -> Vec<Arc<Mutex<GeneralNode>>> {
     let mut cloned_nodes = Vec::new();
     for node in nodes {
         cloned_nodes.push(Arc::clone(node));
@@ -309,7 +301,7 @@ pub fn do_gradient_descent_steps_on_all_nodes(root_note: &Arc<Mutex<GeneralNode>
     bfs_operands(root_note, f);
 }
 
-fn bfs_operands(root_node: &Arc<Mutex<GeneralNode>>, f: impl Fn(&mut GeneralNode) -> ()) {
+fn bfs_operands(root_node: &Arc<Mutex<GeneralNode>>, f: impl Fn(&mut GeneralNode)) {
     let mut q = VecDeque::new();
     q.push_back(Arc::clone(root_node));
 

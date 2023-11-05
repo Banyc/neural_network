@@ -75,3 +75,9 @@ impl CachedNodeData {
         self.has_distributed_global_gradient_entries = false;
     }
 }
+
+impl Default for CachedNodeData {
+    fn default() -> Self {
+        Self::new()
+    }
+}

@@ -4,23 +4,14 @@ use super::node::{GeneralNode, NodeComputation};
 
 pub fn bias_node(operand: Arc<Mutex<GeneralNode>>, bias: Option<f64>) -> GeneralNode {
     let computation = BiasNodeComputation {};
-    let bias = match bias {
-        Some(x) => x,
-        None => 0.0,
-    };
-    let node = GeneralNode::new(vec![operand], Box::new(computation), vec![bias]);
-    node
+    let bias = bias.unwrap_or(0.0);
+    GeneralNode::new(vec![operand], Box::new(computation), vec![bias])
 }
 
 struct BiasNodeComputation {}
 
 impl NodeComputation for BiasNodeComputation {
-    fn compute_output(
-        &self,
-        parameters: &Vec<f64>,
-        operand_outputs: &Vec<f64>,
-        _inputs: &Vec<f64>,
-    ) -> f64 {
+    fn compute_output(&self, parameters: &[f64], operand_outputs: &[f64], _inputs: &[f64]) -> f64 {
         assert_eq!(operand_outputs.len(), 1);
         assert_eq!(parameters.len(), 1);
         bias(operand_outputs[0], parameters[0])
@@ -28,16 +19,16 @@ impl NodeComputation for BiasNodeComputation {
 
     fn compute_local_operand_gradient(
         &self,
-        _parameters: &Vec<f64>,
-        _operand_outputs: &Vec<f64>,
+        _parameters: &[f64],
+        _operand_outputs: &[f64],
     ) -> Vec<f64> {
         vec![bias_derivative()]
     }
 
     fn compute_local_parameter_gradient(
         &self,
-        _parameters: &Vec<f64>,
-        _operand_outputs: &Vec<f64>,
+        _parameters: &[f64],
+        _operand_outputs: &[f64],
     ) -> Vec<f64> {
         vec![1.0]
     }

@@ -4,27 +4,21 @@ use super::node::{GeneralNode, NodeComputation};
 
 pub fn sigmoid_node(operand: Arc<Mutex<GeneralNode>>) -> GeneralNode {
     let computation = SigmoidNodeComputation {};
-    let node = GeneralNode::new(vec![operand], Box::new(computation), Vec::new());
-    node
+    GeneralNode::new(vec![operand], Box::new(computation), Vec::new())
 }
 
 struct SigmoidNodeComputation {}
 
 impl NodeComputation for SigmoidNodeComputation {
-    fn compute_output(
-        &self,
-        _parameters: &Vec<f64>,
-        operand_outputs: &Vec<f64>,
-        _inputs: &Vec<f64>,
-    ) -> f64 {
+    fn compute_output(&self, _parameters: &[f64], operand_outputs: &[f64], _inputs: &[f64]) -> f64 {
         assert_eq!(operand_outputs.len(), 1);
         sigmoid(operand_outputs[0])
     }
 
     fn compute_local_operand_gradient(
         &self,
-        _parameters: &Vec<f64>,
-        operand_outputs: &Vec<f64>,
+        _parameters: &[f64],
+        operand_outputs: &[f64],
     ) -> Vec<f64> {
         assert_eq!(operand_outputs.len(), 1);
         vec![sigmoid_derivative(operand_outputs[0])]
@@ -32,8 +26,8 @@ impl NodeComputation for SigmoidNodeComputation {
 
     fn compute_local_parameter_gradient(
         &self,
-        _parameters: &Vec<f64>,
-        _operand_outputs: &Vec<f64>,
+        _parameters: &[f64],
+        _operand_outputs: &[f64],
     ) -> Vec<f64> {
         Vec::new()
     }

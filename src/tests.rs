@@ -20,8 +20,7 @@ fn single_linear_relu(
     initial_bias: Option<f64>,
 ) -> GeneralNode {
     let linear_node = linear_node(input_nodes, initial_weights, initial_bias).unwrap();
-    let relu_node = relu_node(Arc::new(Mutex::new(linear_node)));
-    relu_node
+    relu_node(Arc::new(Mutex::new(linear_node)))
 }
 
 fn single_linear_relu_network(
@@ -34,19 +33,18 @@ fn single_linear_relu_network(
     let relu_node = Arc::new(Mutex::new(relu_node));
     let label_node = input_node(node_count);
     let error_node = l2_error_node(Arc::clone(&relu_node), Arc::new(Mutex::new(label_node)));
-    let neural_network = NeuralNetwork::new(
+    NeuralNetwork::new(
         relu_node,
         Arc::new(Mutex::new(error_node)),
         node_count,
         1e-2,
-    );
-    neural_network
+    )
 }
 
 #[test]
 fn evaluate() {
     let network = single_linear_relu_network(3, Some(vec![3.0, 2.0, 1.0]), Some(-20.0));
-    let ret = network.evaluate_and_reset_caches(&vec![1.0, 2.0, 3.0]);
+    let ret = network.evaluate_and_reset_caches(&[1.0, 2.0, 3.0]);
     assert_eq!(ret, 0.0);
 }
 
@@ -69,9 +67,9 @@ fn error() {
 #[test]
 fn cache_reset() {
     let network = single_linear_relu_network(2, Some(vec![2.0, 1.0]), Some(3.0));
-    let ret = network.evaluate_and_reset_caches(&vec![2.0, -2.0]);
+    let ret = network.evaluate_and_reset_caches(&[2.0, -2.0]);
     assert_eq!(ret, 5.0);
-    let ret = network.evaluate_and_reset_caches(&vec![6.0, -2.0]);
+    let ret = network.evaluate_and_reset_caches(&[6.0, -2.0]);
     assert!(ret != 5.0);
 }
 

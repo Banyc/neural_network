@@ -157,12 +157,12 @@ impl GeneralNode {
         let operand_outputs = self
             .operand_outputs()
             .ok_or(LocalOperandGradientError::NoEvaluationOutputCaches)?;
-        self.cache.local_operand_gradient.get_or_insert_with(|| {
-            Arc::new(
+        if self.cache.local_operand_gradient.is_none() {
+            self.cache.local_operand_gradient = Some(Arc::new(
                 self.computation
-                    .compute_local_operand_gradient(&self.parameters, operand_outputs.as_ref()),
-            )
-        });
+                    .compute_local_operand_gradient(&self.parameters, operand_outputs),
+            ));
+        }
         self.check_rep();
         Ok(Arc::clone(
             self.cache.local_operand_gradient.as_ref().unwrap(),
@@ -202,12 +202,12 @@ impl GeneralNode {
         let operand_outputs = self
             .operand_outputs()
             .ok_or(LocalParameterGradientError::NoEvaluationOutputCaches)?;
-        self.cache.local_parameter_gradient.get_or_insert_with(|| {
-            Arc::new(
+        if self.cache.local_parameter_gradient.is_none() {
+            self.cache.local_parameter_gradient = Some(Arc::new(
                 self.computation
                     .compute_local_parameter_gradient(&self.parameters, operand_outputs.as_ref()),
-            )
-        });
+            ));
+        }
         self.check_rep();
         Ok(Arc::clone(
             self.cache.local_parameter_gradient.as_ref().unwrap(),
@@ -241,8 +241,8 @@ impl GeneralNode {
         ))
     }
 
-    pub fn operand_outputs(&self) -> Option<Arc<Vec<f64>>> {
-        self.cache.operand_outputs.as_ref().map(Arc::clone)
+    pub fn operand_outputs(&self) -> Option<&Arc<Vec<f64>>> {
+        self.cache.operand_outputs.as_ref()
     }
 
     pub fn output(&self) -> Option<f64> {

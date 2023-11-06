@@ -121,7 +121,10 @@ fn gradients() {
 
     {
         let mut error_node = error_node.borrow_mut();
-        assert_eq!(error_node.gradient_of_root_at_this().unwrap(), 1.0);
+        assert_eq!(
+            error_node.partial_derivative_of_root_at_this().unwrap(),
+            1.0
+        );
         assert_eq!(
             error_node.gradient_of_this_at_operand().unwrap().as_ref(),
             &[8.0, -8.0]
@@ -130,7 +133,7 @@ fn gradients() {
 
     {
         let mut relu_node = relu_node.borrow_mut();
-        assert_eq!(relu_node.gradient_of_root_at_this().unwrap(), 8.0);
+        assert_eq!(relu_node.partial_derivative_of_root_at_this().unwrap(), 8.0);
         assert_eq!(
             relu_node.gradient_of_this_at_operand().unwrap().as_ref(),
             &[1.0]
@@ -147,7 +150,7 @@ fn gradients() {
 
     {
         let mut bias_node = bias_node.borrow_mut();
-        assert_eq!(bias_node.gradient_of_root_at_this().unwrap(), 8.0);
+        assert_eq!(bias_node.partial_derivative_of_root_at_this().unwrap(), 8.0);
         assert_eq!(
             bias_node.gradient_of_this_at_operand().unwrap().as_ref(),
             &[1.0]
@@ -164,7 +167,10 @@ fn gradients() {
 
     {
         let mut weight_node = weight_node.borrow_mut();
-        assert_eq!(weight_node.gradient_of_root_at_this().unwrap(), 8.0);
+        assert_eq!(
+            weight_node.partial_derivative_of_root_at_this().unwrap(),
+            8.0
+        );
         assert_eq!(
             weight_node.gradient_of_this_at_operand().unwrap().as_ref(),
             &[2.0, 1.0]
@@ -251,7 +257,10 @@ fn backpropagation_step2() {
 
     {
         let mut error_node = error_node.borrow_mut();
-        assert_eq!(error_node.gradient_of_root_at_this().unwrap(), 1.0);
+        assert_eq!(
+            error_node.partial_derivative_of_root_at_this().unwrap(),
+            1.0
+        );
         assert_eq!(error_node.output().unwrap(), 121.0);
         assert_eq!(
             error_node.gradient_of_this_at_operand().unwrap().as_ref(),
@@ -263,7 +272,10 @@ fn backpropagation_step2() {
         let mut weight_node = weight_node2.borrow_mut();
         assert_eq!(weight_node.output().unwrap(), 12.0);
         assert_eq!(weight_node.parameters(), &[-41.0]); // 3 - 0.5 * 88
-        assert_eq!(weight_node.gradient_of_root_at_this().unwrap(), 22.0);
+        assert_eq!(
+            weight_node.partial_derivative_of_root_at_this().unwrap(),
+            22.0
+        );
         assert_eq!(
             weight_node
                 .gradient_of_this_at_parameter()
@@ -288,7 +300,10 @@ fn backpropagation_step2() {
         let mut weight_node = weight_node1.borrow_mut();
         assert_eq!(weight_node.output().unwrap(), 4.0);
         assert_eq!(weight_node.parameters(), &[-64.0]); // 2 - 0.5 * 121
-        assert_eq!(weight_node.gradient_of_root_at_this().unwrap(), 66.0);
+        assert_eq!(
+            weight_node.partial_derivative_of_root_at_this().unwrap(),
+            66.0
+        );
         assert_eq!(
             weight_node
                 .gradient_of_this_at_parameter()

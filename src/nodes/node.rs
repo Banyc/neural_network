@@ -59,20 +59,20 @@ impl GeneralNode {
         if let Some(gradient) = &self.cache.gradient_of_root_at_parameter {
             assert_eq!(gradient.len(), self.parameters.len());
         }
-        if let Some(gradient) = &self.cache.gradient_of_function_at_parameter {
+        if let Some(gradient) = &self.cache.gradient_of_this_at_parameter {
             assert_eq!(gradient.len(), self.parameters.len());
         }
-        if let Some(gradient) = &self.cache.gradient_of_function_at_operand {
+        if let Some(gradient) = &self.cache.gradient_of_this_at_operand {
             assert_eq!(gradient.len(), self.operands.len());
         }
         assert_eq!(
             self.cache.output.is_none(),
             self.cache.operand_outputs.is_none()
         );
-        assert!(self.cache.addends_of_gradient_of_root_at_function.len() <= self.successor_len);
-        if self.cache.gradient_of_root_at_function.is_some() {
+        assert!(self.cache.addends_of_gradient_of_root_at_this.len() <= self.successor_len);
+        if self.cache.partial_derivative_of_root_at_this.is_some() {
             assert_eq!(
-                self.cache.addends_of_gradient_of_root_at_function.len(),
+                self.cache.addends_of_gradient_of_root_at_this.len(),
                 self.successor_len
             );
         }
@@ -132,7 +132,7 @@ impl GeneralNode {
     }
 
     pub fn do_gradient_descent_step(&mut self, step_size: f64) -> Result<(), GradientDescentError> {
-        if self.successor_len > self.cache.addends_of_gradient_of_root_at_function.len() {
+        if self.successor_len > self.cache.addends_of_gradient_of_root_at_this.len() {
             return Err(GradientDescentError::NotReceivingEnoughAddendsOfGradientFromSuccessors);
         }
         if self.cache.output.is_none() || self.cache.operand_outputs.is_none() {
@@ -140,9 +140,9 @@ impl GeneralNode {
         }
         assert_eq!(
             self.successor_len,
-            self.cache.addends_of_gradient_of_root_at_function.len()
+            self.cache.addends_of_gradient_of_root_at_this.len()
         );
-        self.distribute_global_gradient_addends_to_operands();
+        self.distribute_addends_of_partial_derivatives_of_root_at_operands_to_operands();
         self.adjust_parameters(step_size);
         self.check_rep();
         Ok(())
@@ -164,35 +164,34 @@ impl GeneralNode {
         self.check_rep();
     }
 
-    fn distribute_global_gradient_addends_to_operands(&mut self) {
+    fn distribute_addends_of_partial_derivatives_of_root_at_operands_to_operands(&mut self) {
         let gradient_of_this_at_operand = Rc::clone(self.gradient_of_this_at_operand().unwrap());
-        let gradient_of_root_at_this = self.gradient_of_root_at_this().unwrap();
+        let partial_derivative_of_root_at_this = self.partial_derivative_of_root_at_this().unwrap();
         if self
             .cache
-            .has_distributed_addend_of_gradient_of_root_at_predecessor
+            .has_distributed_addends_of_partial_derivatives_of_root_at_operands_to_operands
         {
             panic!();
         }
         self.cache
-            .has_distributed_addend_of_gradient_of_root_at_predecessor = true;
+            .has_distributed_addends_of_partial_derivatives_of_root_at_operands_to_operands = true;
         (0..self.operands.len()).for_each(|i| {
             // $$
             // \frac{\partial E}{\partial f} \cdot \frac{\partial f}{\partial z}
             // $$
-            let addend_of_gradient_of_root_at_predecessor =
-                gradient_of_root_at_this * gradient_of_this_at_operand[i];
+            let addend_of_partial_derivative_of_root_at_operand =
+                partial_derivative_of_root_at_this * gradient_of_this_at_operand[i];
             let mut operand = self.operands[i].borrow_mut();
-            operand
-                .add_addend_of_gradient_of_root_at_this(addend_of_gradient_of_root_at_predecessor);
+            operand.add_addend_of_partial_derivative_of_root_at_this(
+                addend_of_partial_derivative_of_root_at_operand,
+            );
         });
         self.check_rep();
     }
 
-    fn add_addend_of_gradient_of_root_at_this(&mut self, gradient_addend: f64) {
-        assert!(self.cache.gradient_of_root_at_function.is_none());
-        self.cache
-            .addends_of_gradient_of_root_at_function
-            .push(gradient_addend);
+    fn add_addend_of_partial_derivative_of_root_at_this(&mut self, addend: f64) {
+        assert!(self.cache.partial_derivative_of_root_at_this.is_none());
+        self.cache.addends_of_gradient_of_root_at_this.push(addend);
         self.check_rep();
     }
 
@@ -207,15 +206,15 @@ impl GeneralNode {
         let operand_outputs = self
             .operand_outputs()
             .ok_or(GradientOfThisAtOperandError::NoEvaluationOutputCaches)?;
-        if self.cache.gradient_of_function_at_operand.is_none() {
-            self.cache.gradient_of_function_at_operand = Some(
+        if self.cache.gradient_of_this_at_operand.is_none() {
+            self.cache.gradient_of_this_at_operand = Some(
                 self.computation
                     .compute_gradient_of_this_at_operand(&self.parameters, operand_outputs)
                     .into(),
             );
         }
         self.check_rep();
-        Ok(self.cache.gradient_of_function_at_operand.as_ref().unwrap())
+        Ok(self.cache.gradient_of_this_at_operand.as_ref().unwrap())
     }
 
     /// $$
@@ -223,32 +222,29 @@ impl GeneralNode {
     /// $$
     ///
     /// - $E$: the out-most function of the entire network
-    pub fn gradient_of_root_at_this(&mut self) -> Result<f64, GradientOfRootAtThisError> {
-        if self.successor_len != self.cache.addends_of_gradient_of_root_at_function.len() {
+    pub fn partial_derivative_of_root_at_this(&mut self) -> Result<f64, GradientOfRootAtThisError> {
+        if self.successor_len != self.cache.addends_of_gradient_of_root_at_this.len() {
             return Err(
                 GradientOfRootAtThisError::NotReceivingEnoughAddendsOfGradientFromSuccessors,
             );
         }
-        let gradient_of_root_at_function = *self
+        let partial_derivative_of_root_at_this = *self
             .cache
-            .gradient_of_root_at_function
+            .partial_derivative_of_root_at_this
             .get_or_insert_with(|| {
                 assert_eq!(
                     self.successor_len,
-                    self.cache.addends_of_gradient_of_root_at_function.len()
+                    self.cache.addends_of_gradient_of_root_at_this.len()
                 );
                 if self.successor_len == 0 {
                     // this is the root node
                     1.0
                 } else {
-                    self.cache
-                        .addends_of_gradient_of_root_at_function
-                        .iter()
-                        .sum()
+                    self.cache.addends_of_gradient_of_root_at_this.iter().sum()
                 }
             });
         self.check_rep();
-        Ok(gradient_of_root_at_function)
+        Ok(partial_derivative_of_root_at_this)
     }
 
     /// $$
@@ -262,8 +258,8 @@ impl GeneralNode {
         let operand_outputs = self
             .operand_outputs()
             .ok_or(GradientOfThisAtParameterError::NoEvaluationOutputCaches)?;
-        if self.cache.gradient_of_function_at_parameter.is_none() {
-            self.cache.gradient_of_function_at_parameter = Some(
+        if self.cache.gradient_of_this_at_parameter.is_none() {
+            self.cache.gradient_of_this_at_parameter = Some(
                 self.computation
                     .compute_gradient_of_this_at_parameter(
                         &self.parameters,
@@ -273,11 +269,7 @@ impl GeneralNode {
             );
         }
         self.check_rep();
-        Ok(self
-            .cache
-            .gradient_of_function_at_parameter
-            .as_ref()
-            .unwrap())
+        Ok(self.cache.gradient_of_this_at_parameter.as_ref().unwrap())
     }
 
     /// $$
@@ -292,8 +284,8 @@ impl GeneralNode {
             self.gradient_of_this_at_parameter()
                 .map_err(GradientOfRootAtParameterError::GradientOfThisAtParameter)?,
         );
-        let gradient_of_root_at_this = self
-            .gradient_of_root_at_this()
+        let partial_derivative_of_root_at_this = self
+            .partial_derivative_of_root_at_this()
             .map_err(GradientOfRootAtParameterError::GradientOfRootAtThis)?;
         self.cache
             .gradient_of_root_at_parameter
@@ -301,7 +293,8 @@ impl GeneralNode {
                 gradient_of_this_at_parameter
                     .iter()
                     .map(|partial_derivative_of_this_at_parameter_i| {
-                        gradient_of_root_at_this * *partial_derivative_of_this_at_parameter_i
+                        partial_derivative_of_root_at_this
+                            * *partial_derivative_of_this_at_parameter_i
                     })
                     .collect()
             });

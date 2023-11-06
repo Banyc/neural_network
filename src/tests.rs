@@ -124,7 +124,7 @@ fn gradients() {
         assert_eq!(error_node.gradient_of_root_at_this().unwrap(), 1.0);
         assert_eq!(
             error_node.gradient_of_this_at_operand().unwrap().as_ref(),
-            &vec![8.0, -8.0]
+            &[8.0, -8.0]
         );
     }
 
@@ -133,15 +133,15 @@ fn gradients() {
         assert_eq!(relu_node.gradient_of_root_at_this().unwrap(), 8.0);
         assert_eq!(
             relu_node.gradient_of_this_at_operand().unwrap().as_ref(),
-            &vec![1.0]
+            &[1.0]
         );
         assert_eq!(
             relu_node.gradient_of_this_at_parameter().unwrap().as_ref(),
-            &vec![]
+            &[]
         );
         assert_eq!(
             relu_node.gradient_of_root_at_parameter().unwrap().as_ref(),
-            &vec![]
+            &[]
         );
     }
 
@@ -150,15 +150,15 @@ fn gradients() {
         assert_eq!(bias_node.gradient_of_root_at_this().unwrap(), 8.0);
         assert_eq!(
             bias_node.gradient_of_this_at_operand().unwrap().as_ref(),
-            &vec![1.0]
+            &[1.0]
         );
         assert_eq!(
             bias_node.gradient_of_this_at_parameter().unwrap().as_ref(),
-            &vec![1.0]
+            &[1.0]
         );
         assert_eq!(
             bias_node.gradient_of_root_at_parameter().unwrap().as_ref(),
-            &vec![8.0]
+            &[8.0]
         );
     }
 
@@ -167,21 +167,21 @@ fn gradients() {
         assert_eq!(weight_node.gradient_of_root_at_this().unwrap(), 8.0);
         assert_eq!(
             weight_node.gradient_of_this_at_operand().unwrap().as_ref(),
-            &vec![2.0, 1.0]
+            &[2.0, 1.0]
         );
         assert_eq!(
             weight_node
                 .gradient_of_this_at_parameter()
                 .unwrap()
                 .as_ref(),
-            &vec![2.0, -2.0]
+            &[2.0, -2.0]
         );
         assert_eq!(
             weight_node
                 .gradient_of_root_at_parameter()
                 .unwrap()
                 .as_ref(),
-            &vec![16.0, -16.0]
+            &[16.0, -16.0]
         )
     }
 }
@@ -215,12 +215,12 @@ fn backpropagation_step() {
 
     {
         let weight_node = weight_node.borrow_mut();
-        assert_eq!(weight_node.parameters(), &vec![-6.0, 9.0])
+        assert_eq!(weight_node.parameters(), &[-6.0, 9.0])
     }
 
     {
         let bias_node = bias_node.borrow_mut();
-        assert_eq!(bias_node.parameters(), &vec![-1.0])
+        assert_eq!(bias_node.parameters(), &[-1.0])
     }
 }
 
@@ -255,57 +255,57 @@ fn backpropagation_step2() {
         assert_eq!(error_node.output().unwrap(), 121.0);
         assert_eq!(
             error_node.gradient_of_this_at_operand().unwrap().as_ref(),
-            &vec![22.0, -22.0]
+            &[22.0, -22.0]
         );
     }
 
     {
         let mut weight_node = weight_node2.borrow_mut();
         assert_eq!(weight_node.output().unwrap(), 12.0);
-        assert_eq!(weight_node.parameters(), &vec![-41.0]); // 3 - 0.5 * 88
+        assert_eq!(weight_node.parameters(), &[-41.0]); // 3 - 0.5 * 88
         assert_eq!(weight_node.gradient_of_root_at_this().unwrap(), 22.0);
         assert_eq!(
             weight_node
                 .gradient_of_this_at_parameter()
                 .unwrap()
                 .as_ref(),
-            &vec![4.0]
+            &[4.0]
         );
         assert_eq!(
             weight_node
                 .gradient_of_root_at_parameter()
                 .unwrap()
                 .as_ref(),
-            &vec![88.0]
+            &[88.0]
         );
         assert_eq!(
             weight_node.gradient_of_this_at_operand().unwrap().as_ref(),
-            &vec![3.0]
+            &[3.0]
         );
     }
 
     {
         let mut weight_node = weight_node1.borrow_mut();
         assert_eq!(weight_node.output().unwrap(), 4.0);
-        assert_eq!(weight_node.parameters(), &vec![-64.0]); // 2 - 0.5 * 121
+        assert_eq!(weight_node.parameters(), &[-64.0]); // 2 - 0.5 * 121
         assert_eq!(weight_node.gradient_of_root_at_this().unwrap(), 66.0);
         assert_eq!(
             weight_node
                 .gradient_of_this_at_parameter()
                 .unwrap()
                 .as_ref(),
-            &vec![2.0]
+            &[2.0]
         );
         assert_eq!(
             weight_node
                 .gradient_of_root_at_parameter()
                 .unwrap()
                 .as_ref(),
-            &vec![132.0]
+            &[132.0]
         );
         assert_eq!(
             weight_node.gradient_of_this_at_operand().unwrap().as_ref(),
-            &vec![2.0]
+            &[2.0]
         );
     }
 }

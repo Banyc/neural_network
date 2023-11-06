@@ -99,7 +99,7 @@ mod tests {
         let mut weight_node = weight_node(input_nodes, Some(initial_weights)).unwrap();
         weight_node.evaluate(&inputs);
         let ret = weight_node.gradient_of_this_at_operand().unwrap();
-        assert_eq!(ret.as_ref(), &vec![3.0, 2.0, 1.0]);
+        assert_eq!(ret.as_ref(), &[3.0, 2.0, 1.0]);
     }
 
     #[test]
@@ -110,6 +110,6 @@ mod tests {
         let mut weight_node = weight_node(input_nodes, Some(initial_weights)).unwrap();
         weight_node.evaluate(&inputs);
         let ret = weight_node.gradient_of_this_at_parameter().unwrap();
-        assert_eq!(ret.as_ref(), &vec![1.0, 2.0, 3.0]);
+        assert_eq!(ret.as_ref(), &[1.0, 2.0, 3.0]);
     }
 }

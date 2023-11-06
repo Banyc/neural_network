@@ -154,10 +154,13 @@ impl GeneralNode {
     }
 
     fn adjust_parameters(&mut self, step_size: f64) {
-        let gradient = Rc::clone(self.gradient_of_root_at_parameter().unwrap());
-        gradient.iter().enumerate().for_each(|(i, gradient_entry)| {
-            self.parameters[i] -= step_size * *gradient_entry;
-        });
+        let gradient_of_root_at_parameter =
+            Rc::clone(self.gradient_of_root_at_parameter().unwrap());
+        gradient_of_root_at_parameter.iter().enumerate().for_each(
+            |(i, partial_derivative_of_root_at_parameter_i)| {
+                self.parameters[i] -= step_size * *partial_derivative_of_root_at_parameter_i;
+            },
+        );
         self.check_rep();
     }
 
@@ -340,7 +343,7 @@ pub fn do_gradient_descent_steps_and_reset_caches_on_all_nodes(
             Ok(_) => (),
             Err(e) => match e {
                 GradientDescentError::NotReceivingEnoughAddendsOfGradientFromSuccessors => (),
-                // haven't evaluate before gradient descent
+                // haven't evaluated before gradient descent
                 GradientDescentError::NoEvaluationOutputCaches => panic!(),
             },
         };
@@ -357,7 +360,7 @@ pub fn do_gradient_descent_steps_on_all_nodes(
             Ok(_) => (),
             Err(e) => match e {
                 GradientDescentError::NotReceivingEnoughAddendsOfGradientFromSuccessors => (),
-                // haven't evaluate before gradient descent
+                // haven't evaluated before gradient descent
                 GradientDescentError::NoEvaluationOutputCaches => panic!(),
             },
         };

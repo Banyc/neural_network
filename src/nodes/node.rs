@@ -12,6 +12,10 @@ use thiserror::Error;
 
 use super::utils::cached_node_data::CachedNodeData;
 
+/// The function of this node should be
+/// $$
+/// f : \mathbb{R}^n \to \mathbb{R}
+/// $$
 pub trait NodeComputation {
     fn compute_output(&self, parameters: &[f64], operand_outputs: &[f64], inputs: &[f64]) -> f64;
 
@@ -38,6 +42,10 @@ pub trait NodeComputation {
     ) -> Vec<f64>;
 }
 
+/// The function of this node should be
+/// $$
+/// f : \mathbb{R}^n \to \mathbb{R}
+/// $$
 pub struct GeneralNode {
     parameters: Vec<f64>,
     operands: Vec<Rc<RefCell<GeneralNode>>>,
@@ -92,7 +100,7 @@ impl GeneralNode {
 
     /// The output is cached until reset
     pub fn evaluate(&mut self, inputs: &[f64]) -> f64 {
-        self.cache.output.get_or_insert_with(|| {
+        let output = *self.cache.output.get_or_insert_with(|| {
             assert!(self.cache.operand_outputs.is_none());
             let operand_outputs: Rc<_> = self
                 .operands
@@ -110,7 +118,7 @@ impl GeneralNode {
         });
         self.check_rep();
         assert!(self.cache.operand_outputs.is_some());
-        self.cache.output.unwrap()
+        output
     }
 
     pub fn do_gradient_descent_step_and_reset_cache(
@@ -218,7 +226,8 @@ impl GeneralNode {
                 GradientOfRootAtThisError::NotReceivingEnoughAddendsOfGradientFromSuccessors,
             );
         }
-        self.cache
+        let gradient_of_root_at_function = *self
+            .cache
             .gradient_of_root_at_function
             .get_or_insert_with(|| {
                 assert_eq!(
@@ -236,7 +245,7 @@ impl GeneralNode {
                 }
             });
         self.check_rep();
-        Ok(self.cache.gradient_of_root_at_function.unwrap())
+        Ok(gradient_of_root_at_function)
     }
 
     /// $$

@@ -17,7 +17,7 @@ impl NodeComputation for BiasNodeComputation {
         bias(operand_outputs[0], parameters[0])
     }
 
-    fn compute_gradient_of_function_at_operand(
+    fn compute_gradient_of_this_at_operand(
         &self,
         _parameters: &[f64],
         _operand_outputs: &[f64],
@@ -25,7 +25,7 @@ impl NodeComputation for BiasNodeComputation {
         vec![bias_derivative()]
     }
 
-    fn compute_gradient_of_function_at_parameter(
+    fn compute_gradient_of_this_at_parameter(
         &self,
         _parameters: &[f64],
         _operand_outputs: &[f64],

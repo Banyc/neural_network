@@ -23,7 +23,7 @@ pub trait NodeComputation {
     /// $$
     ///
     /// - $z$: the non-tunable operands of $f$
-    fn compute_gradient_of_function_at_operand(
+    fn compute_gradient_of_this_at_operand(
         &self,
         parameters: &[f64],
         operand_outputs: &[f64],
@@ -34,7 +34,7 @@ pub trait NodeComputation {
     /// $$
     ///
     /// - $w$: the tunable parameters of $f$
-    fn compute_gradient_of_function_at_parameter(
+    fn compute_gradient_of_this_at_parameter(
         &self,
         parameters: &[f64],
         operand_outputs: &[f64],
@@ -199,7 +199,7 @@ impl GeneralNode {
         if self.cache.gradient_of_function_at_operand.is_none() {
             self.cache.gradient_of_function_at_operand = Some(
                 self.computation
-                    .compute_gradient_of_function_at_operand(&self.parameters, operand_outputs)
+                    .compute_gradient_of_this_at_operand(&self.parameters, operand_outputs)
                     .into(),
             );
         }
@@ -253,7 +253,7 @@ impl GeneralNode {
         if self.cache.gradient_of_function_at_parameter.is_none() {
             self.cache.gradient_of_function_at_parameter = Some(
                 self.computation
-                    .compute_gradient_of_function_at_parameter(
+                    .compute_gradient_of_this_at_parameter(
                         &self.parameters,
                         operand_outputs.as_ref(),
                     )

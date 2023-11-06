@@ -3,6 +3,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use thiserror::Error;
+
 use super::utils::cached_node_data::CachedNodeData;
 
 pub trait NodeComputation {
@@ -224,10 +226,10 @@ impl GeneralNode {
     ) -> Result<Arc<[f64]>, GlobalParameterGradientError> {
         let local_parameter_gradient = self
             .local_parameter_gradient()
-            .map_err(GlobalParameterGradientError::LocalParameterGradientError)?;
+            .map_err(GlobalParameterGradientError::LocalParameterGradient)?;
         let global_gradient = self
             .global_gradient()
-            .map_err(GlobalParameterGradientError::GlobalGradientError)?;
+            .map_err(GlobalParameterGradientError::GlobalGradient)?;
         self.cache.global_parameter_gradient.get_or_insert_with(|| {
             let mut gradient_entries = Vec::new();
             for local_parameter_gradient_entry in local_parameter_gradient.iter() {
@@ -314,28 +316,36 @@ fn bfs_operands(root_node: &Arc<Mutex<GeneralNode>>, f: impl Fn(&mut GeneralNode
     }
 }
 
+#[derive(Debug, Error)]
 pub enum GradientDescentError {
+    #[error("Not receiving enough global gradient entries from successors")]
     NotReceivingEnoughGlobalGradientEntriesFromSuccessors,
+    #[error("No evaluation output caches")]
     NoEvaluationOutputCaches,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum GlobalGradientError {
+    #[error("Not receiving enough global gradient entries from successors")]
     NotReceivingEnoughGlobalGradientEntriesFromSuccessors,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum GlobalParameterGradientError {
-    GlobalGradientError(GlobalGradientError),
-    LocalParameterGradientError(LocalParameterGradientError),
+    #[error("Global gradient error: {0}")]
+    GlobalGradient(GlobalGradientError),
+    #[error("Local parameter gradient error: {0}")]
+    LocalParameterGradient(LocalParameterGradientError),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum LocalParameterGradientError {
+    #[error("No evaluation output caches")]
     NoEvaluationOutputCaches,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum LocalOperandGradientError {
+    #[error("No evaluation output caches")]
     NoEvaluationOutputCaches,
 }

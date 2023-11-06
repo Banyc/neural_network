@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use rand::Rng;
+use thiserror::Error;
 
 use super::node::{GeneralNode, NodeComputation};
 
@@ -74,8 +75,9 @@ fn derivative_of_w(x: &[f64]) -> Vec<f64> {
     x.to_vec()
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum WeightNodeError {
+    #[error("Parameter size not matched")]
     ParameterSizeNotMatched,
 }
 

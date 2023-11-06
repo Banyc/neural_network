@@ -15,7 +15,7 @@ impl NodeComputation for SigmoidNodeComputation {
         sigmoid(operand_outputs[0])
     }
 
-    fn compute_local_operand_gradient(
+    fn compute_gradient_of_function_at_operand(
         &self,
         _parameters: &[f64],
         operand_outputs: &[f64],
@@ -24,7 +24,7 @@ impl NodeComputation for SigmoidNodeComputation {
         vec![sigmoid_derivative(operand_outputs[0])]
     }
 
-    fn compute_local_parameter_gradient(
+    fn compute_gradient_of_function_at_parameter(
         &self,
         _parameters: &[f64],
         _operand_outputs: &[f64],

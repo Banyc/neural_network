@@ -1,3 +1,11 @@
+//! # Terminologies
+//!
+//! - $f$: the function represented by the node
+//! - $z$: the functions represented by the operands (predecessors) of the node
+//!   - outputs of those functions become the input of the node
+//! - $w$: the tunable parameters of $f$
+//! - $E$: the outmost function represented by the root node of the computation graph
+
 use std::{
     collections::VecDeque,
     sync::{Arc, Mutex},
@@ -9,12 +17,24 @@ use super::utils::cached_node_data::CachedNodeData;
 
 pub trait NodeComputation {
     fn compute_output(&self, parameters: &[f64], operand_outputs: &[f64], inputs: &[f64]) -> f64;
-    fn compute_local_operand_gradient(
+
+    /// $$
+    /// \frac{\partial f}{\partial z}
+    /// $$
+    ///
+    /// - $z$: the non-tunable operands of $f$
+    fn compute_gradient_of_function_at_operand(
         &self,
         parameters: &[f64],
         operand_outputs: &[f64],
     ) -> Vec<f64>;
-    fn compute_local_parameter_gradient(
+
+    /// $$
+    /// \frac{\partial f}{\partial w}
+    /// $$
+    ///
+    /// - $w$: the tunable parameters of $f$
+    fn compute_gradient_of_function_at_parameter(
         &self,
         parameters: &[f64],
         operand_outputs: &[f64],
@@ -31,22 +51,25 @@ pub struct GeneralNode {
 
 impl GeneralNode {
     fn check_rep(&self) {
-        if let Some(gradient) = &self.cache.global_parameter_gradient {
+        if let Some(gradient) = &self.cache.gradient_of_root_at_parameter {
             assert_eq!(gradient.len(), self.parameters.len());
         }
-        if let Some(gradient) = &self.cache.local_parameter_gradient {
+        if let Some(gradient) = &self.cache.gradient_of_function_at_parameter {
             assert_eq!(gradient.len(), self.parameters.len());
         }
-        if let Some(gradient) = &self.cache.local_operand_gradient {
+        if let Some(gradient) = &self.cache.gradient_of_function_at_operand {
             assert_eq!(gradient.len(), self.operands.len());
         }
         assert_eq!(
             self.cache.output.is_none(),
             self.cache.operand_outputs.is_none()
         );
-        assert!(self.cache.global_gradient_entries.len() <= self.successor_len);
-        if self.cache.global_gradient.is_some() {
-            assert_eq!(self.cache.global_gradient_entries.len(), self.successor_len);
+        assert!(self.cache.addends_of_gradient_of_root_at_function.len() <= self.successor_len);
+        if self.cache.gradient_of_root_at_function.is_some() {
+            assert_eq!(
+                self.cache.addends_of_gradient_of_root_at_function.len(),
+                self.successor_len
+            );
         }
     }
 
@@ -101,16 +124,17 @@ impl GeneralNode {
     }
 
     pub fn do_gradient_descent_step(&mut self, step_size: f64) -> Result<(), GradientDescentError> {
-        if self.successor_len > self.cache.global_gradient_entries.len() {
-            return Err(
-                GradientDescentError::NotReceivingEnoughGlobalGradientEntriesFromSuccessors,
-            );
+        if self.successor_len > self.cache.addends_of_gradient_of_root_at_function.len() {
+            return Err(GradientDescentError::NotReceivingEnoughAddendsOfGradientFromSuccessors);
         }
         if self.cache.output.is_none() || self.cache.operand_outputs.is_none() {
             return Err(GradientDescentError::NoEvaluationOutputCaches);
         }
-        assert_eq!(self.successor_len, self.cache.global_gradient_entries.len());
-        self.distribute_global_gradient_entries_to_operands();
+        assert_eq!(
+            self.successor_len,
+            self.cache.addends_of_gradient_of_root_at_function.len()
+        );
+        self.distribute_global_gradient_addends_to_operands();
         self.adjust_parameters(step_size);
         self.check_rep();
         Ok(())
@@ -122,31 +146,42 @@ impl GeneralNode {
     }
 
     fn adjust_parameters(&mut self, step_size: f64) {
-        let gradient = self.global_parameter_gradient().unwrap();
+        let gradient = Arc::clone(self.gradient_of_root_at_parameter().unwrap());
         for (i, gradient_entry) in gradient.iter().enumerate() {
             self.parameters[i] -= step_size * *gradient_entry;
         }
         self.check_rep();
     }
 
-    fn distribute_global_gradient_entries_to_operands(&mut self) {
-        let local_operand_gradient = self.local_operand_gradient().unwrap();
-        let global_gradient = self.global_gradient().unwrap();
-        if self.cache.has_distributed_global_gradient_entries {
+    fn distribute_global_gradient_addends_to_operands(&mut self) {
+        let gradient_of_this_at_operand = Arc::clone(self.gradient_of_this_at_operand().unwrap());
+        let gradient_of_root_at_this = self.gradient_of_root_at_this().unwrap();
+        if self
+            .cache
+            .has_distributed_addend_of_gradient_of_root_at_predecessor
+        {
             panic!();
         }
-        self.cache.has_distributed_global_gradient_entries = true;
+        self.cache
+            .has_distributed_addend_of_gradient_of_root_at_predecessor = true;
         for i in 0..self.operands.len() {
-            let gradient_entry = global_gradient * local_operand_gradient[i];
+            // $$
+            // \frac{\partial E}{\partial f} \cdot \frac{\partial f}{\partial z}
+            // $$
+            let addend_of_gradient_of_root_at_predecessor =
+                gradient_of_root_at_this * gradient_of_this_at_operand[i];
             let mut operand = self.operands[i].lock().unwrap();
-            operand.add_global_gradient_entry(gradient_entry);
+            operand
+                .add_addend_of_gradient_of_root_at_this(addend_of_gradient_of_root_at_predecessor);
         }
         self.check_rep();
     }
 
-    fn add_global_gradient_entry(&mut self, gradient_entry: f64) {
-        assert!(self.cache.global_gradient.is_none());
-        self.cache.global_gradient_entries.push(gradient_entry);
+    fn add_addend_of_gradient_of_root_at_this(&mut self, gradient_addend: f64) {
+        assert!(self.cache.gradient_of_root_at_function.is_none());
+        self.cache
+            .addends_of_gradient_of_root_at_function
+            .push(gradient_addend);
         self.check_rep();
     }
 
@@ -155,21 +190,21 @@ impl GeneralNode {
     /// $$
     ///
     /// - $z$: the non-tunable operands of $f$
-    pub fn local_operand_gradient(&mut self) -> Result<Arc<[f64]>, LocalOperandGradientError> {
+    pub fn gradient_of_this_at_operand(
+        &mut self,
+    ) -> Result<&Arc<[f64]>, GradientOfThisAtOperandError> {
         let operand_outputs = self
             .operand_outputs()
-            .ok_or(LocalOperandGradientError::NoEvaluationOutputCaches)?;
-        if self.cache.local_operand_gradient.is_none() {
-            self.cache.local_operand_gradient = Some(
+            .ok_or(GradientOfThisAtOperandError::NoEvaluationOutputCaches)?;
+        if self.cache.gradient_of_function_at_operand.is_none() {
+            self.cache.gradient_of_function_at_operand = Some(
                 self.computation
-                    .compute_local_operand_gradient(&self.parameters, operand_outputs)
+                    .compute_gradient_of_function_at_operand(&self.parameters, operand_outputs)
                     .into(),
             );
         }
         self.check_rep();
-        Ok(Arc::clone(
-            self.cache.local_operand_gradient.as_ref().unwrap(),
-        ))
+        Ok(self.cache.gradient_of_function_at_operand.as_ref().unwrap())
     }
 
     /// $$
@@ -177,21 +212,31 @@ impl GeneralNode {
     /// $$
     ///
     /// - $E$: the out-most function of the entire network
-    pub fn global_gradient(&mut self) -> Result<f64, GlobalGradientError> {
-        if self.successor_len != self.cache.global_gradient_entries.len() {
-            return Err(GlobalGradientError::NotReceivingEnoughGlobalGradientEntriesFromSuccessors);
+    pub fn gradient_of_root_at_this(&mut self) -> Result<f64, GradientOfRootAtThisError> {
+        if self.successor_len != self.cache.addends_of_gradient_of_root_at_function.len() {
+            return Err(
+                GradientOfRootAtThisError::NotReceivingEnoughAddendsOfGradientFromSuccessors,
+            );
         }
-        self.cache.global_gradient.get_or_insert_with(|| {
-            assert_eq!(self.successor_len, self.cache.global_gradient_entries.len());
-            if self.successor_len == 0 {
-                // this is the root node
-                1.0
-            } else {
-                self.cache.global_gradient_entries.iter().sum()
-            }
-        });
+        self.cache
+            .gradient_of_root_at_function
+            .get_or_insert_with(|| {
+                assert_eq!(
+                    self.successor_len,
+                    self.cache.addends_of_gradient_of_root_at_function.len()
+                );
+                if self.successor_len == 0 {
+                    // this is the root node
+                    1.0
+                } else {
+                    self.cache
+                        .addends_of_gradient_of_root_at_function
+                        .iter()
+                        .sum()
+                }
+            });
         self.check_rep();
-        Ok(self.cache.global_gradient.unwrap())
+        Ok(self.cache.gradient_of_root_at_function.unwrap())
     }
 
     /// $$
@@ -199,21 +244,28 @@ impl GeneralNode {
     /// $$
     ///
     /// - $w$: the tunable parameters of $f$
-    pub fn local_parameter_gradient(&mut self) -> Result<Arc<[f64]>, LocalParameterGradientError> {
+    pub fn gradient_of_this_at_parameter(
+        &mut self,
+    ) -> Result<&Arc<[f64]>, GradientOfThisAtParameterError> {
         let operand_outputs = self
             .operand_outputs()
-            .ok_or(LocalParameterGradientError::NoEvaluationOutputCaches)?;
-        if self.cache.local_parameter_gradient.is_none() {
-            self.cache.local_parameter_gradient = Some(
+            .ok_or(GradientOfThisAtParameterError::NoEvaluationOutputCaches)?;
+        if self.cache.gradient_of_function_at_parameter.is_none() {
+            self.cache.gradient_of_function_at_parameter = Some(
                 self.computation
-                    .compute_local_parameter_gradient(&self.parameters, operand_outputs.as_ref())
+                    .compute_gradient_of_function_at_parameter(
+                        &self.parameters,
+                        operand_outputs.as_ref(),
+                    )
                     .into(),
             );
         }
         self.check_rep();
-        Ok(Arc::clone(
-            self.cache.local_parameter_gradient.as_ref().unwrap(),
-        ))
+        Ok(self
+            .cache
+            .gradient_of_function_at_parameter
+            .as_ref()
+            .unwrap())
     }
 
     /// $$
@@ -221,26 +273,28 @@ impl GeneralNode {
     /// $$
     ///
     /// - $w$: the tunable parameters of $f$
-    pub fn global_parameter_gradient(
+    pub fn gradient_of_root_at_parameter(
         &mut self,
-    ) -> Result<Arc<[f64]>, GlobalParameterGradientError> {
-        let local_parameter_gradient = self
-            .local_parameter_gradient()
-            .map_err(GlobalParameterGradientError::LocalParameterGradient)?;
-        let global_gradient = self
-            .global_gradient()
-            .map_err(GlobalParameterGradientError::GlobalGradient)?;
-        self.cache.global_parameter_gradient.get_or_insert_with(|| {
-            let mut gradient_entries = Vec::new();
-            for local_parameter_gradient_entry in local_parameter_gradient.iter() {
-                gradient_entries.push(global_gradient * *local_parameter_gradient_entry);
-            }
-            gradient_entries.into()
-        });
+    ) -> Result<&Arc<[f64]>, GradientOfRootAtParameterError> {
+        let gradient_of_this_at_parameter = Arc::clone(
+            self.gradient_of_this_at_parameter()
+                .map_err(GradientOfRootAtParameterError::GradientOfThisAtParameter)?,
+        );
+        let gradient_of_root_at_this = self
+            .gradient_of_root_at_this()
+            .map_err(GradientOfRootAtParameterError::GradientOfRootAtThis)?;
+        self.cache
+            .gradient_of_root_at_parameter
+            .get_or_insert_with(|| {
+                gradient_of_this_at_parameter
+                    .iter()
+                    .map(|partial_derivative_of_this_at_parameter_i| {
+                        gradient_of_root_at_this * *partial_derivative_of_this_at_parameter_i
+                    })
+                    .collect()
+            });
         self.check_rep();
-        Ok(Arc::clone(
-            self.cache.global_parameter_gradient.as_ref().unwrap(),
-        ))
+        Ok(self.cache.gradient_of_root_at_parameter.as_ref().unwrap())
     }
 
     pub fn operand_outputs(&self) -> Option<&Arc<[f64]>> {
@@ -257,11 +311,7 @@ impl GeneralNode {
 }
 
 pub fn clone_node_batch(nodes: &[Arc<Mutex<GeneralNode>>]) -> Vec<Arc<Mutex<GeneralNode>>> {
-    let mut cloned_nodes = Vec::new();
-    for node in nodes {
-        cloned_nodes.push(Arc::clone(node));
-    }
-    cloned_nodes
+    nodes.iter().map(Arc::clone).collect()
 }
 
 /// Inefficient: same node might be visited more than once
@@ -280,7 +330,7 @@ pub fn do_gradient_descent_steps_and_reset_caches_on_all_nodes(
         match n.do_gradient_descent_step_and_reset_cache(step_size) {
             Ok(_) => (),
             Err(e) => match e {
-                GradientDescentError::NotReceivingEnoughGlobalGradientEntriesFromSuccessors => (),
+                GradientDescentError::NotReceivingEnoughAddendsOfGradientFromSuccessors => (),
                 // haven't evaluate before gradient descent
                 GradientDescentError::NoEvaluationOutputCaches => panic!(),
             },
@@ -294,7 +344,7 @@ pub fn do_gradient_descent_steps_on_all_nodes(root_note: &Arc<Mutex<GeneralNode>
         match n.do_gradient_descent_step(step_size) {
             Ok(_) => (),
             Err(e) => match e {
-                GradientDescentError::NotReceivingEnoughGlobalGradientEntriesFromSuccessors => (),
+                GradientDescentError::NotReceivingEnoughAddendsOfGradientFromSuccessors => (),
                 // haven't evaluate before gradient descent
                 GradientDescentError::NoEvaluationOutputCaches => panic!(),
             },
@@ -318,34 +368,34 @@ fn bfs_operands(root_node: &Arc<Mutex<GeneralNode>>, f: impl Fn(&mut GeneralNode
 
 #[derive(Debug, Error)]
 pub enum GradientDescentError {
-    #[error("Not receiving enough global gradient entries from successors")]
-    NotReceivingEnoughGlobalGradientEntriesFromSuccessors,
+    #[error("Not receiving enough addends of gradient of root node at this node from successors")]
+    NotReceivingEnoughAddendsOfGradientFromSuccessors,
     #[error("No evaluation output caches")]
     NoEvaluationOutputCaches,
 }
 
 #[derive(Debug, Error)]
-pub enum GlobalGradientError {
-    #[error("Not receiving enough global gradient entries from successors")]
-    NotReceivingEnoughGlobalGradientEntriesFromSuccessors,
+pub enum GradientOfRootAtThisError {
+    #[error("Not receiving enough addends of gradient of root node at this node from successors")]
+    NotReceivingEnoughAddendsOfGradientFromSuccessors,
 }
 
 #[derive(Debug, Error)]
-pub enum GlobalParameterGradientError {
-    #[error("Global gradient error: {0}")]
-    GlobalGradient(GlobalGradientError),
-    #[error("Local parameter gradient error: {0}")]
-    LocalParameterGradient(LocalParameterGradientError),
+pub enum GradientOfRootAtParameterError {
+    #[error("Gradient of root node at this node error: {0}")]
+    GradientOfRootAtThis(GradientOfRootAtThisError),
+    #[error("Gradient of this node at parameter error: {0}")]
+    GradientOfThisAtParameter(GradientOfThisAtParameterError),
 }
 
 #[derive(Debug, Error)]
-pub enum LocalParameterGradientError {
+pub enum GradientOfThisAtParameterError {
     #[error("No evaluation output caches")]
     NoEvaluationOutputCaches,
 }
 
 #[derive(Debug, Error)]
-pub enum LocalOperandGradientError {
+pub enum GradientOfThisAtOperandError {
     #[error("No evaluation output caches")]
     NoEvaluationOutputCaches,
 }

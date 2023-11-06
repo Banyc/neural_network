@@ -16,38 +16,38 @@ pub struct CachedNodeData {
     /// $$
     ///
     /// - $E$: the out-most function of the entire network
-    pub global_gradient: Option<f64>,
+    pub gradient_of_root_at_function: Option<f64>,
 
     /// $$
     /// (\frac{\partial E}{\partial h_i} \cdot \frac{\partial h_i}{\partial f})
     /// $$
     ///
     /// - $h_i$: the $i$-th immediate successor of $f$
-    pub global_gradient_entries: Vec<f64>,
+    pub addends_of_gradient_of_root_at_function: Vec<f64>,
 
     /// $$
     /// \frac{\partial f}{\partial z}
     /// $$
     ///
     /// - $z$: the non-tunable operands of $f$
-    pub local_operand_gradient: Option<Arc<[f64]>>,
+    pub gradient_of_function_at_operand: Option<Arc<[f64]>>,
 
     /// $$
     /// \frac{\partial f}{\partial w}
     /// $$
     ///
     /// - $w$: the tunable parameters of $f$
-    pub local_parameter_gradient: Option<Arc<[f64]>>,
+    pub gradient_of_function_at_parameter: Option<Arc<[f64]>>,
 
     /// $$
     /// \frac{\partial E}{\partial w}
     /// $$
     ///
     /// - $w$: the tunable parameters of $f$
-    pub global_parameter_gradient: Option<Arc<[f64]>>,
+    pub gradient_of_root_at_parameter: Option<Arc<[f64]>>,
 
     /// Prevent from distributing it more than once
-    pub has_distributed_global_gradient_entries: bool,
+    pub has_distributed_addend_of_gradient_of_root_at_predecessor: bool,
 }
 
 impl CachedNodeData {
@@ -55,24 +55,24 @@ impl CachedNodeData {
         Self {
             output: None,
             operand_outputs: None,
-            global_gradient: None,
-            global_gradient_entries: Vec::new(),
-            local_operand_gradient: None,
-            local_parameter_gradient: None,
-            global_parameter_gradient: None,
-            has_distributed_global_gradient_entries: false,
+            gradient_of_root_at_function: None,
+            addends_of_gradient_of_root_at_function: Vec::new(),
+            gradient_of_function_at_operand: None,
+            gradient_of_function_at_parameter: None,
+            gradient_of_root_at_parameter: None,
+            has_distributed_addend_of_gradient_of_root_at_predecessor: false,
         }
     }
 
     pub fn reset(&mut self) {
         self.output = None;
         self.operand_outputs = None;
-        self.global_gradient = None;
-        self.global_gradient_entries = Vec::new();
-        self.local_operand_gradient = None;
-        self.local_parameter_gradient = None;
-        self.global_parameter_gradient = None;
-        self.has_distributed_global_gradient_entries = false;
+        self.gradient_of_root_at_function = None;
+        self.addends_of_gradient_of_root_at_function = Vec::new();
+        self.gradient_of_function_at_operand = None;
+        self.gradient_of_function_at_parameter = None;
+        self.gradient_of_root_at_parameter = None;
+        self.has_distributed_addend_of_gradient_of_root_at_predecessor = false;
     }
 }
 

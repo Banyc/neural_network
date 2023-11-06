@@ -25,7 +25,7 @@ impl NodeComputation for InputNodeComputation {
         inputs[self.input_index]
     }
 
-    fn compute_local_operand_gradient(
+    fn compute_gradient_of_function_at_operand(
         &self,
         _parameters: &[f64],
         _operand_outputs: &[f64],
@@ -33,7 +33,7 @@ impl NodeComputation for InputNodeComputation {
         Vec::new()
     }
 
-    fn compute_local_parameter_gradient(
+    fn compute_gradient_of_function_at_parameter(
         &self,
         _parameters: &[f64],
         _operand_outputs: &[f64],

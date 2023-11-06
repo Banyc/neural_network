@@ -18,7 +18,7 @@ fn linear_evaluate() {
 }
 
 #[test]
-fn linear_local_operand_gradient() {
+fn linear_gradient_of_this_at_operand() {
     let input_nodes = input_node_batch(3);
     let inputs = vec![1.0, 2.0, 3.0];
     let initial_weights = vec![3.0, 2.0, 1.0];
@@ -26,12 +26,12 @@ fn linear_local_operand_gradient() {
     let weight_node = weight_node(input_nodes, Some(initial_weights)).unwrap();
     let mut bias_node = bias_node(Arc::new(Mutex::new(weight_node)), Some(initial_bias));
     bias_node.evaluate(&inputs);
-    let ret = bias_node.local_operand_gradient().unwrap();
-    assert_eq!(ret.as_ref(), &vec![1.0]);
+    let ret = bias_node.gradient_of_this_at_operand().unwrap();
+    assert_eq!(ret.as_ref(), &[1.0]);
 }
 
 #[test]
-fn linear_local_parameter_gradient() {
+fn linear_gradient_of_this_at_parameter() {
     let input_nodes = input_node_batch(3);
     let inputs = vec![1.0, 2.0, 3.0];
     let initial_weights = vec![3.0, 2.0, 1.0];
@@ -39,8 +39,8 @@ fn linear_local_parameter_gradient() {
     let weight_node = weight_node(input_nodes, Some(initial_weights)).unwrap();
     let mut bias_node = bias_node(Arc::new(Mutex::new(weight_node)), Some(initial_bias));
     bias_node.evaluate(&inputs);
-    let ret = bias_node.local_parameter_gradient().unwrap();
-    assert_eq!(ret.as_ref(), &vec![1.0]);
+    let ret = bias_node.gradient_of_this_at_parameter().unwrap();
+    assert_eq!(ret.as_ref(), &[1.0]);
 }
 
 #[test]

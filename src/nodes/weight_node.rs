@@ -41,7 +41,7 @@ impl NodeComputation for WeightNodeComputation {
         weight(operand_outputs, parameters)
     }
 
-    fn compute_local_operand_gradient(
+    fn compute_gradient_of_function_at_operand(
         &self,
         parameters: &[f64],
         _operand_outputs: &[f64],
@@ -49,7 +49,7 @@ impl NodeComputation for WeightNodeComputation {
         weight_derivative(parameters)
     }
 
-    fn compute_local_parameter_gradient(
+    fn compute_gradient_of_function_at_parameter(
         &self,
         _parameters: &[f64],
         operand_outputs: &[f64],
@@ -96,24 +96,24 @@ mod tests {
     }
 
     #[test]
-    fn local_operand_gradient() {
+    fn gradient_of_this_at_operand() {
         let input_nodes = input_node_batch(3);
         let inputs = vec![1.0, 2.0, 3.0];
         let initial_weights = vec![3.0, 2.0, 1.0];
         let mut weight_node = weight_node(input_nodes, Some(initial_weights)).unwrap();
         weight_node.evaluate(&inputs);
-        let ret = weight_node.local_operand_gradient().unwrap();
+        let ret = weight_node.gradient_of_this_at_operand().unwrap();
         assert_eq!(ret.as_ref(), &vec![3.0, 2.0, 1.0]);
     }
 
     #[test]
-    fn local_parameter_gradient() {
+    fn gradient_of_this_at_parameter() {
         let input_nodes = input_node_batch(3);
         let inputs = vec![1.0, 2.0, 3.0];
         let initial_weights = vec![3.0, 2.0, 1.0];
         let mut weight_node = weight_node(input_nodes, Some(initial_weights)).unwrap();
         weight_node.evaluate(&inputs);
-        let ret = weight_node.local_parameter_gradient().unwrap();
+        let ret = weight_node.gradient_of_this_at_parameter().unwrap();
         assert_eq!(ret.as_ref(), &vec![1.0, 2.0, 3.0]);
     }
 }

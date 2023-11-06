@@ -1,8 +1,8 @@
-use std::sync::{Arc, Mutex};
+use std::{cell::RefCell, rc::Rc};
 
 use super::node::{GeneralNode, NodeComputation};
 
-pub fn relu_node(operand: Arc<Mutex<GeneralNode>>) -> GeneralNode {
+pub fn relu_node(operand: Rc<RefCell<GeneralNode>>) -> GeneralNode {
     let computation = ReluNodeComputation {};
     GeneralNode::new(vec![operand], Box::new(computation), Vec::new())
 }
@@ -46,14 +46,14 @@ fn relu_derivative(x: f64) -> f64 {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{Arc, Mutex};
+    use std::{cell::RefCell, rc::Rc};
 
     use super::super::{input_node::input_node, relu_node::relu_node};
 
     #[test]
     fn evaluate_negative() {
         let input_node = input_node(0);
-        let mut relu = relu_node(Arc::new(Mutex::new(input_node)));
+        let mut relu = relu_node(Rc::new(RefCell::new(input_node)));
         let ret = relu.evaluate(&[-2.0]);
         assert!(ret >= 0.0);
         assert!(ret <= 0.0);
@@ -62,7 +62,7 @@ mod tests {
     #[test]
     fn evaluate_positive() {
         let input_node = input_node(0);
-        let mut relu = relu_node(Arc::new(Mutex::new(input_node)));
+        let mut relu = relu_node(Rc::new(RefCell::new(input_node)));
         let ret = relu.evaluate(&[3.0]);
         assert!(ret >= 3.0);
         assert!(ret <= 3.0);
@@ -71,7 +71,7 @@ mod tests {
     #[test]
     fn positive_gradient_of_this_at_operand() {
         let input_node = input_node(0);
-        let mut relu = relu_node(Arc::new(Mutex::new(input_node)));
+        let mut relu = relu_node(Rc::new(RefCell::new(input_node)));
         relu.evaluate(&[3.0]);
         let ret = relu.gradient_of_this_at_operand().unwrap();
         assert!(ret[0] >= 1.0);
@@ -81,7 +81,7 @@ mod tests {
     #[test]
     fn negative_gradient_of_this_at_operand() {
         let input_node = input_node(0);
-        let mut relu = relu_node(Arc::new(Mutex::new(input_node)));
+        let mut relu = relu_node(Rc::new(RefCell::new(input_node)));
         relu.evaluate(&[-3.0]);
         let ret = relu.gradient_of_this_at_operand().unwrap();
         assert!(ret[0] >= 0.0);
@@ -91,7 +91,7 @@ mod tests {
     #[test]
     fn empty_gradient_of_this_at_parameter() {
         let input_node = input_node(0);
-        let mut relu = relu_node(Arc::new(Mutex::new(input_node)));
+        let mut relu = relu_node(Rc::new(RefCell::new(input_node)));
         relu.evaluate(&[3.0]);
         let ret = relu.gradient_of_this_at_parameter().unwrap();
         assert_eq!(ret.len(), 0);

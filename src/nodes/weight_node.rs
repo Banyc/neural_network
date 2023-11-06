@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::{cell::RefCell, rc::Rc};
 
 use rand::Rng;
 use thiserror::Error;
@@ -6,7 +6,7 @@ use thiserror::Error;
 use super::node::{GeneralNode, NodeComputation};
 
 pub fn weight_node(
-    operands: Vec<Arc<Mutex<GeneralNode>>>,
+    operands: Vec<Rc<RefCell<GeneralNode>>>,
     mut weights: Option<Vec<f64>>,
 ) -> Result<GeneralNode, WeightNodeError> {
     if let Some(weights) = &weights {
@@ -18,15 +18,15 @@ pub fn weight_node(
     let weights = match weights.take() {
         Some(x) => x,
         None => {
-            let mut weights = Vec::new();
             let op_len = operands.len();
             let weight_bound = 1.0 / (op_len as f64).sqrt();
             let mut rng = rand::thread_rng();
-            for _ in 0..op_len {
-                let weight: f64 = rng.gen_range(-weight_bound..weight_bound);
-                weights.push(weight);
-            }
-            weights
+            (0..op_len)
+                .map(|_| {
+                    let weight: f64 = rng.gen_range(-weight_bound..weight_bound);
+                    weight
+                })
+                .collect()
         }
     };
     let node = GeneralNode::new(operands, Box::new(computation), weights);
@@ -60,11 +60,7 @@ impl NodeComputation for WeightNodeComputation {
 
 fn weight(x: &[f64], w: &[f64]) -> f64 {
     assert_eq!(x.len(), w.len());
-    let mut sum = 0.0;
-    for i in 0..w.len() {
-        sum += x[i] * w[i];
-    }
-    sum
+    (0..w.len()).map(|i| x[i] * w[i]).sum()
 }
 
 fn weight_derivative(w: &[f64]) -> Vec<f64> {

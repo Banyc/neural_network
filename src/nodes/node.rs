@@ -6,10 +6,7 @@
 //! - $w$: the tunable parameters of $f$
 //! - $E$: the outmost function represented by the root node of the computation graph
 
-use std::{
-    collections::VecDeque,
-    sync::{Arc, Mutex},
-};
+use std::{cell::RefCell, collections::VecDeque, rc::Rc};
 
 use thiserror::Error;
 
@@ -43,7 +40,7 @@ pub trait NodeComputation {
 
 pub struct GeneralNode {
     parameters: Vec<f64>,
-    operands: Vec<Arc<Mutex<GeneralNode>>>,
+    operands: Vec<Rc<RefCell<GeneralNode>>>,
     successor_len: usize,
     cache: CachedNodeData,
     computation: Box<dyn NodeComputation + Sync + Send>,
@@ -74,14 +71,14 @@ impl GeneralNode {
     }
 
     pub fn new(
-        operands: Vec<Arc<Mutex<GeneralNode>>>,
+        operands: Vec<Rc<RefCell<GeneralNode>>>,
         computation: Box<dyn NodeComputation + Sync + Send>,
         parameters: Vec<f64>,
     ) -> GeneralNode {
-        for operand in &operands {
-            let mut operand = operand.lock().unwrap();
+        operands.iter().for_each(|operand| {
+            let mut operand = operand.borrow_mut();
             operand.increment_successor_len();
-        }
+        });
         let this = Self {
             parameters,
             operands,
@@ -97,15 +94,18 @@ impl GeneralNode {
     pub fn evaluate(&mut self, inputs: &[f64]) -> f64 {
         self.cache.output.get_or_insert_with(|| {
             assert!(self.cache.operand_outputs.is_none());
-            let mut operand_outputs = Vec::new();
-            for operand in self.operands.iter_mut() {
-                let mut operand = operand.lock().unwrap();
-                operand_outputs.push(operand.evaluate(inputs));
-            }
+            let operand_outputs: Rc<_> = self
+                .operands
+                .iter_mut()
+                .map(|operand| {
+                    let mut operand = operand.borrow_mut();
+                    operand.evaluate(inputs)
+                })
+                .collect();
             let ret = self
                 .computation
                 .compute_output(&self.parameters, &operand_outputs, inputs);
-            self.cache.operand_outputs = Some(operand_outputs.into());
+            self.cache.operand_outputs = Some(operand_outputs);
             ret
         });
         self.check_rep();
@@ -146,15 +146,15 @@ impl GeneralNode {
     }
 
     fn adjust_parameters(&mut self, step_size: f64) {
-        let gradient = Arc::clone(self.gradient_of_root_at_parameter().unwrap());
-        for (i, gradient_entry) in gradient.iter().enumerate() {
+        let gradient = Rc::clone(self.gradient_of_root_at_parameter().unwrap());
+        gradient.iter().enumerate().for_each(|(i, gradient_entry)| {
             self.parameters[i] -= step_size * *gradient_entry;
-        }
+        });
         self.check_rep();
     }
 
     fn distribute_global_gradient_addends_to_operands(&mut self) {
-        let gradient_of_this_at_operand = Arc::clone(self.gradient_of_this_at_operand().unwrap());
+        let gradient_of_this_at_operand = Rc::clone(self.gradient_of_this_at_operand().unwrap());
         let gradient_of_root_at_this = self.gradient_of_root_at_this().unwrap();
         if self
             .cache
@@ -164,16 +164,16 @@ impl GeneralNode {
         }
         self.cache
             .has_distributed_addend_of_gradient_of_root_at_predecessor = true;
-        for i in 0..self.operands.len() {
+        (0..self.operands.len()).for_each(|i| {
             // $$
             // \frac{\partial E}{\partial f} \cdot \frac{\partial f}{\partial z}
             // $$
             let addend_of_gradient_of_root_at_predecessor =
                 gradient_of_root_at_this * gradient_of_this_at_operand[i];
-            let mut operand = self.operands[i].lock().unwrap();
+            let mut operand = self.operands[i].borrow_mut();
             operand
                 .add_addend_of_gradient_of_root_at_this(addend_of_gradient_of_root_at_predecessor);
-        }
+        });
         self.check_rep();
     }
 
@@ -192,7 +192,7 @@ impl GeneralNode {
     /// - $z$: the non-tunable operands of $f$
     pub fn gradient_of_this_at_operand(
         &mut self,
-    ) -> Result<&Arc<[f64]>, GradientOfThisAtOperandError> {
+    ) -> Result<&Rc<[f64]>, GradientOfThisAtOperandError> {
         let operand_outputs = self
             .operand_outputs()
             .ok_or(GradientOfThisAtOperandError::NoEvaluationOutputCaches)?;
@@ -246,7 +246,7 @@ impl GeneralNode {
     /// - $w$: the tunable parameters of $f$
     pub fn gradient_of_this_at_parameter(
         &mut self,
-    ) -> Result<&Arc<[f64]>, GradientOfThisAtParameterError> {
+    ) -> Result<&Rc<[f64]>, GradientOfThisAtParameterError> {
         let operand_outputs = self
             .operand_outputs()
             .ok_or(GradientOfThisAtParameterError::NoEvaluationOutputCaches)?;
@@ -275,8 +275,8 @@ impl GeneralNode {
     /// - $w$: the tunable parameters of $f$
     pub fn gradient_of_root_at_parameter(
         &mut self,
-    ) -> Result<&Arc<[f64]>, GradientOfRootAtParameterError> {
-        let gradient_of_this_at_parameter = Arc::clone(
+    ) -> Result<&Rc<[f64]>, GradientOfRootAtParameterError> {
+        let gradient_of_this_at_parameter = Rc::clone(
             self.gradient_of_this_at_parameter()
                 .map_err(GradientOfRootAtParameterError::GradientOfThisAtParameter)?,
         );
@@ -297,7 +297,7 @@ impl GeneralNode {
         Ok(self.cache.gradient_of_root_at_parameter.as_ref().unwrap())
     }
 
-    pub fn operand_outputs(&self) -> Option<&Arc<[f64]>> {
+    pub fn operand_outputs(&self) -> Option<&Rc<[f64]>> {
         self.cache.operand_outputs.as_ref()
     }
 
@@ -310,12 +310,12 @@ impl GeneralNode {
     }
 }
 
-pub fn clone_node_batch(nodes: &[Arc<Mutex<GeneralNode>>]) -> Vec<Arc<Mutex<GeneralNode>>> {
-    nodes.iter().map(Arc::clone).collect()
+pub fn clone_node_batch(nodes: &[Rc<RefCell<GeneralNode>>]) -> Vec<Rc<RefCell<GeneralNode>>> {
+    nodes.iter().map(Rc::clone).collect()
 }
 
 /// Inefficient: same node might be visited more than once
-pub fn reset_caches_on_all_nodes(root_note: &Arc<Mutex<GeneralNode>>) {
+pub fn reset_caches_on_all_nodes(root_note: &Rc<RefCell<GeneralNode>>) {
     let f = |n: &mut GeneralNode| {
         n.cache.reset();
     };
@@ -323,7 +323,7 @@ pub fn reset_caches_on_all_nodes(root_note: &Arc<Mutex<GeneralNode>>) {
 }
 
 pub fn do_gradient_descent_steps_and_reset_caches_on_all_nodes(
-    root_note: &Arc<Mutex<GeneralNode>>,
+    root_note: &Rc<RefCell<GeneralNode>>,
     step_size: f64,
 ) {
     let f = |n: &mut GeneralNode| {
@@ -339,7 +339,10 @@ pub fn do_gradient_descent_steps_and_reset_caches_on_all_nodes(
     bfs_operands(root_note, f);
 }
 
-pub fn do_gradient_descent_steps_on_all_nodes(root_note: &Arc<Mutex<GeneralNode>>, step_size: f64) {
+pub fn do_gradient_descent_steps_on_all_nodes(
+    root_note: &Rc<RefCell<GeneralNode>>,
+    step_size: f64,
+) {
     let f = |n: &mut GeneralNode| {
         match n.do_gradient_descent_step(step_size) {
             Ok(_) => (),
@@ -353,15 +356,15 @@ pub fn do_gradient_descent_steps_on_all_nodes(root_note: &Arc<Mutex<GeneralNode>
     bfs_operands(root_note, f);
 }
 
-fn bfs_operands(root_node: &Arc<Mutex<GeneralNode>>, f: impl Fn(&mut GeneralNode)) {
+fn bfs_operands(root_node: &Rc<RefCell<GeneralNode>>, f: impl Fn(&mut GeneralNode)) {
     let mut q = VecDeque::new();
-    q.push_back(Arc::clone(root_node));
+    q.push_back(Rc::clone(root_node));
 
     while let Some(n) = q.pop_front() {
-        let mut n = n.lock().unwrap();
+        let mut n = n.borrow_mut();
         f(&mut n);
         for op in &n.operands {
-            q.push_back(Arc::clone(op));
+            q.push_back(Rc::clone(op));
         }
     }
 }

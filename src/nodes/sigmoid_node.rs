@@ -1,8 +1,8 @@
-use std::sync::{Arc, Mutex};
+use std::{cell::RefCell, rc::Rc};
 
 use super::node::{GeneralNode, NodeComputation};
 
-pub fn sigmoid_node(operand: Arc<Mutex<GeneralNode>>) -> GeneralNode {
+pub fn sigmoid_node(operand: Rc<RefCell<GeneralNode>>) -> GeneralNode {
     let computation = SigmoidNodeComputation {};
     GeneralNode::new(vec![operand], Box::new(computation), Vec::new())
 }

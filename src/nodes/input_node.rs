@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::{cell::RefCell, rc::Rc};
 
 use super::node::{GeneralNode, NodeComputation};
 
@@ -7,13 +7,13 @@ pub fn input_node(input_index: usize) -> GeneralNode {
     GeneralNode::new(Vec::new(), Box::new(computation), Vec::new())
 }
 
-pub fn input_node_batch(len: usize) -> Vec<Arc<Mutex<GeneralNode>>> {
-    let mut nodes = Vec::new();
-    for i in 0..len {
-        let node = input_node(i);
-        nodes.push(Arc::new(Mutex::new(node)));
-    }
-    nodes
+pub fn input_node_batch(len: usize) -> Vec<Rc<RefCell<GeneralNode>>> {
+    (0..len)
+        .map(|i| {
+            let node = input_node(i);
+            Rc::new(RefCell::new(node))
+        })
+        .collect()
 }
 
 struct InputNodeComputation {

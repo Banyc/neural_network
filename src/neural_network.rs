@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::{cell::RefCell, rc::Rc};
 
 use rand::Rng;
 
@@ -8,8 +8,8 @@ use super::nodes::node::{
 };
 
 pub struct NeuralNetwork {
-    terminal_node: Arc<Mutex<GeneralNode>>,
-    error_node: Arc<Mutex<GeneralNode>>,
+    terminal_node: Rc<RefCell<GeneralNode>>,
+    error_node: Rc<RefCell<GeneralNode>>,
     label_index: usize,
     step_size: f64,
 }
@@ -18,8 +18,8 @@ impl NeuralNetwork {
     fn check_rep(&self) {}
 
     pub fn new(
-        terminal_node: Arc<Mutex<GeneralNode>>,
-        error_node: Arc<Mutex<GeneralNode>>,
+        terminal_node: Rc<RefCell<GeneralNode>>,
+        error_node: Rc<RefCell<GeneralNode>>,
         label_index: usize,
         step_size: f64,
     ) -> NeuralNetwork {
@@ -50,7 +50,7 @@ impl NeuralNetwork {
     }
 
     pub fn evaluate(&self, inputs: &[f64]) -> f64 {
-        let mut terminal_node = self.terminal_node.lock().unwrap();
+        let mut terminal_node = self.terminal_node.borrow_mut();
         terminal_node.evaluate(inputs)
     }
 
@@ -61,7 +61,7 @@ impl NeuralNetwork {
     }
 
     pub fn compute_error(&self, inputs: &[f64]) -> f64 {
-        let mut error_node = self.error_node.lock().unwrap();
+        let mut error_node = self.error_node.borrow_mut();
         error_node.evaluate(inputs)
     }
 

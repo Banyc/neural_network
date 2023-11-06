@@ -1,8 +1,8 @@
-use std::sync::{Arc, Mutex};
+use std::{cell::RefCell, rc::Rc};
 
 use super::node::{GeneralNode, NodeComputation};
 
-pub fn bias_node(operand: Arc<Mutex<GeneralNode>>, bias: Option<f64>) -> GeneralNode {
+pub fn bias_node(operand: Rc<RefCell<GeneralNode>>, bias: Option<f64>) -> GeneralNode {
     let computation = BiasNodeComputation {};
     let bias = bias.unwrap_or(0.0);
     GeneralNode::new(vec![operand], Box::new(computation), vec![bias])

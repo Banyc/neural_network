@@ -1,10 +1,10 @@
-use std::sync::{Arc, Mutex};
+use std::{cell::RefCell, rc::Rc};
 
 use super::node::{GeneralNode, NodeComputation};
 
 pub fn l2_error_node(
-    operand: Arc<Mutex<GeneralNode>>,
-    label: Arc<Mutex<GeneralNode>>,
+    operand: Rc<RefCell<GeneralNode>>,
+    label: Rc<RefCell<GeneralNode>>,
 ) -> GeneralNode {
     let computation = L2ErrorNodeComputation {};
     GeneralNode::new(vec![operand, label], Box::new(computation), Vec::new())

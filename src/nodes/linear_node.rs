@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::{cell::RefCell, rc::Rc};
 
 use super::{
     bias_node::bias_node,
@@ -7,11 +7,11 @@ use super::{
 };
 
 pub fn linear_node(
-    input_nodes: Vec<Arc<Mutex<GeneralNode>>>,
+    input_nodes: Vec<Rc<RefCell<GeneralNode>>>,
     initial_weights: Option<Vec<f64>>,
     initial_bias: Option<f64>,
 ) -> Result<GeneralNode, WeightNodeError> {
     let weight_node = weight_node(input_nodes, initial_weights)?;
-    let bias_node = bias_node(Arc::new(Mutex::new(weight_node)), initial_bias);
+    let bias_node = bias_node(Rc::new(RefCell::new(weight_node)), initial_bias);
     Ok(bias_node)
 }

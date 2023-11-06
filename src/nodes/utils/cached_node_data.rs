@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::rc::Rc;
 
 /// The function of this node should be
 /// $$
@@ -9,7 +9,7 @@ pub struct CachedNodeData {
     pub output: Option<f64>,
 
     /// the outputs of the operands
-    pub operand_outputs: Option<Arc<[f64]>>,
+    pub operand_outputs: Option<Rc<[f64]>>,
 
     /// $$
     /// \frac{\partial E}{\partial f}
@@ -30,21 +30,21 @@ pub struct CachedNodeData {
     /// $$
     ///
     /// - $z$: the non-tunable operands of $f$
-    pub gradient_of_function_at_operand: Option<Arc<[f64]>>,
+    pub gradient_of_function_at_operand: Option<Rc<[f64]>>,
 
     /// $$
     /// \frac{\partial f}{\partial w}
     /// $$
     ///
     /// - $w$: the tunable parameters of $f$
-    pub gradient_of_function_at_parameter: Option<Arc<[f64]>>,
+    pub gradient_of_function_at_parameter: Option<Rc<[f64]>>,
 
     /// $$
     /// \frac{\partial E}{\partial w}
     /// $$
     ///
     /// - $w$: the tunable parameters of $f$
-    pub gradient_of_root_at_parameter: Option<Arc<[f64]>>,
+    pub gradient_of_root_at_parameter: Option<Rc<[f64]>>,
 
     /// Prevent from distributing it more than once
     pub has_distributed_addend_of_gradient_of_root_at_predecessor: bool,

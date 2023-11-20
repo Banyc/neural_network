@@ -7,14 +7,22 @@ use super::node::{GeneralNode, NodeComputation};
 
 pub fn weight_node(
     operands: Vec<Rc<RefCell<GeneralNode>>>,
+    weights: Option<Vec<f64>>,
+) -> Result<GeneralNode, WeightNodeError> {
+    regularized_weight_node(operands, weights, 0.0)
+}
+
+pub fn regularized_weight_node(
+    operands: Vec<Rc<RefCell<GeneralNode>>>,
     mut weights: Option<Vec<f64>>,
+    lambda: f64,
 ) -> Result<GeneralNode, WeightNodeError> {
     if let Some(weights) = &weights {
         if operands.len() != weights.len() {
             return Err(WeightNodeError::ParameterSizeNotMatched);
         }
     }
-    let computation = WeightNodeComputation {};
+    let computation = WeightNodeComputation { lambda };
     let weights = match weights.take() {
         Some(x) => x,
         None => {
@@ -33,7 +41,9 @@ pub fn weight_node(
     Ok(node)
 }
 
-struct WeightNodeComputation {}
+struct WeightNodeComputation {
+    lambda: f64,
+}
 
 impl NodeComputation for WeightNodeComputation {
     fn compute_output(&self, parameters: &[f64], operand_outputs: &[f64], _inputs: &[f64]) -> f64 {
@@ -56,6 +66,10 @@ impl NodeComputation for WeightNodeComputation {
     ) -> Vec<f64> {
         derivative_of_w(operand_outputs)
     }
+
+    fn regularization(&self, parameter: f64) -> f64 {
+        derivative_of_l2_regularization(parameter, self.lambda)
+    }
 }
 
 fn weight(x: &[f64], w: &[f64]) -> f64 {
@@ -69,6 +83,10 @@ fn weight_derivative(w: &[f64]) -> Vec<f64> {
 
 fn derivative_of_w(x: &[f64]) -> Vec<f64> {
     x.to_vec()
+}
+
+fn derivative_of_l2_regularization(w: f64, lambda: f64) -> f64 {
+    w * lambda
 }
 
 #[derive(Debug, Error)]

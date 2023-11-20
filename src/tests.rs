@@ -6,7 +6,7 @@ use crate::{
         bias_node::bias_node,
         input_node::{input_node, input_node_batch},
         l2_error_node::l2_error_node,
-        linear_node::linear_node,
+        linear_node::{linear_node, regularized_linear_node},
         node::{clone_node_batch, GeneralNode},
         relu_node::relu_node,
         sigmoid_node::sigmoid_node,
@@ -357,6 +357,55 @@ fn learn_xor_sigmoid() {
         vec![0.0, 0.0, 0.0],
         vec![0.0, 1.0, 1.0],
         vec![1.0, 0.0, 1.0],
+        vec![1.0, 1.0, 0.0],
+    ];
+
+    let max_steps = 10_000;
+    network.train(&dataset, max_steps);
+    for inputs in &dataset {
+        let ret = network.evaluate_and_reset_caches(inputs);
+        assert!((ret - inputs[label_index]).abs() < 0.1);
+    }
+    let ret = network.errors_on_dataset(&dataset);
+    assert_eq!(ret, 0.0);
+}
+
+#[test]
+fn learn_xor_regularized_sigmoid() {
+    let label_index = 2;
+    let lambda = 0.0001;
+    let input_nodes = input_node_batch(label_index);
+    let linear_node_1 =
+        regularized_linear_node(clone_node_batch(&input_nodes), None, None, lambda).unwrap();
+    let linear_node_2 =
+        regularized_linear_node(clone_node_batch(&input_nodes), None, None, lambda).unwrap();
+    let linear_node_3 =
+        regularized_linear_node(clone_node_batch(&input_nodes), None, None, lambda).unwrap();
+    let sigmoid_node_1 = sigmoid_node(Rc::new(RefCell::new(linear_node_1)));
+    let sigmoid_node_2 = sigmoid_node(Rc::new(RefCell::new(linear_node_2)));
+    let sigmoid_node_3 = sigmoid_node(Rc::new(RefCell::new(linear_node_3)));
+    let sigmoid_nodes = vec![
+        Rc::new(RefCell::new(sigmoid_node_1)),
+        Rc::new(RefCell::new(sigmoid_node_2)),
+        Rc::new(RefCell::new(sigmoid_node_3)),
+    ];
+    let linear_output = regularized_linear_node(sigmoid_nodes, None, None, lambda).unwrap();
+    let output = sigmoid_node(Rc::new(RefCell::new(linear_output)));
+    let output = Rc::new(RefCell::new(output));
+    let label_node = input_node(label_index);
+    let error_node = l2_error_node(Rc::clone(&output), Rc::new(RefCell::new(label_node)));
+    let step_size = 0.5;
+    let network = NeuralNetwork::new(
+        output,
+        Rc::new(RefCell::new(error_node)),
+        label_index,
+        step_size,
+    );
+
+    let dataset = vec![
+        vec![-1.0, -1.0, 0.0],
+        vec![-1.0, 1.0, 1.0],
+        vec![1.0, -1.0, 1.0],
         vec![1.0, 1.0, 0.0],
     ];
 

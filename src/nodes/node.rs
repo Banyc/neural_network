@@ -40,6 +40,10 @@ pub trait NodeComputation {
         parameters: &[f64],
         operand_outputs: &[f64],
     ) -> Vec<f64>;
+
+    fn regularization(&self, _parameter: f64) -> f64 {
+        0.0
+    }
 }
 
 /// The function of this node should be
@@ -158,7 +162,9 @@ impl GeneralNode {
             Rc::clone(self.gradient_of_root_at_parameter().unwrap());
         gradient_of_root_at_parameter.iter().enumerate().for_each(
             |(i, partial_derivative_of_root_at_parameter_i)| {
-                self.parameters[i] -= step_size * *partial_derivative_of_root_at_parameter_i;
+                let regularization = self.computation.regularization(self.parameters[i]);
+                self.parameters[i] -=
+                    step_size * (*partial_derivative_of_root_at_parameter_i + regularization);
             },
         );
         self.check_rep();

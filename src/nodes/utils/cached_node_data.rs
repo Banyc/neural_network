@@ -4,6 +4,7 @@ use std::rc::Rc;
 /// ```math
 /// f : \mathbb{R}^n \to \mathbb{R}
 /// ```
+#[derive(Debug, Clone)]
 pub struct CachedNodeData {
     /// the output of this node
     pub output: Option<f64>,

@@ -4,9 +4,10 @@ use super::node::{Node, NodeComputation};
 
 pub fn l2_error_node(operand: Rc<RefCell<Node>>, label: Rc<RefCell<Node>>) -> Node {
     let computation = L2ErrorNodeComputation {};
-    Node::new(vec![operand, label], Box::new(computation), Vec::new())
+    Node::new(vec![operand, label], Rc::new(computation), Vec::new())
 }
 
+#[derive(Debug)]
 struct L2ErrorNodeComputation {}
 impl NodeComputation for L2ErrorNodeComputation {
     fn compute_output(&self, _parameters: &[f64], operand_outputs: &[f64], _inputs: &[f64]) -> f64 {

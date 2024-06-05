@@ -37,10 +37,11 @@ pub fn regularized_weight_node(
                 .collect()
         }
     };
-    let node = Node::new(operands, Box::new(computation), weights);
+    let node = Node::new(operands, Rc::new(computation), weights);
     Ok(node)
 }
 
+#[derive(Debug)]
 struct WeightNodeComputation {
     lambda: f64,
 }

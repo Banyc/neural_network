@@ -4,9 +4,10 @@ use super::node::{Node, NodeComputation};
 
 pub fn relu_node(operand: Rc<RefCell<Node>>) -> Node {
     let computation = ReluNodeComputation {};
-    Node::new(vec![operand], Box::new(computation), Vec::new())
+    Node::new(vec![operand], Rc::new(computation), Vec::new())
 }
 
+#[derive(Debug)]
 struct ReluNodeComputation {}
 impl NodeComputation for ReluNodeComputation {
     fn compute_output(&self, _parameters: &[f64], operand_outputs: &[f64], _inputs: &[f64]) -> f64 {

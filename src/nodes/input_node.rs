@@ -4,7 +4,7 @@ use super::node::{Node, NodeComputation};
 
 pub fn input_node(input_index: usize) -> Node {
     let computation = InputNodeComputation { input_index };
-    Node::new(Vec::new(), Box::new(computation), Vec::new())
+    Node::new(Vec::new(), Rc::new(computation), Vec::new())
 }
 
 pub fn input_node_batch(len: usize) -> Vec<Rc<RefCell<Node>>> {
@@ -16,6 +16,7 @@ pub fn input_node_batch(len: usize) -> Vec<Rc<RefCell<Node>>> {
         .collect()
 }
 
+#[derive(Debug)]
 struct InputNodeComputation {
     input_index: usize,
 }

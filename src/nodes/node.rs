@@ -16,7 +16,7 @@ use super::utils::cached_node_data::CachedNodeData;
 /// ```math
 /// f : \mathbb{R}^n \to \mathbb{R}
 /// ```
-pub trait NodeComputation {
+pub trait NodeComputation: core::fmt::Debug {
     fn compute_output(&self, parameters: &[f64], operand_outputs: &[f64], inputs: &[f64]) -> f64;
 
     /// ```math
@@ -46,16 +46,23 @@ pub trait NodeComputation {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum EvalOption {
+    KeepCache,
+    ResetCache,
+}
+
 /// The function of this node should be
 /// ```math
 /// f : \mathbb{R}^n \to \mathbb{R}
 /// ```
+#[derive(Debug, Clone)]
 pub struct Node {
     parameters: Vec<f64>,
     operands: Vec<Rc<RefCell<Node>>>,
     successor_len: usize,
     cache: CachedNodeData,
-    computation: Box<dyn NodeComputation + Sync + Send>,
+    computation: Rc<dyn NodeComputation + Sync + Send>,
 }
 
 impl Node {
@@ -84,7 +91,7 @@ impl Node {
 
     pub fn new(
         operands: Vec<Rc<RefCell<Node>>>,
-        computation: Box<dyn NodeComputation + Sync + Send>,
+        computation: Rc<dyn NodeComputation + Sync + Send>,
         parameters: Vec<f64>,
     ) -> Node {
         operands.iter().for_each(|operand| {
@@ -106,7 +113,7 @@ impl Node {
     pub fn evaluate(&mut self, inputs: &[f64]) -> f64 {
         let output = *self.cache.output.get_or_insert_with(|| {
             assert!(self.cache.operand_outputs.is_none());
-            let operand_outputs: Rc<_> = self
+            let operand_outputs: Rc<[f64]> = self
                 .operands
                 .iter_mut()
                 .map(|operand| {

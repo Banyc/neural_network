@@ -5,9 +5,10 @@ use super::node::{Node, NodeComputation};
 pub fn bias_node(operand: Rc<RefCell<Node>>, bias: Option<f64>) -> Node {
     let computation = BiasNodeComputation {};
     let bias = bias.unwrap_or(0.0);
-    Node::new(vec![operand], Box::new(computation), vec![bias])
+    Node::new(vec![operand], Rc::new(computation), vec![bias])
 }
 
+#[derive(Debug)]
 struct BiasNodeComputation {}
 impl NodeComputation for BiasNodeComputation {
     fn compute_output(&self, parameters: &[f64], operand_outputs: &[f64], _inputs: &[f64]) -> f64 {

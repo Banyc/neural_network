@@ -50,7 +50,6 @@ pub struct CachedNodeData {
     /// Prevent from distributing it more than once
     pub has_distributed_addends_of_partial_derivatives_of_root_at_operands_to_operands: bool,
 }
-
 impl CachedNodeData {
     pub fn new() -> CachedNodeData {
         Self {
@@ -69,14 +68,13 @@ impl CachedNodeData {
         self.output = None;
         self.operand_outputs = None;
         self.partial_derivative_of_root_at_this = None;
-        self.addends_of_gradient_of_root_at_this = Vec::new();
+        self.addends_of_gradient_of_root_at_this.clear();
         self.gradient_of_this_at_operand = None;
         self.gradient_of_this_at_parameter = None;
         self.gradient_of_root_at_parameter = None;
         self.has_distributed_addends_of_partial_derivatives_of_root_at_operands_to_operands = false;
     }
 }
-
 impl Default for CachedNodeData {
     fn default() -> Self {
         Self::new()

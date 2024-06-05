@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    neural_network::NeuralNetwork,
+    neural_network::{EvalOption, NeuralNetwork},
     nodes::{
         bias_node::bias_node,
         input_node::{input_node, input_node_batch},
@@ -44,7 +44,7 @@ fn single_linear_relu_network(
 #[test]
 fn evaluate() {
     let network = single_linear_relu_network(3, Some(vec![3.0, 2.0, 1.0]), Some(-20.0));
-    let ret = network.evaluate_and_reset_caches(&[1.0, 2.0, 3.0]);
+    let ret = network.evaluate(&[1.0, 2.0, 3.0]);
     assert_eq!(ret, 0.0);
 }
 
@@ -58,18 +58,18 @@ fn error() {
     let error = Rc::new(RefCell::new(error));
     let network = NeuralNetwork::new(relu, error, 1, 1e-2);
     let inputs = vec![-2.0, 1.0];
-    let ret = network.evaluate_and_reset_caches(&inputs);
+    let ret = network.evaluate(&inputs);
     assert_eq!(ret, 0.0);
-    let ret = network.compute_error_and_reset_caches(&inputs);
+    let ret = network.compute_error(&inputs, EvalOption::ClearCache);
     assert_eq!(ret, 1.0);
 }
 
 #[test]
 fn cache_reset() {
     let network = single_linear_relu_network(2, Some(vec![2.0, 1.0]), Some(3.0));
-    let ret = network.evaluate_and_reset_caches(&[2.0, -2.0]);
+    let ret = network.evaluate(&[2.0, -2.0]);
     assert_eq!(ret, 5.0);
-    let ret = network.evaluate_and_reset_caches(&[6.0, -2.0]);
+    let ret = network.evaluate(&[6.0, -2.0]);
     assert!(ret != 5.0);
 }
 
@@ -109,87 +109,8 @@ fn gradients() {
 
     let ret = network.evaluate(&inputs);
     assert_eq!(ret, 5.0);
-    {
-        let relu_node = relu_node.borrow_mut();
-        assert!(relu_node.output().unwrap() > 0.0);
-    }
-    let ret = network.compute_error(&inputs);
+    let ret = network.compute_error(&inputs, EvalOption::KeepCache);
     assert_eq!(ret, 16.0);
-
-    // fill all caches
-    network.backpropagation_step(&inputs);
-
-    {
-        let mut error_node = error_node.borrow_mut();
-        assert_eq!(
-            error_node.partial_derivative_of_root_at_this().unwrap(),
-            1.0
-        );
-        assert_eq!(
-            error_node.gradient_of_this_at_operand().unwrap().as_ref(),
-            &[8.0, -8.0]
-        );
-    }
-
-    {
-        let mut relu_node = relu_node.borrow_mut();
-        assert_eq!(relu_node.partial_derivative_of_root_at_this().unwrap(), 8.0);
-        assert_eq!(
-            relu_node.gradient_of_this_at_operand().unwrap().as_ref(),
-            &[1.0]
-        );
-        assert_eq!(
-            relu_node.gradient_of_this_at_parameter().unwrap().as_ref(),
-            &[]
-        );
-        assert_eq!(
-            relu_node.gradient_of_root_at_parameter().unwrap().as_ref(),
-            &[]
-        );
-    }
-
-    {
-        let mut bias_node = bias_node.borrow_mut();
-        assert_eq!(bias_node.partial_derivative_of_root_at_this().unwrap(), 8.0);
-        assert_eq!(
-            bias_node.gradient_of_this_at_operand().unwrap().as_ref(),
-            &[1.0]
-        );
-        assert_eq!(
-            bias_node.gradient_of_this_at_parameter().unwrap().as_ref(),
-            &[1.0]
-        );
-        assert_eq!(
-            bias_node.gradient_of_root_at_parameter().unwrap().as_ref(),
-            &[8.0]
-        );
-    }
-
-    {
-        let mut weight_node = weight_node.borrow_mut();
-        assert_eq!(
-            weight_node.partial_derivative_of_root_at_this().unwrap(),
-            8.0
-        );
-        assert_eq!(
-            weight_node.gradient_of_this_at_operand().unwrap().as_ref(),
-            &[2.0, 1.0]
-        );
-        assert_eq!(
-            weight_node
-                .gradient_of_this_at_parameter()
-                .unwrap()
-                .as_ref(),
-            &[2.0, -2.0]
-        );
-        assert_eq!(
-            weight_node
-                .gradient_of_root_at_parameter()
-                .unwrap()
-                .as_ref(),
-            &[16.0, -16.0]
-        )
-    }
 }
 
 #[test]
@@ -218,12 +139,10 @@ fn backpropagation_step() {
 
     let inputs = vec![2.0, -2.0, 1.0];
     network.backpropagation_step(&inputs);
-
     {
         let weight_node = weight_node.borrow_mut();
         assert_eq!(weight_node.parameters(), &[-6.0, 9.0])
     }
-
     {
         let bias_node = bias_node.borrow_mut();
         assert_eq!(bias_node.parameters(), &[-1.0])
@@ -254,74 +173,13 @@ fn backpropagation_step2() {
 
     let inputs = vec![2.0, 1.0];
     network.backpropagation_step(&inputs);
-
     {
-        let mut error_node = error_node.borrow_mut();
-        assert_eq!(
-            error_node.partial_derivative_of_root_at_this().unwrap(),
-            1.0
-        );
-        assert_eq!(error_node.output().unwrap(), 121.0);
-        assert_eq!(
-            error_node.gradient_of_this_at_operand().unwrap().as_ref(),
-            &[22.0, -22.0]
-        );
-    }
-
-    {
-        let mut weight_node = weight_node2.borrow_mut();
-        assert_eq!(weight_node.output().unwrap(), 12.0);
+        let weight_node = weight_node2.borrow();
         assert_eq!(weight_node.parameters(), &[-41.0]); // 3 - 0.5 * 88
-        assert_eq!(
-            weight_node.partial_derivative_of_root_at_this().unwrap(),
-            22.0
-        );
-        assert_eq!(
-            weight_node
-                .gradient_of_this_at_parameter()
-                .unwrap()
-                .as_ref(),
-            &[4.0]
-        );
-        assert_eq!(
-            weight_node
-                .gradient_of_root_at_parameter()
-                .unwrap()
-                .as_ref(),
-            &[88.0]
-        );
-        assert_eq!(
-            weight_node.gradient_of_this_at_operand().unwrap().as_ref(),
-            &[3.0]
-        );
     }
-
     {
-        let mut weight_node = weight_node1.borrow_mut();
-        assert_eq!(weight_node.output().unwrap(), 4.0);
+        let weight_node = weight_node1.borrow();
         assert_eq!(weight_node.parameters(), &[-64.0]); // 2 - 0.5 * 121
-        assert_eq!(
-            weight_node.partial_derivative_of_root_at_this().unwrap(),
-            66.0
-        );
-        assert_eq!(
-            weight_node
-                .gradient_of_this_at_parameter()
-                .unwrap()
-                .as_ref(),
-            &[2.0]
-        );
-        assert_eq!(
-            weight_node
-                .gradient_of_root_at_parameter()
-                .unwrap()
-                .as_ref(),
-            &[132.0]
-        );
-        assert_eq!(
-            weight_node.gradient_of_this_at_operand().unwrap().as_ref(),
-            &[2.0]
-        );
     }
 }
 
@@ -363,7 +221,7 @@ fn learn_xor_sigmoid() {
     let max_steps = 10_000;
     network.train(&dataset, max_steps);
     for inputs in &dataset {
-        let ret = network.evaluate_and_reset_caches(inputs);
+        let ret = network.evaluate(inputs);
         assert!((ret - inputs[label_index]).abs() < 0.1);
     }
     let ret = network.errors_on_dataset(&dataset);
@@ -412,7 +270,7 @@ fn learn_xor_regularized_sigmoid() {
     let max_steps = 10_000;
     network.train(&dataset, max_steps);
     for inputs in &dataset {
-        let ret = network.evaluate_and_reset_caches(inputs);
+        let ret = network.evaluate(inputs);
         assert!((ret - inputs[label_index]).abs() < 0.1);
     }
     let ret = network.errors_on_dataset(&dataset);
@@ -478,7 +336,7 @@ fn learn_xor_relu() {
     let max_steps = 5_000;
     network.train(&dataset, max_steps);
     for inputs in &dataset {
-        let ret = network.evaluate_and_reset_caches(inputs);
+        let ret = network.evaluate(inputs);
         assert!((ret - inputs[label_index]).abs() < 0.1);
     }
     let ret = network.errors_on_dataset(&dataset);

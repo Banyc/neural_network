@@ -45,7 +45,6 @@ pub fn regularized_weight_node(
 struct WeightNodeComputation {
     lambda: f64,
 }
-
 impl NodeComputation for WeightNodeComputation {
     fn compute_output(&self, parameters: &[f64], operand_outputs: &[f64], _inputs: &[f64]) -> f64 {
         assert_eq!(operand_outputs.len(), parameters.len());
@@ -106,7 +105,7 @@ mod tests {
         let inputs = vec![1.0, 2.0, 3.0];
         let initial_weights = vec![3.0, 2.0, 1.0];
         let mut weight_node = weight_node(input_nodes, Some(initial_weights)).unwrap();
-        let ret = weight_node.evaluate(&inputs);
+        let ret = weight_node.evaluate_once(&inputs);
         assert_eq!(ret, 3.0 * 1.0 + 2.0 * 2.0 + 1.0 * 3.0);
     }
 
@@ -116,9 +115,9 @@ mod tests {
         let inputs = vec![1.0, 2.0, 3.0];
         let initial_weights = vec![3.0, 2.0, 1.0];
         let mut weight_node = weight_node(input_nodes, Some(initial_weights)).unwrap();
-        weight_node.evaluate(&inputs);
+        weight_node.evaluate_once(&inputs);
         let ret = weight_node.gradient_of_this_at_operand().unwrap();
-        assert_eq!(ret.as_ref(), &[3.0, 2.0, 1.0]);
+        assert_eq!(&ret, &[3.0, 2.0, 1.0]);
     }
 
     #[test]
@@ -127,8 +126,8 @@ mod tests {
         let inputs = vec![1.0, 2.0, 3.0];
         let initial_weights = vec![3.0, 2.0, 1.0];
         let mut weight_node = weight_node(input_nodes, Some(initial_weights)).unwrap();
-        weight_node.evaluate(&inputs);
+        weight_node.evaluate_once(&inputs);
         let ret = weight_node.gradient_of_this_at_parameter().unwrap();
-        assert_eq!(ret.as_ref(), &[1.0, 2.0, 3.0]);
+        assert_eq!(&ret, &[1.0, 2.0, 3.0]);
     }
 }

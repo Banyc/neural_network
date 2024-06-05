@@ -2,10 +2,9 @@ use std::{cell::RefCell, rc::Rc};
 
 use rand::Rng;
 
-use super::nodes::node::{
-    do_gradient_descent_steps_and_reset_caches_on_all_nodes,
-    do_gradient_descent_steps_on_all_nodes, reset_caches_on_all_nodes, Node,
-};
+use crate::nodes::node::graph_delete_caches;
+
+use super::nodes::node::{graph_do_gradient_descent_steps, Node};
 
 #[derive(Debug)]
 pub struct NeuralNetwork {
@@ -33,36 +32,27 @@ impl NeuralNetwork {
         this
     }
 
-    pub fn backpropagation_step_and_reset_caches(&self, inputs: &[f64]) {
-        self.compute_error(inputs);
-        do_gradient_descent_steps_and_reset_caches_on_all_nodes(&self.error_node, self.step_size);
-    }
-
     pub fn backpropagation_step(&self, inputs: &[f64]) {
-        self.compute_error(inputs);
-        do_gradient_descent_steps_on_all_nodes(&self.error_node, self.step_size);
-    }
-
-    pub fn evaluate_and_reset_caches(&self, inputs: &[f64]) -> f64 {
-        let ret = self.evaluate(inputs);
-        reset_caches_on_all_nodes(&self.terminal_node);
-        ret
+        self.compute_error(inputs, EvalOption::KeepCache);
+        graph_do_gradient_descent_steps(&self.error_node, self.step_size);
     }
 
     pub fn evaluate(&self, inputs: &[f64]) -> f64 {
         let mut terminal_node = self.terminal_node.borrow_mut();
-        terminal_node.evaluate(inputs)
+        let output = terminal_node.evaluate_once(inputs);
+        drop(terminal_node);
+        graph_delete_caches(&self.terminal_node);
+        output
     }
 
-    pub fn compute_error_and_reset_caches(&self, inputs: &[f64]) -> f64 {
-        let ret = self.compute_error(inputs);
-        reset_caches_on_all_nodes(&self.error_node);
-        ret
-    }
-
-    pub fn compute_error(&self, inputs: &[f64]) -> f64 {
+    pub fn compute_error(&self, inputs: &[f64], option: EvalOption) -> f64 {
         let mut error_node = self.error_node.borrow_mut();
-        error_node.evaluate(inputs)
+        let output = error_node.evaluate_once(inputs);
+        drop(error_node);
+        if matches!(option, EvalOption::ClearCache) {
+            graph_delete_caches(&self.error_node);
+        }
+        output
     }
 
     pub fn train<S>(&self, dataset: &[S], max_steps: usize)
@@ -72,7 +62,7 @@ impl NeuralNetwork {
         let mut rng = rand::thread_rng();
         for i in 0..max_steps {
             let dataset_index: usize = rng.gen_range(0..dataset.len());
-            self.backpropagation_step_and_reset_caches(dataset[dataset_index].as_ref());
+            self.backpropagation_step(dataset[dataset_index].as_ref());
             if i % (max_steps / 10) == 0 {
                 println!("{:.2}%", (100 * i) as f64 / max_steps as f64);
             }
@@ -85,11 +75,16 @@ impl NeuralNetwork {
     {
         let mut errors = 0;
         for inputs in dataset {
-            let eval = self.evaluate_and_reset_caches(inputs.as_ref());
+            let eval = self.evaluate(inputs.as_ref());
             if (eval - inputs.as_ref()[self.label_index]).abs() >= 0.5 {
                 errors += 1;
             }
         }
         errors as f64 / dataset.len() as f64
     }
+}
+
+pub enum EvalOption {
+    KeepCache,
+    ClearCache,
 }

@@ -7,5 +7,4 @@ pub mod relu_node;
 pub mod sigmoid_node;
 #[cfg(test)]
 mod tests;
-pub mod utils;
 pub mod weight_node;

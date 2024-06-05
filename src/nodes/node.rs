@@ -327,7 +327,7 @@ pub fn graph_do_gradient_descent_steps(root_note: &Arc<Mutex<Node>>, step_size: 
     let f = |n: &mut Node| match n.do_gradient_descent_step(step_size) {
         Ok(_) => true,
         Err(e) => match e {
-            GradientDescentError::NotReceivingEnoughAddendsOfGradientFromSuccessors => false,
+            GradientDescentError::NotReceivingEnoughAddendsOfGradientFromSuccessors => panic!(),
             // This node has had it parameters updated already
             GradientDescentError::NoEvaluationOutputCaches => false,
         },

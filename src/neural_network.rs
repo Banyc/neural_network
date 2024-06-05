@@ -7,7 +7,7 @@ use super::nodes::node::{
     do_gradient_descent_steps_on_all_nodes, reset_caches_on_all_nodes, Node,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct NeuralNetwork {
     terminal_node: Rc<RefCell<Node>>,
     error_node: Rc<RefCell<Node>>,

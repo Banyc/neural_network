@@ -56,7 +56,7 @@ pub enum EvalOption {
 /// ```math
 /// f : \mathbb{R}^n \to \mathbb{R}
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Node {
     parameters: Vec<f64>,
     operands: Vec<Rc<RefCell<Node>>>,

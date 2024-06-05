@@ -21,7 +21,8 @@ pub trait NodeComputation: core::fmt::Debug {
     /// \frac{\partial f}{\partial z}
     /// ```
     ///
-    /// - $z$: the non-tunable operands of $f$
+    /// - $z$: the non-tunable operands of this node
+    /// - $f$: this node
     fn compute_gradient_of_this_at_operand(
         &self,
         parameters: &[f64],
@@ -32,7 +33,8 @@ pub trait NodeComputation: core::fmt::Debug {
     /// \frac{\partial f}{\partial w}
     /// ```
     ///
-    /// - $w$: the tunable parameters of $f$
+    /// - $w$: the tunable parameters of this node
+    /// - $f$: this node
     fn compute_gradient_of_this_at_parameter(
         &self,
         parameters: &[f64],
@@ -200,7 +202,8 @@ impl Node {
     /// \frac{\partial f}{\partial z}
     /// ```
     ///
-    /// - $z$: the non-tunable operands of $f$
+    /// - $z$: the non-tunable operands of this node
+    /// - $f$: this node
     pub fn gradient_of_this_at_operand(&self) -> Result<Vec<f64>, GradientOfThisAtOperandError> {
         let operand_outputs = self
             .operand_outputs()
@@ -215,6 +218,7 @@ impl Node {
     /// ```
     ///
     /// - $E$: the out-most function of the entire network
+    /// - $f$: this node
     pub fn partial_derivative_of_root_at_this(&self) -> Result<f64, GradientOfRootAtThisError> {
         let Some(cache) = &self.cache else {
             return Err(
@@ -245,7 +249,8 @@ impl Node {
     /// \frac{\partial f}{\partial w}
     /// ```
     ///
-    /// - $w$: the tunable parameters of $f$
+    /// - $w$: the tunable parameters of this node
+    /// - $f$: this node
     pub fn gradient_of_this_at_parameter(
         &self,
     ) -> Result<Vec<f64>, GradientOfThisAtParameterError> {
@@ -261,7 +266,7 @@ impl Node {
     /// \frac{\partial E}{\partial w}
     /// ```
     ///
-    /// - $w$: the tunable parameters of $f$
+    /// - $w$: the tunable parameters of this node
     pub fn gradient_of_root_at_parameter(
         &self,
     ) -> Result<Vec<f64>, GradientOfRootAtParameterError> {
@@ -399,7 +404,8 @@ struct BackpropagateCache {
     /// (\frac{\partial E}{\partial h_i} \cdot \frac{\partial h_i}{\partial f})
     /// ```
     ///
-    /// - $h_i$: the $i$-th immediate successor of $f$
+    /// - $h_i$: the $i$-th immediate successor of this node
+    /// - $f$: this node
     pub addends_of_gradient_of_root_at_this: Vec<f64>,
 
     pub evaluate_cache: EvaluateCache,

@@ -7,7 +7,7 @@ use crate::{
         input_node::{input_node, input_node_batch},
         l2_error_node::l2_error_node,
         linear_node::{linear_node, regularized_linear_node},
-        node::{clone_node_batch, GeneralNode},
+        node::{clone_node_batch, Node},
         relu_node::relu_node,
         sigmoid_node::sigmoid_node,
         weight_node::weight_node,
@@ -15,10 +15,10 @@ use crate::{
 };
 
 fn single_linear_relu(
-    input_nodes: Vec<Rc<RefCell<GeneralNode>>>,
+    input_nodes: Vec<Rc<RefCell<Node>>>,
     initial_weights: Option<Vec<f64>>,
     initial_bias: Option<f64>,
-) -> GeneralNode {
+) -> Node {
     let linear_node = linear_node(input_nodes, initial_weights, initial_bias).unwrap();
     relu_node(Rc::new(RefCell::new(linear_node)))
 }

@@ -1,14 +1,13 @@
 use std::{cell::RefCell, rc::Rc};
 
-use super::node::{GeneralNode, NodeComputation};
+use super::node::{Node, NodeComputation};
 
-pub fn relu_node(operand: Rc<RefCell<GeneralNode>>) -> GeneralNode {
+pub fn relu_node(operand: Rc<RefCell<Node>>) -> Node {
     let computation = ReluNodeComputation {};
-    GeneralNode::new(vec![operand], Box::new(computation), Vec::new())
+    Node::new(vec![operand], Box::new(computation), Vec::new())
 }
 
 struct ReluNodeComputation {}
-
 impl NodeComputation for ReluNodeComputation {
     fn compute_output(&self, _parameters: &[f64], operand_outputs: &[f64], _inputs: &[f64]) -> f64 {
         assert_eq!(operand_outputs.len(), 1);

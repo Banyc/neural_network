@@ -1,15 +1,14 @@
 use std::{cell::RefCell, rc::Rc};
 
-use super::node::{GeneralNode, NodeComputation};
+use super::node::{Node, NodeComputation};
 
-pub fn bias_node(operand: Rc<RefCell<GeneralNode>>, bias: Option<f64>) -> GeneralNode {
+pub fn bias_node(operand: Rc<RefCell<Node>>, bias: Option<f64>) -> Node {
     let computation = BiasNodeComputation {};
     let bias = bias.unwrap_or(0.0);
-    GeneralNode::new(vec![operand], Box::new(computation), vec![bias])
+    Node::new(vec![operand], Box::new(computation), vec![bias])
 }
 
 struct BiasNodeComputation {}
-
 impl NodeComputation for BiasNodeComputation {
     fn compute_output(&self, parameters: &[f64], operand_outputs: &[f64], _inputs: &[f64]) -> f64 {
         assert_eq!(operand_outputs.len(), 1);

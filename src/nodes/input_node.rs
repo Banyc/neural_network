@@ -1,13 +1,13 @@
 use std::{cell::RefCell, rc::Rc};
 
-use super::node::{GeneralNode, NodeComputation};
+use super::node::{Node, NodeComputation};
 
-pub fn input_node(input_index: usize) -> GeneralNode {
+pub fn input_node(input_index: usize) -> Node {
     let computation = InputNodeComputation { input_index };
-    GeneralNode::new(Vec::new(), Box::new(computation), Vec::new())
+    Node::new(Vec::new(), Box::new(computation), Vec::new())
 }
 
-pub fn input_node_batch(len: usize) -> Vec<Rc<RefCell<GeneralNode>>> {
+pub fn input_node_batch(len: usize) -> Vec<Rc<RefCell<Node>>> {
     (0..len)
         .map(|i| {
             let node = input_node(i);
@@ -19,7 +19,6 @@ pub fn input_node_batch(len: usize) -> Vec<Rc<RefCell<GeneralNode>>> {
 struct InputNodeComputation {
     input_index: usize,
 }
-
 impl NodeComputation for InputNodeComputation {
     fn compute_output(&self, _parameters: &[f64], _operand_outputs: &[f64], inputs: &[f64]) -> f64 {
         inputs[self.input_index]

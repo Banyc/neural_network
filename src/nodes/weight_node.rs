@@ -3,20 +3,20 @@ use std::{cell::RefCell, rc::Rc};
 use rand::Rng;
 use thiserror::Error;
 
-use super::node::{GeneralNode, NodeComputation};
+use super::node::{Node, NodeComputation};
 
 pub fn weight_node(
-    operands: Vec<Rc<RefCell<GeneralNode>>>,
+    operands: Vec<Rc<RefCell<Node>>>,
     weights: Option<Vec<f64>>,
-) -> Result<GeneralNode, WeightNodeError> {
+) -> Result<Node, WeightNodeError> {
     regularized_weight_node(operands, weights, 0.0)
 }
 
 pub fn regularized_weight_node(
-    operands: Vec<Rc<RefCell<GeneralNode>>>,
+    operands: Vec<Rc<RefCell<Node>>>,
     mut weights: Option<Vec<f64>>,
     lambda: f64,
-) -> Result<GeneralNode, WeightNodeError> {
+) -> Result<Node, WeightNodeError> {
     if let Some(weights) = &weights {
         if operands.len() != weights.len() {
             return Err(WeightNodeError::ParameterSizeNotMatched);
@@ -37,7 +37,7 @@ pub fn regularized_weight_node(
                 .collect()
         }
     };
-    let node = GeneralNode::new(operands, Box::new(computation), weights);
+    let node = Node::new(operands, Box::new(computation), weights);
     Ok(node)
 }
 

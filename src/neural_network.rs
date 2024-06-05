@@ -4,22 +4,21 @@ use rand::Rng;
 
 use super::nodes::node::{
     do_gradient_descent_steps_and_reset_caches_on_all_nodes,
-    do_gradient_descent_steps_on_all_nodes, reset_caches_on_all_nodes, GeneralNode,
+    do_gradient_descent_steps_on_all_nodes, reset_caches_on_all_nodes, Node,
 };
 
 pub struct NeuralNetwork {
-    terminal_node: Rc<RefCell<GeneralNode>>,
-    error_node: Rc<RefCell<GeneralNode>>,
+    terminal_node: Rc<RefCell<Node>>,
+    error_node: Rc<RefCell<Node>>,
     label_index: usize,
     step_size: f64,
 }
-
 impl NeuralNetwork {
     fn check_rep(&self) {}
 
     pub fn new(
-        terminal_node: Rc<RefCell<GeneralNode>>,
-        error_node: Rc<RefCell<GeneralNode>>,
+        terminal_node: Rc<RefCell<Node>>,
+        error_node: Rc<RefCell<Node>>,
         label_index: usize,
         step_size: f64,
     ) -> NeuralNetwork {

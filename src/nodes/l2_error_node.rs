@@ -1,17 +1,13 @@
 use std::{cell::RefCell, rc::Rc};
 
-use super::node::{GeneralNode, NodeComputation};
+use super::node::{Node, NodeComputation};
 
-pub fn l2_error_node(
-    operand: Rc<RefCell<GeneralNode>>,
-    label: Rc<RefCell<GeneralNode>>,
-) -> GeneralNode {
+pub fn l2_error_node(operand: Rc<RefCell<Node>>, label: Rc<RefCell<Node>>) -> Node {
     let computation = L2ErrorNodeComputation {};
-    GeneralNode::new(vec![operand, label], Box::new(computation), Vec::new())
+    Node::new(vec![operand, label], Box::new(computation), Vec::new())
 }
 
 struct L2ErrorNodeComputation {}
-
 impl NodeComputation for L2ErrorNodeComputation {
     fn compute_output(&self, _parameters: &[f64], operand_outputs: &[f64], _inputs: &[f64]) -> f64 {
         assert_eq!(operand_outputs.len(), 2);

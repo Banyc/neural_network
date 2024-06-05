@@ -13,15 +13,15 @@ use thiserror::Error;
 use super::utils::cached_node_data::CachedNodeData;
 
 /// The function of this node should be
-/// $$
+/// ```math
 /// f : \mathbb{R}^n \to \mathbb{R}
-/// $$
+/// ```
 pub trait NodeComputation {
     fn compute_output(&self, parameters: &[f64], operand_outputs: &[f64], inputs: &[f64]) -> f64;
 
-    /// $$
+    /// ```math
     /// \frac{\partial f}{\partial z}
-    /// $$
+    /// ```
     ///
     /// - $z$: the non-tunable operands of $f$
     fn compute_gradient_of_this_at_operand(
@@ -30,9 +30,9 @@ pub trait NodeComputation {
         operand_outputs: &[f64],
     ) -> Vec<f64>;
 
-    /// $$
+    /// ```math
     /// \frac{\partial f}{\partial w}
-    /// $$
+    /// ```
     ///
     /// - $w$: the tunable parameters of $f$
     fn compute_gradient_of_this_at_parameter(
@@ -47,18 +47,18 @@ pub trait NodeComputation {
 }
 
 /// The function of this node should be
-/// $$
+/// ```math
 /// f : \mathbb{R}^n \to \mathbb{R}
-/// $$
-pub struct GeneralNode {
+/// ```
+pub struct Node {
     parameters: Vec<f64>,
-    operands: Vec<Rc<RefCell<GeneralNode>>>,
+    operands: Vec<Rc<RefCell<Node>>>,
     successor_len: usize,
     cache: CachedNodeData,
     computation: Box<dyn NodeComputation + Sync + Send>,
 }
 
-impl GeneralNode {
+impl Node {
     fn check_rep(&self) {
         if let Some(gradient) = &self.cache.gradient_of_root_at_parameter {
             assert_eq!(gradient.len(), self.parameters.len());
@@ -83,10 +83,10 @@ impl GeneralNode {
     }
 
     pub fn new(
-        operands: Vec<Rc<RefCell<GeneralNode>>>,
+        operands: Vec<Rc<RefCell<Node>>>,
         computation: Box<dyn NodeComputation + Sync + Send>,
         parameters: Vec<f64>,
-    ) -> GeneralNode {
+    ) -> Node {
         operands.iter().for_each(|operand| {
             let mut operand = operand.borrow_mut();
             operand.increment_successor_len();
@@ -201,9 +201,9 @@ impl GeneralNode {
         self.check_rep();
     }
 
-    /// $$
+    /// ```math
     /// \frac{\partial f}{\partial z}
-    /// $$
+    /// ```
     ///
     /// - $z$: the non-tunable operands of $f$
     pub fn gradient_of_this_at_operand(
@@ -223,9 +223,9 @@ impl GeneralNode {
         Ok(self.cache.gradient_of_this_at_operand.as_ref().unwrap())
     }
 
-    /// $$
+    /// ```math
     /// \frac{\partial E}{\partial f}
-    /// $$
+    /// ```
     ///
     /// - $E$: the out-most function of the entire network
     pub fn partial_derivative_of_root_at_this(&mut self) -> Result<f64, GradientOfRootAtThisError> {
@@ -253,9 +253,9 @@ impl GeneralNode {
         Ok(partial_derivative_of_root_at_this)
     }
 
-    /// $$
+    /// ```math
     /// \frac{\partial f}{\partial w}
-    /// $$
+    /// ```
     ///
     /// - $w$: the tunable parameters of $f$
     pub fn gradient_of_this_at_parameter(
@@ -278,9 +278,9 @@ impl GeneralNode {
         Ok(self.cache.gradient_of_this_at_parameter.as_ref().unwrap())
     }
 
-    /// $$
+    /// ```math
     /// \frac{\partial E}{\partial w}
-    /// $$
+    /// ```
     ///
     /// - $w$: the tunable parameters of $f$
     pub fn gradient_of_root_at_parameter(
@@ -321,23 +321,23 @@ impl GeneralNode {
     }
 }
 
-pub fn clone_node_batch(nodes: &[Rc<RefCell<GeneralNode>>]) -> Vec<Rc<RefCell<GeneralNode>>> {
+pub fn clone_node_batch(nodes: &[Rc<RefCell<Node>>]) -> Vec<Rc<RefCell<Node>>> {
     nodes.iter().map(Rc::clone).collect()
 }
 
 /// Inefficient: same node might be visited more than once
-pub fn reset_caches_on_all_nodes(root_note: &Rc<RefCell<GeneralNode>>) {
-    let f = |n: &mut GeneralNode| {
+pub fn reset_caches_on_all_nodes(root_note: &Rc<RefCell<Node>>) {
+    let f = |n: &mut Node| {
         n.cache.reset();
     };
     bfs_operands(root_note, f);
 }
 
 pub fn do_gradient_descent_steps_and_reset_caches_on_all_nodes(
-    root_note: &Rc<RefCell<GeneralNode>>,
+    root_note: &Rc<RefCell<Node>>,
     step_size: f64,
 ) {
-    let f = |n: &mut GeneralNode| {
+    let f = |n: &mut Node| {
         match n.do_gradient_descent_step_and_reset_cache(step_size) {
             Ok(_) => (),
             Err(e) => match e {
@@ -350,11 +350,8 @@ pub fn do_gradient_descent_steps_and_reset_caches_on_all_nodes(
     bfs_operands(root_note, f);
 }
 
-pub fn do_gradient_descent_steps_on_all_nodes(
-    root_note: &Rc<RefCell<GeneralNode>>,
-    step_size: f64,
-) {
-    let f = |n: &mut GeneralNode| {
+pub fn do_gradient_descent_steps_on_all_nodes(root_note: &Rc<RefCell<Node>>, step_size: f64) {
+    let f = |n: &mut Node| {
         match n.do_gradient_descent_step(step_size) {
             Ok(_) => (),
             Err(e) => match e {
@@ -367,7 +364,7 @@ pub fn do_gradient_descent_steps_on_all_nodes(
     bfs_operands(root_note, f);
 }
 
-fn bfs_operands(root_node: &Rc<RefCell<GeneralNode>>, f: impl Fn(&mut GeneralNode)) {
+fn bfs_operands(root_node: &Rc<RefCell<Node>>, f: impl Fn(&mut Node)) {
     let mut q = VecDeque::new();
     q.push_back(Rc::clone(root_node));
 

@@ -1,9 +1,9 @@
 use std::rc::Rc;
 
 /// The function of this node should be
-/// $$
+/// ```math
 /// f : \mathbb{R}^n \to \mathbb{R}
-/// $$
+/// ```
 pub struct CachedNodeData {
     /// the output of this node
     pub output: Option<f64>,
@@ -11,37 +11,37 @@ pub struct CachedNodeData {
     /// the outputs of the operands
     pub operand_outputs: Option<Rc<[f64]>>,
 
-    /// $$
+    /// ```math
     /// \frac{\partial E}{\partial f}
-    /// $$
+    /// ```
     ///
     /// - $E$: the out-most function of the entire network
     pub partial_derivative_of_root_at_this: Option<f64>,
 
-    /// $$
+    /// ```math
     /// (\frac{\partial E}{\partial h_i} \cdot \frac{\partial h_i}{\partial f})
-    /// $$
+    /// ```
     ///
     /// - $h_i$: the $i$-th immediate successor of $f$
     pub addends_of_gradient_of_root_at_this: Vec<f64>,
 
-    /// $$
+    /// ```math
     /// \frac{\partial f}{\partial z}
-    /// $$
+    /// ```
     ///
     /// - $z$: the non-tunable operands of $f$
     pub gradient_of_this_at_operand: Option<Rc<[f64]>>,
 
-    /// $$
+    /// ```math
     /// \frac{\partial f}{\partial w}
-    /// $$
+    /// ```
     ///
     /// - $w$: the tunable parameters of $f$
     pub gradient_of_this_at_parameter: Option<Rc<[f64]>>,
 
-    /// $$
+    /// ```math
     /// \frac{\partial E}{\partial w}
-    /// $$
+    /// ```
     ///
     /// - $w$: the tunable parameters of $f$
     pub gradient_of_root_at_parameter: Option<Rc<[f64]>>,

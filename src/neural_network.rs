@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::sync::{Arc, Mutex};
 
 use rand::Rng;
 
@@ -8,8 +8,8 @@ use super::nodes::node::{graph_do_gradient_descent_steps, Node};
 
 #[derive(Debug)]
 pub struct NeuralNetwork {
-    terminal_node: Rc<RefCell<Node>>,
-    error_node: Rc<RefCell<Node>>,
+    terminal_node: Arc<Mutex<Node>>,
+    error_node: Arc<Mutex<Node>>,
     label_index: usize,
     step_size: f64,
 }
@@ -17,8 +17,8 @@ impl NeuralNetwork {
     fn check_rep(&self) {}
 
     pub fn new(
-        terminal_node: Rc<RefCell<Node>>,
-        error_node: Rc<RefCell<Node>>,
+        terminal_node: Arc<Mutex<Node>>,
+        error_node: Arc<Mutex<Node>>,
         label_index: usize,
         step_size: f64,
     ) -> NeuralNetwork {
@@ -38,7 +38,7 @@ impl NeuralNetwork {
     }
 
     pub fn evaluate(&self, inputs: &[f64]) -> f64 {
-        let mut terminal_node = self.terminal_node.borrow_mut();
+        let mut terminal_node = self.terminal_node.lock().unwrap();
         let output = terminal_node.evaluate_once(inputs);
         drop(terminal_node);
         graph_delete_caches(&self.terminal_node);
@@ -46,7 +46,7 @@ impl NeuralNetwork {
     }
 
     pub fn compute_error(&self, inputs: &[f64], option: EvalOption) -> f64 {
-        let mut error_node = self.error_node.borrow_mut();
+        let mut error_node = self.error_node.lock().unwrap();
         let output = error_node.evaluate_once(inputs);
         drop(error_node);
         if matches!(option, EvalOption::ClearCache) {

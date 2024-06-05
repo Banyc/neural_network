@@ -6,7 +6,10 @@
 //! - $w$: the tunable parameters of $f$
 //! - $E$: the outmost function represented by the root node of the computation graph
 
-use std::{cell::RefCell, collections::VecDeque, rc::Rc};
+use std::{
+    collections::VecDeque,
+    sync::{Arc, Mutex},
+};
 
 use thiserror::Error;
 
@@ -53,10 +56,10 @@ pub trait NodeComputation: core::fmt::Debug {
 #[derive(Debug)]
 pub struct Node {
     parameters: Vec<f64>,
-    operands: Vec<Rc<RefCell<Node>>>,
+    operands: Vec<Arc<Mutex<Node>>>,
     successor_len: usize,
     cache: Option<Cache>,
-    computation: Rc<dyn NodeComputation + Sync + Send>,
+    computation: Arc<dyn NodeComputation + Sync + Send>,
 }
 
 impl Node {
@@ -74,12 +77,12 @@ impl Node {
     }
 
     pub fn new(
-        operands: Vec<Rc<RefCell<Node>>>,
-        computation: Rc<dyn NodeComputation + Sync + Send>,
+        operands: Vec<Arc<Mutex<Node>>>,
+        computation: Arc<dyn NodeComputation + Sync + Send>,
         parameters: Vec<f64>,
     ) -> Node {
         operands.iter().for_each(|operand| {
-            let mut operand = operand.borrow_mut();
+            let mut operand = operand.lock().unwrap();
             operand.increment_successor_len();
         });
         let this = Self {
@@ -98,11 +101,11 @@ impl Node {
             return cache.output;
         }
 
-        let operand_outputs: Rc<[f64]> = self
+        let operand_outputs: Vec<f64> = self
             .operands
             .iter_mut()
             .map(|operand| {
-                let mut operand = operand.borrow_mut();
+                let mut operand = operand.lock().unwrap();
                 operand.evaluate_once(inputs)
             })
             .collect();
@@ -161,7 +164,7 @@ impl Node {
                 // $$
                 let addend_of_partial_derivative_of_root_at_operand =
                     partial_derivative_of_root_at_this * gradient_of_this_at_operand[i];
-                let mut operand = self.operands[i].borrow_mut();
+                let mut operand = self.operands[i].lock().unwrap();
                 operand.add_addend_of_partial_derivative_of_root_at_this(
                     addend_of_partial_derivative_of_root_at_operand,
                 );
@@ -284,7 +287,7 @@ impl Node {
             .collect())
     }
 
-    pub fn operand_outputs(&self) -> Option<&Rc<[f64]>> {
+    pub fn operand_outputs(&self) -> Option<&Vec<f64>> {
         Some(match &self.cache {
             Some(Cache::Evaluate(x)) => &x.operand_outputs,
             Some(Cache::Backpropagate(x)) => &x.evaluate_cache.operand_outputs,
@@ -305,11 +308,11 @@ impl Node {
     }
 }
 
-pub fn clone_node_batch(nodes: &[Rc<RefCell<Node>>]) -> Vec<Rc<RefCell<Node>>> {
-    nodes.iter().map(Rc::clone).collect()
+pub fn clone_node_batch(nodes: &[Arc<Mutex<Node>>]) -> Vec<Arc<Mutex<Node>>> {
+    nodes.iter().map(Arc::clone).collect()
 }
 
-pub fn graph_delete_caches(root_note: &Rc<RefCell<Node>>) {
+pub fn graph_delete_caches(root_note: &Arc<Mutex<Node>>) {
     let f = |n: &mut Node| {
         if n.cache.is_none() {
             return false;
@@ -320,7 +323,7 @@ pub fn graph_delete_caches(root_note: &Rc<RefCell<Node>>) {
     bfs_operands(root_note, f);
 }
 
-pub fn graph_do_gradient_descent_steps(root_note: &Rc<RefCell<Node>>, step_size: f64) {
+pub fn graph_do_gradient_descent_steps(root_note: &Arc<Mutex<Node>>, step_size: f64) {
     let f = |n: &mut Node| match n.do_gradient_descent_step(step_size) {
         Ok(_) => true,
         Err(e) => match e {
@@ -333,18 +336,18 @@ pub fn graph_do_gradient_descent_steps(root_note: &Rc<RefCell<Node>>, step_size:
 }
 
 /// `f`: Return `false` to trim this branch
-fn bfs_operands(root_node: &Rc<RefCell<Node>>, f: impl Fn(&mut Node) -> bool) {
+fn bfs_operands(root_node: &Arc<Mutex<Node>>, f: impl Fn(&mut Node) -> bool) {
     let mut q = VecDeque::new();
-    q.push_back(Rc::clone(root_node));
+    q.push_back(Arc::clone(root_node));
 
     while let Some(n) = q.pop_front() {
-        let mut n = n.borrow_mut();
+        let mut n = n.lock().unwrap();
         let should_visit_children = f(&mut n);
         if !should_visit_children {
             continue;
         }
         for op in &n.operands {
-            q.push_back(Rc::clone(op));
+            q.push_back(Arc::clone(op));
         }
     }
 }
@@ -395,7 +398,7 @@ struct EvaluateCache {
     pub output: f64,
 
     /// the outputs of the operands
-    pub operand_outputs: Rc<[f64]>,
+    pub operand_outputs: Vec<f64>,
 }
 
 #[derive(Debug, Clone)]

@@ -1,10 +1,10 @@
-use std::{cell::RefCell, rc::Rc};
+use std::sync::{Arc, Mutex};
 
 use super::node::{Node, NodeComputation};
 
-pub fn sigmoid_node(operand: Rc<RefCell<Node>>) -> Node {
+pub fn sigmoid_node(operand: Arc<Mutex<Node>>) -> Node {
     let computation = SigmoidNodeComputation {};
-    Node::new(vec![operand], Rc::new(computation), Vec::new())
+    Node::new(vec![operand], Arc::new(computation), Vec::new())
 }
 
 #[derive(Debug)]

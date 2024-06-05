@@ -1,10 +1,10 @@
-use std::{cell::RefCell, rc::Rc};
+use std::sync::{Arc, Mutex};
 
 use super::node::{Node, NodeComputation};
 
-pub fn l2_error_node(operand: Rc<RefCell<Node>>, label: Rc<RefCell<Node>>) -> Node {
+pub fn l2_error_node(operand: Arc<Mutex<Node>>, label: Arc<Mutex<Node>>) -> Node {
     let computation = L2ErrorNodeComputation {};
-    Node::new(vec![operand, label], Rc::new(computation), Vec::new())
+    Node::new(vec![operand, label], Arc::new(computation), Vec::new())
 }
 
 #[derive(Debug)]

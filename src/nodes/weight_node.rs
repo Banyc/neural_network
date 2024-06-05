@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::sync::{Arc, Mutex};
 
 use rand::Rng;
 use thiserror::Error;
@@ -6,14 +6,14 @@ use thiserror::Error;
 use super::node::{Node, NodeComputation};
 
 pub fn weight_node(
-    operands: Vec<Rc<RefCell<Node>>>,
+    operands: Vec<Arc<Mutex<Node>>>,
     weights: Option<Vec<f64>>,
 ) -> Result<Node, WeightNodeError> {
     regularized_weight_node(operands, weights, 0.0)
 }
 
 pub fn regularized_weight_node(
-    operands: Vec<Rc<RefCell<Node>>>,
+    operands: Vec<Arc<Mutex<Node>>>,
     mut weights: Option<Vec<f64>>,
     lambda: f64,
 ) -> Result<Node, WeightNodeError> {
@@ -37,7 +37,7 @@ pub fn regularized_weight_node(
                 .collect()
         }
     };
-    let node = Node::new(operands, Rc::new(computation), weights);
+    let node = Node::new(operands, Arc::new(computation), weights);
     Ok(node)
 }
 

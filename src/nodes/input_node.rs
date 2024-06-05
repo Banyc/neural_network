@@ -1,17 +1,17 @@
-use std::{cell::RefCell, rc::Rc};
+use std::sync::{Arc, Mutex};
 
 use super::node::{Node, NodeComputation};
 
 pub fn input_node(input_index: usize) -> Node {
     let computation = InputNodeComputation { input_index };
-    Node::new(Vec::new(), Rc::new(computation), Vec::new())
+    Node::new(Vec::new(), Arc::new(computation), Vec::new())
 }
 
-pub fn input_node_batch(len: usize) -> Vec<Rc<RefCell<Node>>> {
+pub fn input_node_batch(len: usize) -> Vec<Arc<Mutex<Node>>> {
     (0..len)
         .map(|i| {
             let node = input_node(i);
-            Rc::new(RefCell::new(node))
+            Arc::new(Mutex::new(node))
         })
         .collect()
 }

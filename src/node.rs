@@ -312,6 +312,10 @@ impl Node {
     pub fn parameters(&self) -> &Vec<f64> {
         &self.parameters
     }
+    pub fn set_parameters(&mut self, parameters: Vec<f64>) {
+        assert_eq!(self.parameters.len(), parameters.len());
+        self.parameters = parameters;
+    }
 }
 
 pub fn clone_node_batch(nodes: &[Arc<Mutex<Node>>]) -> Vec<Arc<Mutex<Node>>> {

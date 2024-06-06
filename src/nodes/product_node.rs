@@ -13,7 +13,12 @@ pub fn product_node(operands: Vec<Arc<Mutex<Node>>>) -> Node {
 #[derive(Debug)]
 struct ProductNodeComputation {}
 impl NodeComputation for ProductNodeComputation {
-    fn compute_output(&self, parameters: &[f64], operand_outputs: &[f64], _inputs: &[f64]) -> f64 {
+    fn compute_output(
+        &self,
+        parameters: &[f64],
+        operand_outputs: &[f64],
+        _graph_inputs: &[f64],
+    ) -> f64 {
         assert!(parameters.is_empty());
         product(operand_outputs)
     }

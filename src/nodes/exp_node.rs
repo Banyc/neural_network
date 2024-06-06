@@ -15,7 +15,12 @@ struct ExpNodeComputation {
     base: f64,
 }
 impl NodeComputation for ExpNodeComputation {
-    fn compute_output(&self, parameters: &[f64], operand_outputs: &[f64], _inputs: &[f64]) -> f64 {
+    fn compute_output(
+        &self,
+        parameters: &[f64],
+        operand_outputs: &[f64],
+        _graph_inputs: &[f64],
+    ) -> f64 {
         assert!(parameters.is_empty());
         assert_eq!(operand_outputs.len(), 1);
         exp(self.base, operand_outputs[0])

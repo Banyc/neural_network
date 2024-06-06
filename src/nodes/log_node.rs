@@ -15,7 +15,12 @@ struct LogNodeComputation {
     base: f64,
 }
 impl NodeComputation for LogNodeComputation {
-    fn compute_output(&self, parameters: &[f64], operand_outputs: &[f64], _inputs: &[f64]) -> f64 {
+    fn compute_output(
+        &self,
+        parameters: &[f64],
+        operand_outputs: &[f64],
+        _graph_inputs: &[f64],
+    ) -> f64 {
         assert!(parameters.is_empty());
         assert_eq!(operand_outputs.len(), 1);
         log(operand_outputs[0], self.base)

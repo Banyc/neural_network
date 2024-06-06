@@ -20,7 +20,12 @@ use thiserror::Error;
 /// f : \mathbb{R}^n \to \mathbb{R}
 /// ```
 pub trait NodeComputation: core::fmt::Debug {
-    fn compute_output(&self, parameters: &[f64], operand_outputs: &[f64], inputs: &[f64]) -> f64;
+    fn compute_output(
+        &self,
+        parameters: &[f64],
+        operand_outputs: &[f64],
+        graph_inputs: &[f64],
+    ) -> f64;
 
     /// ```math
     /// \frac{\partial f}{\partial z}

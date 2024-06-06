@@ -13,7 +13,12 @@ pub fn l2_error_node(operand: Arc<Mutex<Node>>, label: Arc<Mutex<Node>>) -> Node
 #[derive(Debug)]
 struct L2ErrorNodeComputation {}
 impl NodeComputation for L2ErrorNodeComputation {
-    fn compute_output(&self, _parameters: &[f64], operand_outputs: &[f64], _inputs: &[f64]) -> f64 {
+    fn compute_output(
+        &self,
+        _parameters: &[f64],
+        operand_outputs: &[f64],
+        _graph_inputs: &[f64],
+    ) -> f64 {
         assert_eq!(operand_outputs.len(), 2);
         l2_error(operand_outputs[0], operand_outputs[1])
     }

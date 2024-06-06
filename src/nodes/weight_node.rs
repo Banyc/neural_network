@@ -49,7 +49,12 @@ struct WeightNodeComputation {
     lambda: f64,
 }
 impl NodeComputation for WeightNodeComputation {
-    fn compute_output(&self, parameters: &[f64], operand_outputs: &[f64], _inputs: &[f64]) -> f64 {
+    fn compute_output(
+        &self,
+        parameters: &[f64],
+        operand_outputs: &[f64],
+        _graph_inputs: &[f64],
+    ) -> f64 {
         assert_eq!(operand_outputs.len(), parameters.len());
         weight(operand_outputs, parameters)
     }

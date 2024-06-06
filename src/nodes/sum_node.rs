@@ -13,7 +13,12 @@ pub fn sum_node(operands: Vec<Arc<Mutex<Node>>>) -> Node {
 #[derive(Debug)]
 struct SumNodeComputation {}
 impl NodeComputation for SumNodeComputation {
-    fn compute_output(&self, parameters: &[f64], operand_outputs: &[f64], _inputs: &[f64]) -> f64 {
+    fn compute_output(
+        &self,
+        parameters: &[f64],
+        operand_outputs: &[f64],
+        _graph_inputs: &[f64],
+    ) -> f64 {
         assert!(parameters.is_empty());
         sum(operand_outputs)
     }

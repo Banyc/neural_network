@@ -16,7 +16,12 @@ pub fn relu_node(operand: Arc<Mutex<Node>>) -> Node {
 #[derive(Debug)]
 struct ReluNodeComputation {}
 impl NodeComputation for ReluNodeComputation {
-    fn compute_output(&self, _parameters: &[f64], operand_outputs: &[f64], _inputs: &[f64]) -> f64 {
+    fn compute_output(
+        &self,
+        _parameters: &[f64],
+        operand_outputs: &[f64],
+        _graph_inputs: &[f64],
+    ) -> f64 {
         assert_eq!(operand_outputs.len(), 1);
         relu(operand_outputs[0])
     }

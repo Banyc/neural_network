@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use super::node::{Node, NodeComputation};
 
 /// ```math
-/// G(x) = x[i]
+/// f(x) = x[i]
 /// ```
 pub fn input_node(input_index: usize) -> Node {
     let computation = InputNodeComputation { input_index };
@@ -24,8 +24,13 @@ struct InputNodeComputation {
     input_index: usize,
 }
 impl NodeComputation for InputNodeComputation {
-    fn compute_output(&self, _parameters: &[f64], _operand_outputs: &[f64], inputs: &[f64]) -> f64 {
-        inputs[self.input_index]
+    fn compute_output(
+        &self,
+        _parameters: &[f64],
+        _operand_outputs: &[f64],
+        graph_inputs: &[f64],
+    ) -> f64 {
+        graph_inputs[self.input_index]
     }
 
     fn compute_gradient_of_this_at_operand(

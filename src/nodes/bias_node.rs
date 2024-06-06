@@ -14,7 +14,12 @@ pub fn bias_node(operand: Arc<Mutex<Node>>, bias: Option<f64>) -> Node {
 #[derive(Debug)]
 struct BiasNodeComputation {}
 impl NodeComputation for BiasNodeComputation {
-    fn compute_output(&self, parameters: &[f64], operand_outputs: &[f64], _inputs: &[f64]) -> f64 {
+    fn compute_output(
+        &self,
+        parameters: &[f64],
+        operand_outputs: &[f64],
+        _graph_inputs: &[f64],
+    ) -> f64 {
         assert_eq!(operand_outputs.len(), 1);
         assert_eq!(parameters.len(), 1);
         bias(operand_outputs[0], parameters[0])

@@ -15,19 +15,21 @@ struct L2ErrorNodeComputation {}
 impl NodeComputation for L2ErrorNodeComputation {
     fn compute_output(
         &self,
-        _parameters: &[f64],
+        parameters: &[f64],
         operand_outputs: &[f64],
         _graph_inputs: &[f64],
     ) -> f64 {
+        assert!(parameters.is_empty());
         assert_eq!(operand_outputs.len(), 2);
         l2_error(operand_outputs[0], operand_outputs[1])
     }
 
     fn compute_gradient_of_this_at_operand(
         &self,
-        _parameters: &[f64],
+        parameters: &[f64],
         operand_outputs: &[f64],
     ) -> Vec<f64> {
+        assert!(parameters.is_empty());
         assert_eq!(operand_outputs.len(), 2);
         vec![
             l2_error_derivative(operand_outputs[0], operand_outputs[1]),
@@ -37,9 +39,11 @@ impl NodeComputation for L2ErrorNodeComputation {
 
     fn compute_gradient_of_this_at_parameter(
         &self,
-        _parameters: &[f64],
-        _operand_outputs: &[f64],
+        parameters: &[f64],
+        operand_outputs: &[f64],
     ) -> Vec<f64> {
+        assert!(parameters.is_empty());
+        assert_eq!(operand_outputs.len(), 2);
         Vec::new()
     }
 }

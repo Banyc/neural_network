@@ -26,26 +26,32 @@ struct InputNodeComputation {
 impl NodeComputation for InputNodeComputation {
     fn compute_output(
         &self,
-        _parameters: &[f64],
-        _operand_outputs: &[f64],
+        parameters: &[f64],
+        operand_outputs: &[f64],
         graph_inputs: &[f64],
     ) -> f64 {
+        assert!(parameters.is_empty());
+        assert!(operand_outputs.is_empty());
         graph_inputs[self.input_index]
     }
 
     fn compute_gradient_of_this_at_operand(
         &self,
-        _parameters: &[f64],
-        _operand_outputs: &[f64],
+        parameters: &[f64],
+        operand_outputs: &[f64],
     ) -> Vec<f64> {
+        assert!(parameters.is_empty());
+        assert!(operand_outputs.is_empty());
         Vec::new()
     }
 
     fn compute_gradient_of_this_at_parameter(
         &self,
-        _parameters: &[f64],
-        _operand_outputs: &[f64],
+        parameters: &[f64],
+        operand_outputs: &[f64],
     ) -> Vec<f64> {
+        assert!(parameters.is_empty());
+        assert!(operand_outputs.is_empty());
         Vec::new()
     }
 }

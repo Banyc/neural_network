@@ -176,7 +176,6 @@ impl Node {
                     addend_of_partial_derivative_of_root_at_operand,
                 );
             });
-            self.check_rep();
         }
 
         let gradient_of_root_at_parameter = self.gradient_of_root_at_parameter().unwrap();

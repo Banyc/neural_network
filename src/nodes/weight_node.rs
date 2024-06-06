@@ -62,16 +62,18 @@ impl NodeComputation for WeightNodeComputation {
     fn compute_gradient_of_this_at_operand(
         &self,
         parameters: &[f64],
-        _operand_outputs: &[f64],
+        operand_outputs: &[f64],
     ) -> Vec<f64> {
+        assert_eq!(operand_outputs.len(), parameters.len());
         weight_derivative(parameters)
     }
 
     fn compute_gradient_of_this_at_parameter(
         &self,
-        _parameters: &[f64],
+        parameters: &[f64],
         operand_outputs: &[f64],
     ) -> Vec<f64> {
+        assert_eq!(operand_outputs.len(), parameters.len());
         derivative_of_w(operand_outputs)
     }
 
@@ -82,7 +84,11 @@ impl NodeComputation for WeightNodeComputation {
 
 fn weight(x: &[f64], w: &[f64]) -> f64 {
     assert_eq!(x.len(), w.len());
-    (0..w.len()).map(|i| x[i] * w[i]).sum()
+    x.iter()
+        .copied()
+        .zip(w.iter().copied())
+        .map(|(x, w)| x * w)
+        .sum()
 }
 
 fn weight_derivative(w: &[f64]) -> Vec<f64> {

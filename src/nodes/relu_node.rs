@@ -18,28 +18,32 @@ struct ReluNodeComputation {}
 impl NodeComputation for ReluNodeComputation {
     fn compute_output(
         &self,
-        _parameters: &[f64],
+        parameters: &[f64],
         operand_outputs: &[f64],
         _graph_inputs: &[f64],
     ) -> f64 {
+        assert!(parameters.is_empty());
         assert_eq!(operand_outputs.len(), 1);
         relu(operand_outputs[0])
     }
 
     fn compute_gradient_of_this_at_operand(
         &self,
-        _parameters: &[f64],
+        parameters: &[f64],
         operand_outputs: &[f64],
     ) -> Vec<f64> {
+        assert!(parameters.is_empty());
         assert_eq!(operand_outputs.len(), 1);
         vec![relu_derivative(operand_outputs[0])]
     }
 
     fn compute_gradient_of_this_at_parameter(
         &self,
-        _parameters: &[f64],
-        _operand_outputs: &[f64],
+        parameters: &[f64],
+        operand_outputs: &[f64],
     ) -> Vec<f64> {
+        assert!(parameters.is_empty());
+        assert_eq!(operand_outputs.len(), 1);
         Vec::new()
     }
 }

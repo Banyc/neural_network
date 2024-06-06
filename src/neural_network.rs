@@ -8,9 +8,13 @@ use super::nodes::node::{graph_do_gradient_descent_steps, Node};
 
 #[derive(Debug)]
 pub struct NeuralNetwork {
+    /// output: a prediction
     terminal_node: Arc<Mutex<Node>>,
+    /// output: the error between the prediction and the label
     error_node: Arc<Mutex<Node>>,
+    /// the index of the input node which accepts a label
     label_index: usize,
+    /// learning rate
     step_size: f64,
 }
 impl NeuralNetwork {

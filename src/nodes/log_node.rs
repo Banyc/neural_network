@@ -8,7 +8,7 @@ pub fn log_node(operand: Arc<Mutex<Node>>, base: f64) -> Node {
 }
 
 #[derive(Debug)]
-pub struct LogNodeComputation {
+struct LogNodeComputation {
     base: f64,
 }
 impl NodeComputation for LogNodeComputation {

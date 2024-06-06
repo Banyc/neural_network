@@ -2,17 +2,20 @@ use std::sync::{Arc, Mutex};
 
 use super::node::{Node, NodeComputation};
 
-pub fn sum_node(operands: Vec<Arc<Mutex<Node>>>) -> Node {
-    let computation = SumNodeComputation {};
-    Node::new(operands, Arc::new(computation), Vec::new())
+pub fn exp_node(operand: Arc<Mutex<Node>>, base: f64) -> Node {
+    let computation = ExpNodeComputation { base };
+    Node::new(vec![operand], Arc::new(computation), Vec::new())
 }
 
 #[derive(Debug)]
-struct SumNodeComputation {}
-impl NodeComputation for SumNodeComputation {
+struct ExpNodeComputation {
+    base: f64,
+}
+impl NodeComputation for ExpNodeComputation {
     fn compute_output(&self, parameters: &[f64], operand_outputs: &[f64], _inputs: &[f64]) -> f64 {
         assert!(parameters.is_empty());
-        sum(operand_outputs)
+        assert_eq!(operand_outputs.len(), 1);
+        exp(self.base, operand_outputs[0])
     }
 
     fn compute_gradient_of_this_at_operand(
@@ -21,7 +24,8 @@ impl NodeComputation for SumNodeComputation {
         operand_outputs: &[f64],
     ) -> Vec<f64> {
         assert!(parameters.is_empty());
-        sum_derivative(operand_outputs)
+        assert_eq!(operand_outputs.len(), 1);
+        vec![exp_derivative(self.base, operand_outputs[0])]
     }
 
     fn compute_gradient_of_this_at_parameter(
@@ -35,10 +39,10 @@ impl NodeComputation for SumNodeComputation {
     }
 }
 
-fn sum(x: &[f64]) -> f64 {
-    x.iter().sum()
+fn exp(base: f64, power: f64) -> f64 {
+    base.powf(power)
 }
 
-fn sum_derivative(x: &[f64]) -> Vec<f64> {
-    x.iter().map(|_| 1.).collect()
+fn exp_derivative(base: f64, power: f64) -> f64 {
+    exp(base, power) * base.ln()
 }

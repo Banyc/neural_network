@@ -1,4 +1,5 @@
 pub mod bias_node;
+pub mod coeff_node;
 pub mod exp_node;
 pub mod input_node;
 pub mod l2_error_node;

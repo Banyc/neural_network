@@ -1,10 +1,12 @@
 //! # Terminologies
 //!
 //! - $f$: the function represented by the node
+//!   - "this" in code
 //! - $z$: the functions represented by the operands (predecessors) of the node
 //!   - outputs of those functions become the input of the node
 //! - $w$: the tunable parameters of $f$
 //! - $E$: the outmost function represented by the root node of the computation graph
+//!   - "root" in code
 
 use std::{
     collections::VecDeque,
@@ -159,9 +161,9 @@ impl Node {
             let partial_derivative_of_root_at_this =
                 self.partial_derivative_of_root_at_this().unwrap();
             (0..self.operands.len()).for_each(|i| {
-                // $$
+                // ```math
                 // \frac{\partial E}{\partial f} \cdot \frac{\partial f}{\partial z}
-                // $$
+                // ```
                 let addend_of_partial_derivative_of_root_at_operand =
                     partial_derivative_of_root_at_this * gradient_of_this_at_operand[i];
                 let mut operand = self.operands[i].lock().unwrap();

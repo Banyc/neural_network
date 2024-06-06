@@ -1,8 +1,9 @@
 use std::sync::{Arc, Mutex};
 
+use crate::node::Node;
+
 use super::{
     bias_node::bias_node,
-    node::Node,
     weight_node::{regularized_weight_node, weight_node, WeightNodeError},
 };
 

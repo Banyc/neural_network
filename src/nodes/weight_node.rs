@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use rand::Rng;
 use thiserror::Error;
 
-use super::node::{Node, NodeComputation};
+use crate::node::{Node, NodeComputation};
 
 /// ```math
 /// f_w (x) = wx

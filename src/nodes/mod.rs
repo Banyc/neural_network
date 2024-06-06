@@ -5,7 +5,6 @@ pub mod input_node;
 pub mod l2_error_node;
 pub mod linear_node;
 pub mod log_node;
-pub mod node;
 pub mod power_node;
 pub mod product_node;
 pub mod relu_node;

@@ -2,12 +2,12 @@ use std::sync::{Arc, Mutex};
 
 use crate::{
     neural_network::{EvalOption, NeuralNetwork},
+    node::{clone_node_batch, Node},
     nodes::{
         bias_node::bias_node,
         input_node::{input_node, input_node_batch},
         l2_error_node::l2_error_node,
         linear_node::{linear_node, regularized_linear_node},
-        node::{clone_node_batch, Node},
         relu_node::relu_node,
         sigmoid_node::sigmoid_node,
         weight_node::weight_node,

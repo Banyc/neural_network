@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use super::node::{Node, NodeComputation};
+use crate::node::{Node, NodeComputation};
 
 /// ```math
 /// f(x) = \begin{cases}

@@ -2,9 +2,9 @@ use std::sync::{Arc, Mutex};
 
 use rand::Rng;
 
-use crate::nodes::node::graph_delete_caches;
+use crate::node::graph_delete_caches;
 
-use super::nodes::node::{graph_do_gradient_descent_steps, Node};
+use super::node::{graph_do_gradient_descent_steps, Node};
 
 #[derive(Debug)]
 pub struct NeuralNetwork {

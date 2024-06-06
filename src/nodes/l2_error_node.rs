@@ -2,6 +2,9 @@ use std::sync::{Arc, Mutex};
 
 use super::node::{Node, NodeComputation};
 
+/// ```math
+/// f(x, l) = (x - l)^2
+/// ```
 pub fn l2_error_node(operand: Arc<Mutex<Node>>, label: Arc<Mutex<Node>>) -> Node {
     let computation = L2ErrorNodeComputation {};
     Node::new(vec![operand, label], Arc::new(computation), Vec::new())

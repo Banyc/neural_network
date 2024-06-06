@@ -2,6 +2,9 @@ use std::sync::{Arc, Mutex};
 
 use super::node::{Node, NodeComputation};
 
+/// ```math
+/// G(x) = x[i]
+/// ```
 pub fn input_node(input_index: usize) -> Node {
     let computation = InputNodeComputation { input_index };
     Node::new(Vec::new(), Arc::new(computation), Vec::new())

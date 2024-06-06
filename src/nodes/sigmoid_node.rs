@@ -2,6 +2,9 @@ use std::sync::{Arc, Mutex};
 
 use super::node::{Node, NodeComputation};
 
+/// ```math
+/// f(x) = 1 + e^x
+/// ```
 pub fn sigmoid_node(operand: Arc<Mutex<Node>>) -> Node {
     let computation = SigmoidNodeComputation {};
     Node::new(vec![operand], Arc::new(computation), Vec::new())

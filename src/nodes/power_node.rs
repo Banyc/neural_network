@@ -3,22 +3,22 @@ use std::sync::{Arc, Mutex};
 use super::node::{Node, NodeComputation};
 
 /// ```math
-/// f(x) = \log_a x
+/// f(x) = x^a
 /// ```
-pub fn log_node(operand: Arc<Mutex<Node>>, base: f64) -> Node {
-    let computation = LogNodeComputation { base };
+pub fn power_node(operand: Arc<Mutex<Node>>, power: f64) -> Node {
+    let computation = PowerNodeComputation { power };
     Node::new(vec![operand], Arc::new(computation), Vec::new())
 }
 
 #[derive(Debug)]
-struct LogNodeComputation {
-    base: f64,
+struct PowerNodeComputation {
+    power: f64,
 }
-impl NodeComputation for LogNodeComputation {
+impl NodeComputation for PowerNodeComputation {
     fn compute_output(&self, parameters: &[f64], operand_outputs: &[f64], _inputs: &[f64]) -> f64 {
         assert!(parameters.is_empty());
         assert_eq!(operand_outputs.len(), 1);
-        log(operand_outputs[0], self.base)
+        power(operand_outputs[0], self.power)
     }
 
     fn compute_gradient_of_this_at_operand(
@@ -28,7 +28,7 @@ impl NodeComputation for LogNodeComputation {
     ) -> Vec<f64> {
         assert!(parameters.is_empty());
         assert_eq!(operand_outputs.len(), 1);
-        vec![log_derivative(operand_outputs[0], self.base)]
+        vec![power_derivative(operand_outputs[0], self.power)]
     }
 
     fn compute_gradient_of_this_at_parameter(
@@ -42,10 +42,10 @@ impl NodeComputation for LogNodeComputation {
     }
 }
 
-fn log(x: f64, base: f64) -> f64 {
-    x.log(base)
+fn power(base: f64, power: f64) -> f64 {
+    base.powf(power)
 }
 
-fn log_derivative(x: f64, base: f64) -> f64 {
-    1. / (x * base.ln())
+fn power_derivative(base: f64, power: f64) -> f64 {
+    power * base.powf(power - 1.)
 }

@@ -2,6 +2,9 @@ use std::sync::{Arc, Mutex};
 
 use super::node::{Node, NodeComputation};
 
+/// ```math
+/// f(x) = \sum x
+/// ```
 pub fn sum_node(operands: Vec<Arc<Mutex<Node>>>) -> Node {
     let computation = SumNodeComputation {};
     Node::new(operands, Arc::new(computation), Vec::new())

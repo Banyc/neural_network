@@ -6,6 +6,9 @@ use super::{
     weight_node::{regularized_weight_node, weight_node, WeightNodeError},
 };
 
+/// ```math
+/// f_{w,b} (x) = wx + b
+/// ```
 pub fn linear_node(
     input_nodes: Vec<Arc<Mutex<Node>>>,
     initial_weights: Option<Vec<f64>>,

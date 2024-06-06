@@ -2,6 +2,9 @@ use std::sync::{Arc, Mutex};
 
 use super::node::{Node, NodeComputation};
 
+/// ```math
+/// f(x) = \prod x
+/// ```
 pub fn product_node(operands: Vec<Arc<Mutex<Node>>>) -> Node {
     let computation = ProductNodeComputation {};
     Node::new(operands, Arc::new(computation), Vec::new())

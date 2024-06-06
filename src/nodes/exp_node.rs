@@ -2,6 +2,9 @@ use std::sync::{Arc, Mutex};
 
 use super::node::{Node, NodeComputation};
 
+/// ```math
+/// f(x) = a^x
+/// ```
 pub fn exp_node(operand: Arc<Mutex<Node>>, base: f64) -> Node {
     let computation = ExpNodeComputation { base };
     Node::new(vec![operand], Arc::new(computation), Vec::new())

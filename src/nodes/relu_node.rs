@@ -2,6 +2,12 @@ use std::sync::{Arc, Mutex};
 
 use super::node::{Node, NodeComputation};
 
+/// ```math
+/// f(x) = \begin{cases}
+///   x & x \geq 0 \\
+///   0 & x < 0 \\
+/// \end{cases}
+/// ```
 pub fn relu_node(operand: Arc<Mutex<Node>>) -> Node {
     let computation = ReluNodeComputation {};
     Node::new(vec![operand], Arc::new(computation), Vec::new())

@@ -2,6 +2,9 @@ use std::sync::{Arc, Mutex};
 
 use super::node::{Node, NodeComputation};
 
+/// ```math
+/// f_b (x) = x + b
+/// ```
 pub fn bias_node(operand: Arc<Mutex<Node>>, bias: Option<f64>) -> Node {
     let computation = BiasNodeComputation {};
     let bias = bias.unwrap_or(0.0);

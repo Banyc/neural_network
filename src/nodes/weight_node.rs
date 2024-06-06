@@ -5,6 +5,9 @@ use thiserror::Error;
 
 use super::node::{Node, NodeComputation};
 
+/// ```math
+/// f_w (x) = wx
+/// ```
 pub fn weight_node(
     operands: Vec<Arc<Mutex<Node>>>,
     weights: Option<Vec<f64>>,

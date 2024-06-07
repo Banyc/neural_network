@@ -63,14 +63,16 @@ mod tests {
     #[test]
     fn node_output1() {
         let mut node = input_node(0);
-        let ret = node.evaluate_once(&[3.0]);
+        let batch_index = 0;
+        let ret = node.evaluate_once(&[3.0], batch_index);
         assert_eq!(ret, 3.0);
     }
 
     #[test]
     fn node_output2() {
         let mut node = input_node(0);
-        let ret = node.evaluate_once(&[-4.0]);
+        let batch_index = 0;
+        let ret = node.evaluate_once(&[-4.0], batch_index);
         assert_eq!(ret, -4.0);
     }
 

@@ -69,7 +69,8 @@ mod tests {
     fn evaluate_negative() {
         let input_node = input_node(0);
         let mut relu = relu_node(Arc::new(Mutex::new(input_node)));
-        let ret = relu.evaluate_once(&[-2.0]);
+        let batch_index = 0;
+        let ret = relu.evaluate_once(&[-2.0], batch_index);
         assert!(ret >= 0.0);
         assert!(ret <= 0.0);
     }
@@ -78,7 +79,8 @@ mod tests {
     fn evaluate_positive() {
         let input_node = input_node(0);
         let mut relu = relu_node(Arc::new(Mutex::new(input_node)));
-        let ret = relu.evaluate_once(&[3.0]);
+        let batch_index = 0;
+        let ret = relu.evaluate_once(&[3.0], batch_index);
         assert!(ret >= 3.0);
         assert!(ret <= 3.0);
     }
@@ -87,8 +89,9 @@ mod tests {
     fn positive_gradient_of_this_at_operand() {
         let input_node = input_node(0);
         let mut relu = relu_node(Arc::new(Mutex::new(input_node)));
-        relu.evaluate_once(&[3.0]);
-        let ret = relu.gradient_of_this_at_operand().unwrap();
+        let batch_index = 0;
+        relu.evaluate_once(&[3.0], batch_index);
+        let ret = relu.gradient_of_this_at_operand(batch_index).unwrap();
         assert!(ret[0] >= 1.0);
         assert!(ret[0] <= 1.0);
     }
@@ -97,8 +100,9 @@ mod tests {
     fn negative_gradient_of_this_at_operand() {
         let input_node = input_node(0);
         let mut relu = relu_node(Arc::new(Mutex::new(input_node)));
-        relu.evaluate_once(&[-3.0]);
-        let ret = relu.gradient_of_this_at_operand().unwrap();
+        let batch_index = 0;
+        relu.evaluate_once(&[-3.0], batch_index);
+        let ret = relu.gradient_of_this_at_operand(batch_index).unwrap();
         assert!(ret[0] >= 0.0);
         assert!(ret[0] <= 0.0);
     }
@@ -107,8 +111,9 @@ mod tests {
     fn empty_gradient_of_this_at_parameter() {
         let input_node = input_node(0);
         let mut relu = relu_node(Arc::new(Mutex::new(input_node)));
-        relu.evaluate_once(&[3.0]);
-        let ret = relu.gradient_of_this_at_parameter().unwrap();
+        let batch_index = 0;
+        relu.evaluate_once(&[3.0], batch_index);
+        let ret = relu.gradient_of_this_at_parameter(0).unwrap();
         assert_eq!(ret.len(), 0);
     }
 }

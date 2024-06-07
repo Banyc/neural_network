@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use crate::{
-    neural_network::{EvalOption, NeuralNetwork},
+    neural_network::{EvalOption, NeuralNetwork, TrainOption},
     node::{clone_node_batch, Node},
     nodes::{
         bias_node::bias_node,
@@ -60,7 +60,8 @@ fn error() {
     let inputs = vec![-2.0, 1.0];
     let ret = network.evaluate(&inputs);
     assert_eq!(ret, 0.0);
-    let ret = network.compute_error(&inputs, EvalOption::ClearCache);
+    let batch_index = 0;
+    let ret = network.compute_error(&inputs, EvalOption::ClearCache, batch_index);
     assert_eq!(ret, 1.0);
 }
 
@@ -109,7 +110,8 @@ fn gradients() {
 
     let ret = network.evaluate(&inputs);
     assert_eq!(ret, 5.0);
-    let ret = network.compute_error(&inputs, EvalOption::KeepCache);
+    let batch_index = 0;
+    let ret = network.compute_error(&inputs, EvalOption::KeepCache, batch_index);
     assert_eq!(ret, 16.0);
 }
 
@@ -138,7 +140,7 @@ fn backpropagation_step() {
     );
 
     let inputs = vec![2.0, -2.0, 1.0];
-    network.backpropagation_step(&inputs);
+    network.backpropagation_step(&[&inputs]);
     {
         let weight_node = weight_node.lock().unwrap();
         assert_eq!(weight_node.parameters(), &[-6.0, 9.0])
@@ -177,7 +179,7 @@ fn backpropagation_step2() {
     );
 
     let inputs = vec![2.0, 1.0];
-    network.backpropagation_step(&inputs);
+    network.backpropagation_step(&[&inputs]);
     {
         let weight_node = weight_node2.lock().unwrap();
         assert_eq!(weight_node.parameters(), &[-41.0]); // 3 - 0.5 * 88
@@ -227,7 +229,7 @@ fn learn_xor_sigmoid() {
     ];
 
     let max_steps = 10_000;
-    network.train(&dataset, max_steps);
+    network.train(&dataset, max_steps, TrainOption::StochasticGradientDescent);
     for inputs in &dataset {
         let ret = network.evaluate(inputs);
         assert!((ret - inputs[label_index]).abs() < 0.1);
@@ -294,7 +296,7 @@ fn learn_xor_regularized_sigmoid() {
     ];
 
     let max_steps = 10_000;
-    network.train(&dataset, max_steps);
+    network.train(&dataset, max_steps, TrainOption::StochasticGradientDescent);
     for inputs in &dataset {
         let ret = network.evaluate(inputs);
         assert!((ret - inputs[label_index]).abs() < 0.1);
@@ -362,7 +364,7 @@ fn learn_xor_relu() {
     ];
 
     let max_steps = 5_000;
-    network.train(&dataset, max_steps);
+    network.train(&dataset, max_steps, TrainOption::StochasticGradientDescent);
     for inputs in &dataset {
         let ret = network.evaluate(inputs);
         assert!((ret - inputs[label_index]).abs() < 0.1);

@@ -116,7 +116,8 @@ mod tests {
         let inputs = vec![1.0, 2.0, 3.0];
         let initial_weights = vec![3.0, 2.0, 1.0];
         let mut weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
-        let ret = weight_node.evaluate_once(&inputs);
+        let batch_index = 0;
+        let ret = weight_node.evaluate_once(&inputs, batch_index);
         assert_eq!(ret, 3.0 * 1.0 + 2.0 * 2.0 + 1.0 * 3.0);
     }
 
@@ -126,8 +127,11 @@ mod tests {
         let inputs = vec![1.0, 2.0, 3.0];
         let initial_weights = vec![3.0, 2.0, 1.0];
         let mut weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
-        weight_node.evaluate_once(&inputs);
-        let ret = weight_node.gradient_of_this_at_operand().unwrap();
+        let batch_index = 0;
+        weight_node.evaluate_once(&inputs, batch_index);
+        let ret = weight_node
+            .gradient_of_this_at_operand(batch_index)
+            .unwrap();
         assert_eq!(&ret, &[3.0, 2.0, 1.0]);
     }
 
@@ -137,8 +141,11 @@ mod tests {
         let inputs = vec![1.0, 2.0, 3.0];
         let initial_weights = vec![3.0, 2.0, 1.0];
         let mut weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
-        weight_node.evaluate_once(&inputs);
-        let ret = weight_node.gradient_of_this_at_parameter().unwrap();
+        let batch_index = 0;
+        weight_node.evaluate_once(&inputs, batch_index);
+        let ret = weight_node
+            .gradient_of_this_at_parameter(batch_index)
+            .unwrap();
         assert_eq!(&ret, &[1.0, 2.0, 3.0]);
     }
 }

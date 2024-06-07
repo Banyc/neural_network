@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    time::{Duration, Instant},
+};
 
 use rand::Rng;
 
@@ -80,6 +83,7 @@ impl NeuralNetwork {
         };
         let mut batch_input = vec![];
         let mut rng = rand::thread_rng();
+        let mut now = Instant::now();
         for i in 0..max_steps {
             batch_input.clear();
             for _ in 0..batch_size {
@@ -88,7 +92,10 @@ impl NeuralNetwork {
             }
             self.backpropagation_step(&batch_input);
             if i % (max_steps / 10) == 0 {
-                println!("{:.2}%", (100 * i) as f64 / max_steps as f64);
+                let percentage = (100 * i) as f64 / max_steps as f64;
+                let elapsed = human_duration(now.elapsed());
+                now = Instant::now();
+                println!("{percentage:.2}%; {elapsed}");
             }
         }
         self.check_rep();
@@ -121,4 +128,29 @@ pub enum TrainOption {
     StochasticGradientDescent,
     MiniBatchGradientDescent { batch_size: usize },
     BatchGradientDescent,
+}
+
+fn human_duration(duration: Duration) -> String {
+    let seconds = duration.as_secs_f64();
+    let minutes = seconds / 60.;
+    let hours = minutes / 60.;
+    let milliseconds = seconds * 1_000.;
+    let microseconds = milliseconds * 1_000.;
+    let nanoseconds = microseconds * 1_000.;
+    if 1. < hours {
+        return format!("{hours:.2} h");
+    }
+    if 1. < minutes {
+        return format!("{minutes:.2} min");
+    }
+    if 1. < seconds {
+        return format!("{seconds:.2} s");
+    }
+    if 1. < milliseconds {
+        return format!("{milliseconds:.2} ms");
+    }
+    if 1. < microseconds {
+        return format!("{microseconds:.2} us");
+    }
+    format!("{nanoseconds:.2} ns")
 }

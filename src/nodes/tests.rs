@@ -11,7 +11,7 @@ fn linear_evaluate() {
     let inputs = vec![1.0, 2.0, 3.0];
     let initial_weights = vec![3.0, 2.0, 1.0];
     let initial_bias = 4.0;
-    let weight_node = weight_node(input_nodes, Some(initial_weights)).unwrap();
+    let weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
     let mut bias_node = bias_node(Arc::new(Mutex::new(weight_node)), Some(initial_bias));
     let ret = bias_node.evaluate_once(&inputs);
     assert_eq!(ret, (3.0 * 1.0 + 2.0 * 2.0 + 1.0 * 3.0) + 4.0);
@@ -23,7 +23,7 @@ fn linear_gradient_of_this_at_operand() {
     let inputs = vec![1.0, 2.0, 3.0];
     let initial_weights = vec![3.0, 2.0, 1.0];
     let initial_bias = 4.0;
-    let weight_node = weight_node(input_nodes, Some(initial_weights)).unwrap();
+    let weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
     let mut bias_node = bias_node(Arc::new(Mutex::new(weight_node)), Some(initial_bias));
     bias_node.evaluate_once(&inputs);
     let ret = bias_node.gradient_of_this_at_operand().unwrap();
@@ -36,7 +36,7 @@ fn linear_gradient_of_this_at_parameter() {
     let inputs = vec![1.0, 2.0, 3.0];
     let initial_weights = vec![3.0, 2.0, 1.0];
     let initial_bias = 4.0;
-    let weight_node = weight_node(input_nodes, Some(initial_weights)).unwrap();
+    let weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
     let mut bias_node = bias_node(Arc::new(Mutex::new(weight_node)), Some(initial_bias));
     bias_node.evaluate_once(&inputs);
     let ret = bias_node.gradient_of_this_at_parameter().unwrap();
@@ -49,7 +49,7 @@ fn linear_with_relu_evaluate() {
     let inputs = vec![1.0, 2.0, 3.0];
     let initial_weights = vec![3.0, 2.0, 1.0];
     let initial_bias = -20.0;
-    let weight_node = weight_node(input_nodes, Some(initial_weights)).unwrap();
+    let weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
     let bias_node = bias_node(Arc::new(Mutex::new(weight_node)), Some(initial_bias));
     let bias_node = Arc::new(Mutex::new(bias_node));
     let mut relu_node = relu_node(Arc::clone(&bias_node));

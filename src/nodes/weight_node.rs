@@ -8,24 +8,21 @@ use crate::node::{Node, NodeComputation};
 /// ```math
 /// f_w (x) = wx
 /// ```
+///
+/// - `lambda`: for regularization
 pub fn weight_node(
     operands: Vec<Arc<Mutex<Node>>>,
-    weights: Option<Vec<f64>>,
-) -> Result<Node, WeightNodeError> {
-    regularized_weight_node(operands, weights, 0.0)
-}
-
-pub fn regularized_weight_node(
-    operands: Vec<Arc<Mutex<Node>>>,
     mut weights: Option<Vec<f64>>,
-    lambda: f64,
+    lambda: Option<f64>,
 ) -> Result<Node, WeightNodeError> {
     if let Some(weights) = &weights {
         if operands.len() != weights.len() {
             return Err(WeightNodeError::ParameterSizeNotMatched);
         }
     }
-    let computation = WeightNodeComputation { lambda };
+    let computation = WeightNodeComputation {
+        lambda: lambda.unwrap_or(0.),
+    };
     let weights = match weights.take() {
         Some(x) => x,
         None => {
@@ -118,7 +115,7 @@ mod tests {
         let input_nodes = input_node_batch(3);
         let inputs = vec![1.0, 2.0, 3.0];
         let initial_weights = vec![3.0, 2.0, 1.0];
-        let mut weight_node = weight_node(input_nodes, Some(initial_weights)).unwrap();
+        let mut weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
         let ret = weight_node.evaluate_once(&inputs);
         assert_eq!(ret, 3.0 * 1.0 + 2.0 * 2.0 + 1.0 * 3.0);
     }
@@ -128,7 +125,7 @@ mod tests {
         let input_nodes = input_node_batch(3);
         let inputs = vec![1.0, 2.0, 3.0];
         let initial_weights = vec![3.0, 2.0, 1.0];
-        let mut weight_node = weight_node(input_nodes, Some(initial_weights)).unwrap();
+        let mut weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
         weight_node.evaluate_once(&inputs);
         let ret = weight_node.gradient_of_this_at_operand().unwrap();
         assert_eq!(&ret, &[3.0, 2.0, 1.0]);
@@ -139,7 +136,7 @@ mod tests {
         let input_nodes = input_node_batch(3);
         let inputs = vec![1.0, 2.0, 3.0];
         let initial_weights = vec![3.0, 2.0, 1.0];
-        let mut weight_node = weight_node(input_nodes, Some(initial_weights)).unwrap();
+        let mut weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
         weight_node.evaluate_once(&inputs);
         let ret = weight_node.gradient_of_this_at_parameter().unwrap();
         assert_eq!(&ret, &[1.0, 2.0, 3.0]);

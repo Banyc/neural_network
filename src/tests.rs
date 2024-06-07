@@ -7,7 +7,7 @@ use crate::{
         bias_node::bias_node,
         input_node::{input_node, input_node_batch},
         l2_error_node::l2_error_node,
-        linear_node::{linear_node, regularized_linear_node},
+        linear_node::linear_node,
         relu_node::relu_node,
         sigmoid_node::sigmoid_node,
         weight_node::weight_node,
@@ -19,8 +19,8 @@ fn single_linear_relu(
     initial_weights: Option<Vec<f64>>,
     initial_bias: Option<f64>,
 ) -> Node {
-    let linear_node = linear_node(input_nodes, initial_weights, initial_bias).unwrap();
-    relu_node(Arc::new(Mutex::new(linear_node)))
+    let linear_node = linear_node(input_nodes, initial_weights, initial_bias, None, None).unwrap();
+    relu_node(linear_node)
 }
 
 fn single_linear_relu_network(
@@ -87,7 +87,7 @@ fn gradients() {
     let label_index = 2;
     let input_nodes = input_node_batch(label_index);
     let initial_weights = vec![2.0, 1.0];
-    let weight_node = weight_node(input_nodes, Some(initial_weights)).unwrap();
+    let weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
     let weight_node = Arc::new(Mutex::new(weight_node));
     let initial_bias = 3.0;
     let bias_node = bias_node(Arc::clone(&weight_node), Some(initial_bias));
@@ -118,7 +118,7 @@ fn backpropagation_step() {
     let label_index = 2;
     let input_nodes = input_node_batch(label_index);
     let initial_weights = vec![2.0, 1.0];
-    let weight_node = weight_node(input_nodes, Some(initial_weights)).unwrap();
+    let weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
     let weight_node = Arc::new(Mutex::new(weight_node));
     let initial_bias = 3.0;
     let bias_node = bias_node(Arc::clone(&weight_node), Some(initial_bias));
@@ -154,11 +154,15 @@ fn backpropagation_step2() {
     let label_index = 1;
     let input_nodes = input_node_batch(label_index);
     let initial_weights1 = vec![2.0];
-    let weight_node1 = weight_node(input_nodes, Some(initial_weights1)).unwrap();
+    let weight_node1 = weight_node(input_nodes, Some(initial_weights1), None).unwrap();
     let weight_node1 = Arc::new(Mutex::new(weight_node1));
     let initial_weights2 = vec![3.0];
-    let weight_node2 =
-        weight_node(vec![Arc::clone(&weight_node1)], Some(initial_weights2)).unwrap();
+    let weight_node2 = weight_node(
+        vec![Arc::clone(&weight_node1)],
+        Some(initial_weights2),
+        None,
+    )
+    .unwrap();
     let weight_node2 = Arc::new(Mutex::new(weight_node2));
     let label_node = input_node(label_index);
     let label_node = Arc::new(Mutex::new(label_node));
@@ -188,19 +192,22 @@ fn backpropagation_step2() {
 fn learn_xor_sigmoid() {
     let label_index = 2;
     let input_nodes = input_node_batch(label_index);
-    let linear_node_1 = linear_node(clone_node_batch(&input_nodes), None, None).unwrap();
-    let linear_node_2 = linear_node(clone_node_batch(&input_nodes), None, None).unwrap();
-    let linear_node_3 = linear_node(clone_node_batch(&input_nodes), None, None).unwrap();
-    let sigmoid_node_1 = sigmoid_node(Arc::new(Mutex::new(linear_node_1)));
-    let sigmoid_node_2 = sigmoid_node(Arc::new(Mutex::new(linear_node_2)));
-    let sigmoid_node_3 = sigmoid_node(Arc::new(Mutex::new(linear_node_3)));
+    let linear_node_1 =
+        linear_node(clone_node_batch(&input_nodes), None, None, None, None).unwrap();
+    let linear_node_2 =
+        linear_node(clone_node_batch(&input_nodes), None, None, None, None).unwrap();
+    let linear_node_3 =
+        linear_node(clone_node_batch(&input_nodes), None, None, None, None).unwrap();
+    let sigmoid_node_1 = sigmoid_node(linear_node_1);
+    let sigmoid_node_2 = sigmoid_node(linear_node_2);
+    let sigmoid_node_3 = sigmoid_node(linear_node_3);
     let sigmoid_nodes = vec![
         Arc::new(Mutex::new(sigmoid_node_1)),
         Arc::new(Mutex::new(sigmoid_node_2)),
         Arc::new(Mutex::new(sigmoid_node_3)),
     ];
-    let linear_output = linear_node(sigmoid_nodes, None, None).unwrap();
-    let output = sigmoid_node(Arc::new(Mutex::new(linear_output)));
+    let linear_output = linear_node(sigmoid_nodes, None, None, None, None).unwrap();
+    let output = sigmoid_node(linear_output);
     let output = Arc::new(Mutex::new(output));
     let label_node = input_node(label_index);
     let error_node = l2_error_node(Arc::clone(&output), Arc::new(Mutex::new(label_node)));
@@ -234,22 +241,40 @@ fn learn_xor_regularized_sigmoid() {
     let label_index = 2;
     let lambda = 0.0001;
     let input_nodes = input_node_batch(label_index);
-    let linear_node_1 =
-        regularized_linear_node(clone_node_batch(&input_nodes), None, None, lambda).unwrap();
-    let linear_node_2 =
-        regularized_linear_node(clone_node_batch(&input_nodes), None, None, lambda).unwrap();
-    let linear_node_3 =
-        regularized_linear_node(clone_node_batch(&input_nodes), None, None, lambda).unwrap();
-    let sigmoid_node_1 = sigmoid_node(Arc::new(Mutex::new(linear_node_1)));
-    let sigmoid_node_2 = sigmoid_node(Arc::new(Mutex::new(linear_node_2)));
-    let sigmoid_node_3 = sigmoid_node(Arc::new(Mutex::new(linear_node_3)));
+    let linear_node_1 = linear_node(
+        clone_node_batch(&input_nodes),
+        None,
+        None,
+        Some(lambda),
+        None,
+    )
+    .unwrap();
+    let linear_node_2 = linear_node(
+        clone_node_batch(&input_nodes),
+        None,
+        None,
+        Some(lambda),
+        None,
+    )
+    .unwrap();
+    let linear_node_3 = linear_node(
+        clone_node_batch(&input_nodes),
+        None,
+        None,
+        Some(lambda),
+        None,
+    )
+    .unwrap();
+    let sigmoid_node_1 = sigmoid_node(linear_node_1);
+    let sigmoid_node_2 = sigmoid_node(linear_node_2);
+    let sigmoid_node_3 = sigmoid_node(linear_node_3);
     let sigmoid_nodes = vec![
         Arc::new(Mutex::new(sigmoid_node_1)),
         Arc::new(Mutex::new(sigmoid_node_2)),
         Arc::new(Mutex::new(sigmoid_node_3)),
     ];
-    let linear_output = regularized_linear_node(sigmoid_nodes, None, None, lambda).unwrap();
-    let output = sigmoid_node(Arc::new(Mutex::new(linear_output)));
+    let linear_output = linear_node(sigmoid_nodes, None, None, Some(lambda), None).unwrap();
+    let output = sigmoid_node(linear_output);
     let output = Arc::new(Mutex::new(output));
     let label_node = input_node(label_index);
     let error_node = l2_error_node(Arc::clone(&output), Arc::new(Mutex::new(label_node)));
@@ -285,8 +310,9 @@ fn learn_xor_relu() {
     let first_layer = {
         let mut layer = Vec::new();
         for _ in 0..10 {
-            let linear_node = linear_node(clone_node_batch(&input_nodes), None, None).unwrap();
-            layer.push(Arc::new(Mutex::new(linear_node)));
+            let linear_node =
+                linear_node(clone_node_batch(&input_nodes), None, None, None, None).unwrap();
+            layer.push(linear_node);
         }
         layer
     };
@@ -301,8 +327,9 @@ fn learn_xor_relu() {
     let second_layer = {
         let mut layer = Vec::new();
         for _ in 0..10 {
-            let linear_node = linear_node(clone_node_batch(&first_layer_relu), None, None).unwrap();
-            layer.push(Arc::new(Mutex::new(linear_node)));
+            let linear_node =
+                linear_node(clone_node_batch(&first_layer_relu), None, None, None, None).unwrap();
+            layer.push(linear_node);
         }
         layer
     };
@@ -314,8 +341,8 @@ fn learn_xor_relu() {
         }
         layer
     };
-    let linear_output = linear_node(second_layer_relu, None, None).unwrap();
-    let output = sigmoid_node(Arc::new(Mutex::new(linear_output)));
+    let linear_output = linear_node(second_layer_relu, None, None, None, None).unwrap();
+    let output = sigmoid_node(linear_output);
     let output = Arc::new(Mutex::new(output));
     let label_node = input_node(label_index);
     let error_node = l2_error_node(Arc::clone(&output), Arc::new(Mutex::new(label_node)));

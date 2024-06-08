@@ -5,16 +5,19 @@ use std::{
 
 use crate::{
     node::Node,
-    nodes::weight_node,
     param::ParamInjector,
     tensor::{OwnedShape, Tensor},
 };
 
-use super::filter_layer::{filter_layer, FilterParams};
+use super::{
+    filter_layer::{filter_layer, FilterParams},
+    linear_node::{self, linear_node},
+};
 
 pub struct KernelConfig<'a> {
     pub shape: &'a [usize],
     pub initial_weights: Option<Box<dyn Fn() -> Vec<f64>>>,
+    pub initial_bias: Option<Box<dyn Fn() -> f64>>,
     pub lambda: Option<f64>,
 }
 
@@ -32,15 +35,19 @@ pub fn kernel_layer(
 ) -> (Vec<Arc<Mutex<Node>>>, OwnedShape) {
     let create_filter = |params: FilterParams| -> Arc<Mutex<Node>> {
         let weights = kernel.initial_weights.as_ref().map(|f| f());
-        let feature_node = weight_node::weight_node(params.inputs, weights, kernel.lambda).unwrap();
-        let feature_node = Arc::new(Mutex::new(feature_node));
-        if let Some(param_injection) = &mut param_injection {
-            let name = format!("{}:kernel.{}", param_injection.name, params.i);
-            param_injection
-                .injector
-                .insert_node(name, Arc::clone(&feature_node));
-        }
-        feature_node
+        let bias = kernel.initial_bias.as_ref().map(|f| f());
+        let param_injection = param_injection.as_mut().map(|x| {
+            let weight_name = format!("{}:kernel.{}:weights", x.name, params.i);
+            let bias_name = format!("{}:kernel.{}:bias", x.name, params.i);
+            linear_node::ParamInjection {
+                injector: x.injector,
+                weight_name,
+                bias_name,
+            }
+        });
+        let feature_node =
+            linear_node(params.inputs, weights, bias, kernel.lambda, param_injection);
+        feature_node.unwrap()
     };
     filter_layer(inputs, stride, kernel.shape, create_filter)
 }

@@ -24,7 +24,7 @@ pub fn linear_node(
     initial_weights: Option<Vec<f64>>,
     initial_bias: Option<f64>,
     lambda: Option<f64>,
-    param_injection: Option<&mut ParamInjection<'_>>,
+    param_injection: Option<ParamInjection<'_>>,
 ) -> Result<Arc<Mutex<Node>>, WeightNodeError> {
     let weight_node = weight_node(input_nodes, initial_weights, lambda)?;
     let weight_node = Arc::new(Mutex::new(weight_node));
@@ -35,10 +35,10 @@ pub fn linear_node(
     if let Some(param_injection) = param_injection {
         param_injection
             .injector
-            .insert_node(param_injection.weight_name.clone(), weight_node);
+            .insert_node(param_injection.weight_name, weight_node);
         param_injection
             .injector
-            .insert_node(param_injection.bias_name.clone(), Arc::clone(&bias_node));
+            .insert_node(param_injection.bias_name, Arc::clone(&bias_node));
     }
     Ok(bias_node)
 }

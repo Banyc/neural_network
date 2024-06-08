@@ -37,11 +37,11 @@ pub fn kernel_layer(
         let weights = kernel.initial_weights.as_ref().map(|f| f());
         let bias = kernel.initial_bias.as_ref().map(|f| f());
         let param_injection = param_injection.as_mut().map(|x| {
-            let weight_name = format!("{}:kernel.{}:weights", x.name, params.i);
+            let weights_name = format!("{}:kernel.{}:weights", x.name, params.i);
             let bias_name = format!("{}:kernel.{}:bias", x.name, params.i);
             linear_node::ParamInjection {
                 injector: x.injector,
-                weight_name,
+                weights_name,
                 bias_name,
             }
         });

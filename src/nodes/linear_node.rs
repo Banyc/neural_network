@@ -10,7 +10,7 @@ use super::{
 #[derive(Debug)]
 pub struct ParamInjection<'a> {
     pub injector: &'a mut ParamInjector,
-    pub weight_name: String,
+    pub weights_name: String,
     pub bias_name: String,
 }
 
@@ -35,7 +35,7 @@ pub fn linear_node(
     if let Some(param_injection) = param_injection {
         param_injection
             .injector
-            .insert_node(param_injection.weight_name, weight_node);
+            .insert_node(param_injection.weights_name, weight_node);
         param_injection
             .injector
             .insert_node(param_injection.bias_name, Arc::clone(&bias_node));

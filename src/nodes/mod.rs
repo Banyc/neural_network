@@ -8,6 +8,7 @@ pub mod l2_error_node;
 pub mod linear_node;
 pub mod log_node;
 pub mod max_node;
+pub mod max_pooling_layer;
 pub mod power_node;
 pub mod product_node;
 pub mod relu_node;

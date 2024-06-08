@@ -7,9 +7,10 @@ use crate::node::{Node, NodeComputation};
 /// ```math
 /// f(x) = \max x
 /// ```
-pub fn max_node(operand: Arc<Mutex<Node>>) -> Node {
+pub fn max_node(operands: Vec<Arc<Mutex<Node>>>) -> Node {
+    assert!(!operands.is_empty());
     let computation = MaxNodeComputation {};
-    Node::new(vec![operand], Arc::new(computation), Vec::new())
+    Node::new(operands, Arc::new(computation), Vec::new())
 }
 
 #[derive(Debug)]

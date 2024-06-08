@@ -9,6 +9,7 @@ pub mod linear_node;
 pub mod log_node;
 pub mod max_node;
 pub mod max_pooling_layer;
+pub mod mse_node;
 pub mod power_node;
 pub mod product_node;
 pub mod relu_node;

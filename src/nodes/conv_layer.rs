@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use crate::{
     node::Node,
     param::ParamInjector,
-    tensor::{OwnedShape, Shape, Stride, Tensor},
+    tensor::{NonZeroShape, OwnedShape, Stride, Tensor},
 };
 
 use super::{
@@ -12,7 +12,7 @@ use super::{
 };
 
 pub struct KernelConfig<'a> {
-    pub shape: &'a Shape,
+    pub shape: &'a NonZeroShape,
     pub initial_weights: Option<Box<dyn Fn() -> Vec<f64>>>,
     pub initial_bias: Option<Box<dyn Fn() -> f64>>,
     pub lambda: Option<f64>,

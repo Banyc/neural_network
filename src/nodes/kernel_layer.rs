@@ -5,20 +5,20 @@ use std::{
 
 use crate::{
     node::Node,
-    tensor::{IndexIter, OwnedShape, OwnedStride, Shape, Stride, Tensor},
+    tensor::{IndexIter, NonZeroShape, OwnedShape, OwnedStride, Stride, Tensor},
 };
 
 pub fn kernel_layer(
     inputs: Tensor<'_, Arc<Mutex<Node>>>,
     stride: &Stride,
-    kernel_shape: &Shape,
+    kernel_shape: &NonZeroShape,
     mut create_kernel: impl FnMut(KernelParams) -> Arc<Mutex<Node>>,
 ) -> (Vec<Arc<Mutex<Node>>>, OwnedShape) {
     let mut shape = inputs.shape().to_vec();
     shape
         .iter_mut()
         .zip(kernel_shape.iter().copied())
-        .for_each(|(x, kernel_size)| *x = x.saturating_sub(kernel_size));
+        .for_each(|(x, kernel_size)| *x = x.saturating_sub(kernel_size.get() - 1));
     let start_range = shape.iter().copied().map(|x| 0..x).collect::<Vec<_>>();
     let mut start_indices = IndexIter::new(&start_range, stride);
     let mut kernels = vec![];
@@ -27,7 +27,7 @@ pub fn kernel_layer(
             .iter()
             .copied()
             .zip(kernel_shape.iter().copied())
-            .map(|(start, len)| start..(start + len))
+            .map(|(start, len)| start..(start + len.get()))
             .collect::<Vec<_>>();
         let stride = (0..range.len())
             .map(|_| NonZeroUsize::new(1).unwrap())

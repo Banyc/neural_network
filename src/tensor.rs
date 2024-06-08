@@ -54,6 +54,9 @@ pub type OwnedIndex = Vec<usize>;
 pub type Shape = [usize];
 pub type OwnedShape = Vec<usize>;
 
+pub type NonZeroShape = [NonZeroUsize];
+pub type OwnedNonZeroShape = Vec<NonZeroUsize>;
+
 pub type Range = [std::ops::Range<usize>];
 pub type OwnedRange = Vec<std::ops::Range<usize>>;
 
@@ -65,21 +68,39 @@ pub struct IndexIter<'a> {
     range: &'a Range,
     stride: &'a Stride,
     index: Option<OwnedIndex>,
+    done: bool,
 }
 impl<'a> IndexIter<'a> {
     pub fn new(range: &'a Range, stride: &'a Stride) -> Self {
         assert_eq!(range.len(), stride.len());
-        let index = range.iter().map(|x| x.start).collect();
+        // let index = range.iter().map(|x| x.start).collect();
         Self {
             range,
             stride,
-            index: Some(index),
+            index: None,
+            done: false,
         }
     }
 }
 impl IndexIter<'_> {
     pub fn next_index(&mut self) -> Option<&OwnedIndex> {
-        let index = next_index(self.index.take().unwrap(), self.range, self.stride)?;
+        if self.done {
+            return None;
+        }
+        let index = if self.index.is_none() {
+            let out_of_end = self.range.iter().any(|x| x.end <= x.start);
+            if out_of_end {
+                None
+            } else {
+                Some(self.range.iter().map(|x| x.start).collect::<OwnedIndex>())
+            }
+        } else {
+            next_index(self.index.take().unwrap(), self.range, self.stride)
+        };
+        let Some(index) = index else {
+            self.done = true;
+            return None;
+        };
         self.index = Some(index);
         return Some(self.index.as_ref().unwrap());
 

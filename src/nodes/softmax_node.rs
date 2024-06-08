@@ -22,7 +22,7 @@ impl NodeComputation for SoftmaxNodeComputation {
         _graph_inputs: &[f64],
     ) -> f64 {
         assert!(parameters.is_empty());
-        assert!(0 < operand_outputs.len());
+        assert!(!operand_outputs.is_empty());
         softmax(operand_outputs, self.operand_index)
     }
 
@@ -32,7 +32,7 @@ impl NodeComputation for SoftmaxNodeComputation {
         operand_outputs: &[f64],
     ) -> Vec<f64> {
         assert!(parameters.is_empty());
-        assert!(0 < operand_outputs.len());
+        assert!(!operand_outputs.is_empty());
         softmax_derivative(operand_outputs, self.operand_index)
     }
 
@@ -42,7 +42,7 @@ impl NodeComputation for SoftmaxNodeComputation {
         operand_outputs: &[f64],
     ) -> Vec<f64> {
         assert!(parameters.is_empty());
-        assert!(0 < operand_outputs.len());
+        assert!(!operand_outputs.is_empty());
         Vec::new()
     }
 }

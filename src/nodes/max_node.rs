@@ -22,7 +22,7 @@ impl NodeComputation for MaxNodeComputation {
         _graph_inputs: &[f64],
     ) -> f64 {
         assert!(parameters.is_empty());
-        assert!(0 < operand_outputs.len());
+        assert!(!operand_outputs.is_empty());
         max(operand_outputs)
     }
 
@@ -32,7 +32,7 @@ impl NodeComputation for MaxNodeComputation {
         operand_outputs: &[f64],
     ) -> Vec<f64> {
         assert!(parameters.is_empty());
-        assert!(0 < operand_outputs.len());
+        assert!(!operand_outputs.is_empty());
         max_derivative(operand_outputs)
     }
 
@@ -42,7 +42,7 @@ impl NodeComputation for MaxNodeComputation {
         operand_outputs: &[f64],
     ) -> Vec<f64> {
         assert!(parameters.is_empty());
-        assert!(0 < operand_outputs.len());
+        assert!(!operand_outputs.is_empty());
         vec![]
     }
 }

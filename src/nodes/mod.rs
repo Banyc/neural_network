@@ -1,7 +1,7 @@
 pub mod bias_node;
 pub mod coeff_node;
+pub mod conv_layer;
 pub mod exp_node;
-pub mod filter_layer;
 pub mod input_node;
 pub mod kernel_layer;
 pub mod l2_error_node;

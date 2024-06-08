@@ -5,49 +5,48 @@ use std::{
 
 use crate::{
     node::Node,
-    param::ParamInjector,
-    tensor::{OwnedShape, Tensor},
+    tensor::{IndexIter, OwnedShape, Tensor},
 };
-
-use super::{
-    filter_layer::{filter_layer, FilterParams},
-    linear_node::{self, linear_node},
-};
-
-pub struct KernelConfig<'a> {
-    pub shape: &'a [usize],
-    pub initial_weights: Option<Box<dyn Fn() -> Vec<f64>>>,
-    pub initial_bias: Option<Box<dyn Fn() -> f64>>,
-    pub lambda: Option<f64>,
-}
-
-#[derive(Debug)]
-pub struct ParamInjection<'a> {
-    pub injector: &'a mut ParamInjector,
-    pub name: String,
-}
 
 pub fn kernel_layer(
     inputs: Tensor<'_, Arc<Mutex<Node>>>,
     stride: NonZeroUsize,
-    kernel: KernelConfig,
-    mut param_injection: Option<ParamInjection<'_>>,
+    kernel_shape: &[usize],
+    mut create_kernel: impl FnMut(KernelParams) -> Arc<Mutex<Node>>,
 ) -> (Vec<Arc<Mutex<Node>>>, OwnedShape) {
-    let create_filter = |params: FilterParams| -> Arc<Mutex<Node>> {
-        let weights = kernel.initial_weights.as_ref().map(|f| f());
-        let bias = kernel.initial_bias.as_ref().map(|f| f());
-        let param_injection = param_injection.as_mut().map(|x| {
-            let weights_name = format!("{}:kernel.{}:weights", x.name, params.i);
-            let bias_name = format!("{}:kernel.{}:bias", x.name, params.i);
-            linear_node::ParamInjection {
-                injector: x.injector,
-                weights_name,
-                bias_name,
-            }
-        });
-        let feature_node =
-            linear_node(params.inputs, weights, bias, kernel.lambda, param_injection);
-        feature_node.unwrap()
-    };
-    filter_layer(inputs, stride, kernel.shape, create_filter)
+    let mut shape = inputs.shape().to_vec();
+    shape
+        .iter_mut()
+        .zip(kernel_shape.iter().copied())
+        .for_each(|(x, kernel_size)| *x = x.saturating_sub(kernel_size));
+    let start_range = shape.iter().copied().map(|x| 0..x).collect::<Vec<_>>();
+    let mut start_indices = IndexIter::new(&start_range, stride);
+    let mut kernels = vec![];
+    while let Some(start_index) = start_indices.next_index() {
+        let range = start_index
+            .iter()
+            .copied()
+            .zip(kernel_shape.iter().copied())
+            .map(|(start, len)| start..(start + len))
+            .collect::<Vec<_>>();
+        let mut kernel_input_indices = IndexIter::new(&range, NonZeroUsize::new(1).unwrap());
+        let mut kernel_inputs = vec![];
+        while let Some(kernel_input_index) = kernel_input_indices.next_index() {
+            let node = inputs.get(kernel_input_index).unwrap();
+            kernel_inputs.push(Arc::clone(node));
+        }
+        let params = KernelParams {
+            i: kernels.len(),
+            inputs: kernel_inputs,
+        };
+        let kernel = create_kernel(params);
+        kernels.push(kernel);
+    }
+    (kernels, start_indices.shape())
+}
+
+#[derive(Debug, Clone)]
+pub struct KernelParams {
+    pub i: usize,
+    pub inputs: Vec<Arc<Mutex<Node>>>,
 }

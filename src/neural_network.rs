@@ -12,11 +12,11 @@ use super::node::{graph_do_gradient_descent_steps, Node};
 #[derive(Debug)]
 pub struct NeuralNetwork {
     /// output: a prediction
-    terminal_node: Arc<Mutex<Node>>,
+    terminal_nodes: Vec<Arc<Mutex<Node>>>,
     /// output: the error between the prediction and the label
     error_node: Arc<Mutex<Node>>,
     /// the index of the input node which accepts a label
-    label_index: usize,
+    label_indices: Vec<usize>,
     /// learning rate
     step_size: f64,
 }
@@ -24,15 +24,16 @@ impl NeuralNetwork {
     fn check_rep(&self) {}
 
     pub fn new(
-        terminal_node: Arc<Mutex<Node>>,
+        terminal_nodes: Vec<Arc<Mutex<Node>>>,
         error_node: Arc<Mutex<Node>>,
-        label_index: usize,
+        label_indices: Vec<usize>,
         step_size: f64,
     ) -> NeuralNetwork {
+        assert_eq!(terminal_nodes.len(), label_indices.len());
         let this = NeuralNetwork {
-            terminal_node,
+            terminal_nodes,
             error_node,
-            label_index,
+            label_indices,
             step_size,
         };
         this.check_rep();
@@ -51,14 +52,20 @@ impl NeuralNetwork {
         self.check_rep();
     }
 
-    pub fn evaluate(&mut self, inputs: &[f64]) -> f64 {
-        let mut terminal_node = self.terminal_node.lock().unwrap();
-        let batch_index = 0;
-        let output = terminal_node.evaluate_once(inputs, batch_index);
-        drop(terminal_node);
-        graph_delete_caches(&self.terminal_node);
+    pub fn evaluate(&mut self, inputs: &[f64]) -> Vec<f64> {
+        let mut outputs = vec![];
+
+        for terminal_node in &self.terminal_nodes {
+            let mut terminal_node = terminal_node.lock().unwrap();
+            let batch_index = 0;
+            let output = terminal_node.evaluate_once(inputs, batch_index);
+            outputs.push(output);
+        }
+        for terminal_node in &self.terminal_nodes {
+            graph_delete_caches(terminal_node);
+        }
         self.check_rep();
-        output
+        outputs
     }
 
     pub fn compute_error(&mut self, inputs: &[f64], option: EvalOption, batch_index: usize) -> f64 {
@@ -108,7 +115,17 @@ impl NeuralNetwork {
         let mut errors = 0;
         for inputs in dataset {
             let eval = self.evaluate(inputs.as_ref());
-            if (eval - inputs.as_ref()[self.label_index]).abs() >= 0.5 {
+            let label = self
+                .label_indices
+                .iter()
+                .copied()
+                .map(|i| inputs.as_ref()[i]);
+            let erred = eval
+                .iter()
+                .copied()
+                .zip(label)
+                .any(|(eval, label)| 0.5 <= (eval - label).abs());
+            if erred {
                 errors += 1;
             }
         }

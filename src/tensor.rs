@@ -136,6 +136,6 @@ mod tests {
 
     #[test]
     fn test_iter_len() {
-        assert_eq!((0..2).len(), 3);
+        assert_eq!((0..2).len(), 2);
     }
 }

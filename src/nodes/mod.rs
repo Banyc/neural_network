@@ -2,6 +2,7 @@ pub mod bias_node;
 pub mod coeff_node;
 pub mod exp_node;
 pub mod input_node;
+pub mod kernel_layer;
 pub mod l2_error_node;
 pub mod linear_node;
 pub mod log_node;

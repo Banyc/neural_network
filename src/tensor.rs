@@ -1,4 +1,6 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+use std::num::NonZeroUsize;
+
+#[derive(Debug, PartialEq, Eq)]
 pub struct Tensor<'a, T> {
     data: &'a [T],
     shape: &'a [usize],
@@ -13,7 +15,7 @@ impl<'a, T> Tensor<'a, T> {
     }
 }
 impl<T> Tensor<'_, T> {
-    pub fn get(&self, index: Index<'_>) -> Option<&T> {
+    pub fn get(&self, index: &[usize]) -> Option<&T> {
         if self.shape.len() != index.len() {
             return None;
         }
@@ -34,9 +36,58 @@ impl<T> Tensor<'_, T> {
         }
         self.data.get(pos)
     }
+
+    pub fn shape(&self) -> &[usize] {
+        self.shape
+    }
+}
+impl<T> Clone for Tensor<'_, T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+impl<T> Copy for Tensor<'_, T> {}
+
+pub struct IndexIter<'a> {
+    range: &'a Range,
+    stride: NonZeroUsize,
+    index: Option<Vec<usize>>,
+}
+impl<'a> IndexIter<'a> {
+    pub fn new(range: &'a Range, stride: NonZeroUsize) -> Self {
+        let index = range.iter().map(|x| x.start).collect();
+        Self {
+            range,
+            stride,
+            index: Some(index),
+        }
+    }
+}
+impl IndexIter<'_> {
+    pub fn next_index(&mut self) -> Option<&Vec<usize>> {
+        let index = next_index(self.index.take().unwrap(), self.range, self.stride)?;
+        self.index = Some(index);
+        return Some(self.index.as_ref().unwrap());
+
+        fn next_index(
+            mut index: Vec<usize>,
+            range: &Range,
+            stride: NonZeroUsize,
+        ) -> Option<Vec<usize>> {
+            assert_eq!(index.len(), range.len());
+            for dim in 0..index.len() {
+                if index[dim] + stride.get() < range[dim].end {
+                    index[dim] += stride.get();
+                    return Some(index);
+                }
+                index[dim] = range[dim].start;
+            }
+            None
+        }
+    }
 }
 
-pub type Index<'a> = &'a [usize];
+pub type Range = [std::ops::Range<usize>];
 
 #[cfg(test)]
 mod tests {

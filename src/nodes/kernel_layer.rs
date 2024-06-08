@@ -5,12 +5,12 @@ use std::{
 
 use crate::{
     node::Node,
-    tensor::{IndexIter, OwnedShape, Tensor},
+    tensor::{IndexIter, OwnedShape, Stride, Tensor},
 };
 
 pub fn kernel_layer(
     inputs: Tensor<'_, Arc<Mutex<Node>>>,
-    stride: NonZeroUsize,
+    stride: &Stride,
     kernel_shape: &[usize],
     mut create_kernel: impl FnMut(KernelParams) -> Arc<Mutex<Node>>,
 ) -> (Vec<Arc<Mutex<Node>>>, OwnedShape) {
@@ -29,7 +29,10 @@ pub fn kernel_layer(
             .zip(kernel_shape.iter().copied())
             .map(|(start, len)| start..(start + len))
             .collect::<Vec<_>>();
-        let mut kernel_input_indices = IndexIter::new(&range, NonZeroUsize::new(1).unwrap());
+        let stride = (0..range.len())
+            .map(|_| NonZeroUsize::new(1).unwrap())
+            .collect::<Vec<NonZeroUsize>>();
+        let mut kernel_input_indices = IndexIter::new(&range, &stride);
         let mut kernel_inputs = vec![];
         while let Some(kernel_input_index) = kernel_input_indices.next_index() {
             let node = inputs.get(kernel_input_index).unwrap();

@@ -1,11 +1,8 @@
-use std::{
-    num::NonZeroUsize,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
 use crate::{
     node::Node,
-    tensor::{OwnedShape, Tensor},
+    tensor::{OwnedShape, Stride, Tensor},
 };
 
 use super::{
@@ -15,7 +12,7 @@ use super::{
 
 pub fn max_pooling_layer(
     inputs: Tensor<'_, Arc<Mutex<Node>>>,
-    stride: NonZeroUsize,
+    stride: &Stride,
     kernel_shape: &[usize],
 ) -> (Vec<Arc<Mutex<Node>>>, OwnedShape) {
     let create_filter = |params: KernelParams| -> Arc<Mutex<Node>> {

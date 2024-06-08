@@ -1,12 +1,9 @@
-use std::{
-    num::NonZeroUsize,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
 use crate::{
     node::Node,
     param::ParamInjector,
-    tensor::{OwnedShape, Tensor},
+    tensor::{OwnedShape, Stride, Tensor},
 };
 
 use super::{
@@ -29,7 +26,7 @@ pub struct ParamInjection<'a> {
 
 pub fn conv_layer(
     inputs: Tensor<'_, Arc<Mutex<Node>>>,
-    stride: NonZeroUsize,
+    stride: &Stride,
     kernel: KernelConfig,
     mut param_injection: Option<ParamInjection<'_>>,
 ) -> (Vec<Arc<Mutex<Node>>>, OwnedShape) {

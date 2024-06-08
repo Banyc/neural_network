@@ -57,14 +57,18 @@ pub type OwnedShape = Vec<usize>;
 pub type Range = [std::ops::Range<usize>];
 pub type OwnedRange = Vec<std::ops::Range<usize>>;
 
+pub type Stride = [NonZeroUsize];
+pub type OwnedStride = Vec<NonZeroUsize>;
+
 #[derive(Debug, Clone)]
 pub struct IndexIter<'a> {
     range: &'a Range,
-    stride: NonZeroUsize,
+    stride: &'a Stride,
     index: Option<Vec<usize>>,
 }
 impl<'a> IndexIter<'a> {
-    pub fn new(range: &'a Range, stride: NonZeroUsize) -> Self {
+    pub fn new(range: &'a Range, stride: &'a Stride) -> Self {
+        assert_eq!(range.len(), stride.len());
         let index = range.iter().map(|x| x.start).collect();
         Self {
             range,
@@ -79,15 +83,12 @@ impl IndexIter<'_> {
         self.index = Some(index);
         return Some(self.index.as_ref().unwrap());
 
-        fn next_index(
-            mut index: OwnedIndex,
-            range: &Range,
-            stride: NonZeroUsize,
-        ) -> Option<OwnedIndex> {
+        fn next_index(mut index: OwnedIndex, range: &Range, stride: &Stride) -> Option<OwnedIndex> {
             assert_eq!(index.len(), range.len());
+            assert_eq!(index.len(), stride.len());
             for dim in 0..index.len() {
-                if index[dim] + stride.get() < range[dim].end {
-                    index[dim] += stride.get();
+                if index[dim] + stride[dim].get() < range[dim].end {
+                    index[dim] += stride[dim].get();
                     return Some(index);
                 }
                 index[dim] = range[dim].start;
@@ -99,7 +100,8 @@ impl IndexIter<'_> {
     pub fn shape(&self) -> OwnedShape {
         self.range
             .iter()
-            .map(|x| x.len().div_ceil(self.stride.get()))
+            .zip(self.stride.iter())
+            .map(|(range, stride)| range.len().div_ceil(stride.get()))
             .collect()
     }
 }

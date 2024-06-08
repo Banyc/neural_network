@@ -64,7 +64,7 @@ pub type OwnedStride = Vec<NonZeroUsize>;
 pub struct IndexIter<'a> {
     range: &'a Range,
     stride: &'a Stride,
-    index: Option<Vec<usize>>,
+    index: Option<OwnedIndex>,
 }
 impl<'a> IndexIter<'a> {
     pub fn new(range: &'a Range, stride: &'a Stride) -> Self {

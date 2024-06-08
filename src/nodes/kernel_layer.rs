@@ -3,7 +3,12 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::{node::Node, nodes::weight_node, param::ParamInjector, tensor::Tensor};
+use crate::{
+    node::Node,
+    nodes::weight_node,
+    param::ParamInjector,
+    tensor::{OwnedShape, Tensor},
+};
 
 use super::filter_layer::{filter_layer, FilterParams};
 
@@ -24,7 +29,7 @@ pub fn kernel_layer(
     stride: NonZeroUsize,
     kernel: KernelConfig,
     mut param_injection: Option<ParamInjection<'_>>,
-) -> Vec<Arc<Mutex<Node>>> {
+) -> (Vec<Arc<Mutex<Node>>>, OwnedShape) {
     let create_filter = |params: FilterParams| -> Arc<Mutex<Node>> {
         let weights = kernel.initial_weights.as_ref().map(|f| f());
         let feature_node = weight_node::weight_node(params.inputs, weights, kernel.lambda).unwrap();

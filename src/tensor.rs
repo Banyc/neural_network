@@ -3,10 +3,10 @@ use std::num::NonZeroUsize;
 #[derive(Debug, PartialEq, Eq)]
 pub struct Tensor<'a, T> {
     data: &'a [T],
-    shape: &'a [usize],
+    shape: &'a Shape,
 }
 impl<'a, T> Tensor<'a, T> {
-    pub fn new(data: &'a [T], shape: &'a [usize]) -> Option<Self> {
+    pub fn new(data: &'a [T], shape: &'a Shape) -> Option<Self> {
         let n = shape.iter().copied().product::<usize>();
         if data.len() != n {
             return None;
@@ -15,7 +15,7 @@ impl<'a, T> Tensor<'a, T> {
     }
 }
 impl<T> Tensor<'_, T> {
-    pub fn get(&self, index: &[usize]) -> Option<&T> {
+    pub fn get(&self, index: &Index) -> Option<&T> {
         if self.shape.len() != index.len() {
             return None;
         }
@@ -48,6 +48,16 @@ impl<T> Clone for Tensor<'_, T> {
 }
 impl<T> Copy for Tensor<'_, T> {}
 
+pub type Index = [usize];
+pub type OwnedIndex = Vec<usize>;
+
+pub type Shape = [usize];
+pub type OwnedShape = Vec<usize>;
+
+pub type Range = [std::ops::Range<usize>];
+pub type OwnedRange = Vec<std::ops::Range<usize>>;
+
+#[derive(Debug, Clone)]
 pub struct IndexIter<'a> {
     range: &'a Range,
     stride: NonZeroUsize,
@@ -64,16 +74,16 @@ impl<'a> IndexIter<'a> {
     }
 }
 impl IndexIter<'_> {
-    pub fn next_index(&mut self) -> Option<&Vec<usize>> {
+    pub fn next_index(&mut self) -> Option<&OwnedIndex> {
         let index = next_index(self.index.take().unwrap(), self.range, self.stride)?;
         self.index = Some(index);
         return Some(self.index.as_ref().unwrap());
 
         fn next_index(
-            mut index: Vec<usize>,
+            mut index: OwnedIndex,
             range: &Range,
             stride: NonZeroUsize,
-        ) -> Option<Vec<usize>> {
+        ) -> Option<OwnedIndex> {
             assert_eq!(index.len(), range.len());
             for dim in 0..index.len() {
                 if index[dim] + stride.get() < range[dim].end {
@@ -85,9 +95,14 @@ impl IndexIter<'_> {
             None
         }
     }
-}
 
-pub type Range = [std::ops::Range<usize>];
+    pub fn shape(&self) -> OwnedShape {
+        self.range
+            .iter()
+            .map(|x| x.len().div_ceil(self.stride.get()))
+            .collect()
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -117,5 +132,10 @@ mod tests {
         assert_eq!(*tensor.get(&[1, 2, 0]).unwrap(), 9);
         assert_eq!(*tensor.get(&[0, 0, 1]).unwrap(), 12);
         assert_eq!(*tensor.get(&[1, 0, 1]).unwrap(), 13);
+    }
+
+    #[test]
+    fn test_iter_len() {
+        assert_eq!((0..2).len(), 3);
     }
 }

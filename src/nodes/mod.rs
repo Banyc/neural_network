@@ -9,6 +9,7 @@ pub mod power_node;
 pub mod product_node;
 pub mod relu_node;
 pub mod sigmoid_node;
+pub mod softmax_node;
 pub mod sum_node;
 #[cfg(test)]
 mod tests;

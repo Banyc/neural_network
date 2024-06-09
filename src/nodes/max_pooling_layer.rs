@@ -26,7 +26,7 @@ mod tests {
     use std::num::NonZeroUsize;
 
     use crate::{
-        nodes::input_node::input_node_batch,
+        nodes::input_node::{input_node_batch, InputNodeBatchParams},
         tensor::{OwnedNonZeroShape, OwnedStride},
     };
 
@@ -45,7 +45,10 @@ mod tests {
             .copied()
             .map(|x| x as f64)
             .collect::<Vec<f64>>();
-        let input_nodes = input_node_batch(image.len());
+        let input_nodes = input_node_batch(InputNodeBatchParams {
+            start: 0,
+            len: image.len(),
+        });
         let input_shape = [4, 4];
         let inputs = Tensor::new(&input_nodes, &input_shape).unwrap();
         let stride = [2, 2];

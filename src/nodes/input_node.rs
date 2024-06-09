@@ -10,10 +10,15 @@ pub fn input_node(input_index: usize) -> Node {
     Node::new(Vec::new(), Arc::new(computation), Vec::new())
 }
 
-pub fn input_node_batch(len: usize) -> Vec<Arc<Mutex<Node>>> {
-    (0..len)
+#[derive(Debug, Clone)]
+pub struct InputNodeBatchParams {
+    pub start: usize,
+    pub len: usize,
+}
+pub fn input_node_batch(params: InputNodeBatchParams) -> Vec<Arc<Mutex<Node>>> {
+    (0..params.len)
         .map(|i| {
-            let node = input_node(i);
+            let node = input_node(params.start + i);
             Arc::new(Mutex::new(node))
         })
         .collect()

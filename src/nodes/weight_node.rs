@@ -108,11 +108,13 @@ pub enum WeightNodeError {
 
 #[cfg(test)]
 mod tests {
+    use crate::nodes::input_node::InputNodeBatchParams;
+
     use super::{super::input_node::input_node_batch, weight_node};
 
     #[test]
     fn evaluate() {
-        let input_nodes = input_node_batch(3);
+        let input_nodes = input_node_batch(InputNodeBatchParams { start: 0, len: 3 });
         let inputs = vec![1.0, 2.0, 3.0];
         let initial_weights = vec![3.0, 2.0, 1.0];
         let mut weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
@@ -123,7 +125,7 @@ mod tests {
 
     #[test]
     fn gradient_of_this_at_operand() {
-        let input_nodes = input_node_batch(3);
+        let input_nodes = input_node_batch(InputNodeBatchParams { start: 0, len: 3 });
         let inputs = vec![1.0, 2.0, 3.0];
         let initial_weights = vec![3.0, 2.0, 1.0];
         let mut weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
@@ -137,7 +139,7 @@ mod tests {
 
     #[test]
     fn gradient_of_this_at_parameter() {
-        let input_nodes = input_node_batch(3);
+        let input_nodes = input_node_batch(InputNodeBatchParams { start: 0, len: 3 });
         let inputs = vec![1.0, 2.0, 3.0];
         let initial_weights = vec![3.0, 2.0, 1.0];
         let mut weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();

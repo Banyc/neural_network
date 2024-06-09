@@ -5,7 +5,7 @@ use crate::{
     node::{clone_node_batch, Node},
     nodes::{
         bias_node::bias_node,
-        input_node::{input_node, input_node_batch},
+        input_node::{input_node, input_node_batch, InputNodeBatchParams},
         l2_error_node::l2_error_node,
         linear_node::linear_node,
         relu_node::relu_node,
@@ -28,7 +28,10 @@ fn single_linear_relu_network(
     initial_weights: Option<Vec<f64>>,
     initial_bias: Option<f64>,
 ) -> NeuralNetwork {
-    let input_nodes = input_node_batch(node_count);
+    let input_nodes = input_node_batch(InputNodeBatchParams {
+        start: 0,
+        len: node_count,
+    });
     let relu_node = single_linear_relu(input_nodes, initial_weights, initial_bias);
     let relu_node = Arc::new(Mutex::new(relu_node));
     let label_node = input_node(node_count);
@@ -81,7 +84,10 @@ fn errors_on_dataset() {
 #[test]
 fn gradients() {
     let label_index = 2;
-    let input_nodes = input_node_batch(label_index);
+    let input_nodes = input_node_batch(InputNodeBatchParams {
+        start: 0,
+        len: label_index,
+    });
     let initial_weights = vec![2.0, 1.0];
     let weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
     let weight_node = Arc::new(Mutex::new(weight_node));
@@ -109,7 +115,10 @@ fn gradients() {
 #[test]
 fn backpropagation_step() {
     let label_index = 2;
-    let input_nodes = input_node_batch(label_index);
+    let input_nodes = input_node_batch(InputNodeBatchParams {
+        start: 0,
+        len: label_index,
+    });
     let initial_weights = vec![2.0, 1.0];
     let weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
     let weight_node = Arc::new(Mutex::new(weight_node));
@@ -144,7 +153,10 @@ fn backpropagation_step() {
 #[test]
 fn backpropagation_step2() {
     let label_index = 1;
-    let input_nodes = input_node_batch(label_index);
+    let input_nodes = input_node_batch(InputNodeBatchParams {
+        start: 0,
+        len: label_index,
+    });
     let initial_weights1 = vec![2.0];
     let weight_node1 = weight_node(input_nodes, Some(initial_weights1), None).unwrap();
     let weight_node1 = Arc::new(Mutex::new(weight_node1));
@@ -182,7 +194,10 @@ fn backpropagation_step2() {
 #[test]
 fn learn_xor_sigmoid() {
     let label_index = 2;
-    let input_nodes = input_node_batch(label_index);
+    let input_nodes = input_node_batch(InputNodeBatchParams {
+        start: 0,
+        len: label_index,
+    });
     let linear_node_1 =
         linear_node(clone_node_batch(&input_nodes), None, None, None, None).unwrap();
     let linear_node_2 =
@@ -226,7 +241,10 @@ fn learn_xor_sigmoid() {
 fn learn_xor_regularized_sigmoid() {
     let label_index = 2;
     let lambda = 0.0001;
-    let input_nodes = input_node_batch(label_index);
+    let input_nodes = input_node_batch(InputNodeBatchParams {
+        start: 0,
+        len: label_index,
+    });
     let linear_node_1 = linear_node(
         clone_node_batch(&input_nodes),
         None,
@@ -287,7 +305,10 @@ fn learn_xor_regularized_sigmoid() {
 #[test]
 fn learn_xor_relu() {
     let label_index = 2;
-    let input_nodes = input_node_batch(label_index);
+    let input_nodes = input_node_batch(InputNodeBatchParams {
+        start: 0,
+        len: label_index,
+    });
     let first_layer = {
         let mut layer = Vec::new();
         for _ in 0..10 {

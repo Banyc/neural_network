@@ -12,7 +12,7 @@ use crate::{
     node::Node,
     nodes::{
         conv_layer::{self, deep_conv_layer},
-        input_node::input_node_batch,
+        input_node::{input_node_batch, InputNodeBatchParams},
         linear_node, max_pooling_layer,
         mse_node::mse_node,
         sigmoid_node::sigmoid_node,
@@ -31,6 +31,7 @@ const TEST_LABEL: &str = "local/t10k-labels.idx1-ubyte";
 fn mnist() {
     let train_dataset = read_mnist(TRAIN_IMAGE, TRAIN_LABEL).unwrap();
     let test_dataset = read_mnist(TEST_IMAGE, TEST_LABEL).unwrap();
+    // convergence
     {
         println!("inputs: {:?}", train_dataset[0]);
         let mut nn = neural_network(0.1);
@@ -48,11 +49,14 @@ fn mnist() {
             let loss = nn.compute_error(&train_dataset[0], option, 0);
             println!("loss: {loss}");
         }
+        let eval = nn.evaluate(&train_dataset[0]);
+        println!("eval: {eval:?}");
         let acc = nn.accuracy(&train_dataset[0..1], accurate);
         println!("acc: {acc}");
         assert_eq!(acc, 1.);
     }
-    let mut nn = neural_network(0.01);
+    // epochs
+    let mut nn = neural_network(0.1);
     for i in 0.. {
         println!("epoch: {i}");
         let max_steps = 2 << 10;
@@ -60,13 +64,30 @@ fn mnist() {
         nn.train(&train_dataset, max_steps, option);
         let acc = nn.accuracy(&test_dataset[..128], accurate);
         println!("acc: {acc}");
+        {
+            let mut losses = vec![];
+            for inputs in &test_dataset[..128] {
+                let option = EvalOption::ClearCache;
+                let loss = nn.compute_error(inputs, option, 0);
+                losses.push(loss);
+            }
+            let loss = losses
+                .iter()
+                .copied()
+                .map(|x| x / losses.len() as f64)
+                .sum::<f64>();
+            println!("loss: {loss}");
+        }
     }
 }
 
 fn neural_network(step_size: f64) -> NeuralNetwork {
     let width = 28;
     let height = 28;
-    let input_nodes = input_node_batch(width * height);
+    let input_nodes = input_node_batch(InputNodeBatchParams {
+        start: 0,
+        len: width * height,
+    });
     let (conv_layer, shape) = {
         let shape = [width, height];
         let inputs = Tensor::new(&input_nodes, &shape).unwrap();
@@ -145,7 +166,10 @@ fn neural_network(step_size: f64) -> NeuralNetwork {
         linear_node::linear_layer(sigmoid_layer, depth, None, None, None, None).unwrap()
     };
     assert_eq!(linear_layer.len(), CLASSES);
-    let label_nodes = input_node_batch(CLASSES);
+    let label_nodes = input_node_batch(InputNodeBatchParams {
+        start: input_nodes.len(),
+        len: CLASSES,
+    });
     let error_node_inputs = linear_layer
         .iter()
         .cloned()
@@ -234,8 +258,6 @@ fn one_hot(i: usize, space_size: usize) -> Vec<f64> {
 fn accurate(params: AccurateFnParams<'_>) -> bool {
     let eval = params.outputs;
     let label = &params.inputs[params.inputs.len() - CLASSES..];
-    println!("eval: {eval:?}");
-    println!("label: {label:?}");
     assert_eq!(eval.len(), label.len());
     assert!(!eval.is_empty());
     let eval_max_i = max_i(&eval);

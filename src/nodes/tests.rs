@@ -1,5 +1,7 @@
 use std::sync::{Arc, Mutex};
 
+use crate::nodes::input_node::InputNodeBatchParams;
+
 use super::{
     bias_node::bias_node, input_node::input_node_batch, relu_node::relu_node,
     weight_node::weight_node,
@@ -7,7 +9,7 @@ use super::{
 
 #[test]
 fn linear_evaluate() {
-    let input_nodes = input_node_batch(3);
+    let input_nodes = input_node_batch(InputNodeBatchParams { start: 0, len: 3 });
     let inputs = vec![1.0, 2.0, 3.0];
     let initial_weights = vec![3.0, 2.0, 1.0];
     let initial_bias = 4.0;
@@ -20,7 +22,7 @@ fn linear_evaluate() {
 
 #[test]
 fn linear_gradient_of_this_at_operand() {
-    let input_nodes = input_node_batch(3);
+    let input_nodes = input_node_batch(InputNodeBatchParams { start: 0, len: 3 });
     let inputs = vec![1.0, 2.0, 3.0];
     let initial_weights = vec![3.0, 2.0, 1.0];
     let initial_bias = 4.0;
@@ -34,7 +36,7 @@ fn linear_gradient_of_this_at_operand() {
 
 #[test]
 fn linear_gradient_of_this_at_parameter() {
-    let input_nodes = input_node_batch(3);
+    let input_nodes = input_node_batch(InputNodeBatchParams { start: 0, len: 3 });
     let inputs = vec![1.0, 2.0, 3.0];
     let initial_weights = vec![3.0, 2.0, 1.0];
     let initial_bias = 4.0;
@@ -50,7 +52,7 @@ fn linear_gradient_of_this_at_parameter() {
 
 #[test]
 fn linear_with_relu_evaluate() {
-    let input_nodes = input_node_batch(3);
+    let input_nodes = input_node_batch(InputNodeBatchParams { start: 0, len: 3 });
     let inputs = vec![1.0, 2.0, 3.0];
     let initial_weights = vec![3.0, 2.0, 1.0];
     let initial_bias = -20.0;

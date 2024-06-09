@@ -90,7 +90,7 @@ impl NeuralNetwork {
         };
         let mut batch_input = vec![];
         let mut rng = rand::thread_rng();
-        let mut now = Instant::now();
+        let mut progress_printer = ProgressPrinter::new();
         for i in 0..max_steps {
             batch_input.clear();
             for _ in 0..batch_size {
@@ -98,12 +98,7 @@ impl NeuralNetwork {
                 batch_input.push(dataset[dataset_index].as_ref());
             }
             self.backpropagation_step(&batch_input);
-            if i % (max_steps / 10) == 0 {
-                let percentage = (100 * i) as f64 / max_steps as f64;
-                let elapsed = human_duration(now.elapsed());
-                now = Instant::now();
-                println!("{percentage:.2}%; {elapsed}");
-            }
+            progress_printer.print_progress(i, max_steps);
         }
         self.check_rep();
     }
@@ -116,8 +111,9 @@ impl NeuralNetwork {
     where
         S: AsRef<[f64]>,
     {
+        let mut progress_printer = ProgressPrinter::new();
         let mut accurate_count = 0;
-        for inputs in dataset {
+        for (i, inputs) in dataset.iter().enumerate() {
             let eval = self.evaluate(inputs.as_ref());
             let label = self
                 .label_indices
@@ -128,6 +124,7 @@ impl NeuralNetwork {
             if accurate(eval, label) {
                 accurate_count += 1;
             }
+            progress_printer.print_progress(i, dataset.len());
         }
         self.check_rep();
         accurate_count as f64 / dataset.len() as f64
@@ -145,6 +142,28 @@ pub enum TrainOption {
     StochasticGradientDescent,
     MiniBatchGradientDescent { batch_size: usize },
     BatchGradientDescent,
+}
+
+struct ProgressPrinter {
+    now: Instant,
+}
+impl ProgressPrinter {
+    pub fn new() -> Self {
+        Self {
+            now: Instant::now(),
+        }
+    }
+
+    fn print_progress(&mut self, i: usize, len: usize) {
+        let gap = len / 10;
+        if gap != 0 && i % gap != 0 {
+            return;
+        }
+        let percentage = (100 * i) as f64 / len as f64;
+        let elapsed = human_duration(self.now.elapsed());
+        self.now = Instant::now();
+        println!("{percentage:.2}%; {elapsed}");
+    }
 }
 
 fn human_duration(duration: Duration) -> String {

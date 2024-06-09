@@ -108,29 +108,29 @@ impl NeuralNetwork {
         self.check_rep();
     }
 
-    pub fn errors_on_dataset<S>(&mut self, dataset: &[S]) -> f64
+    pub fn accuracy<S>(
+        &mut self,
+        dataset: &[S],
+        accurate: impl Fn(Vec<f64>, Vec<f64>) -> bool,
+    ) -> f64
     where
         S: AsRef<[f64]>,
     {
-        let mut errors = 0;
+        let mut accurate_count = 0;
         for inputs in dataset {
             let eval = self.evaluate(inputs.as_ref());
             let label = self
                 .label_indices
                 .iter()
                 .copied()
-                .map(|i| inputs.as_ref()[i]);
-            let erred = eval
-                .iter()
-                .copied()
-                .zip(label)
-                .any(|(eval, label)| 0.5 <= (eval - label).abs());
-            if erred {
-                errors += 1;
+                .map(|i| inputs.as_ref()[i])
+                .collect::<Vec<f64>>();
+            if accurate(eval, label) {
+                accurate_count += 1;
             }
         }
         self.check_rep();
-        errors as f64 / dataset.len() as f64
+        accurate_count as f64 / dataset.len() as f64
     }
 }
 

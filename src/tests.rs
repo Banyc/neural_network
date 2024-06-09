@@ -78,7 +78,7 @@ fn cache_reset() {
 fn errors_on_dataset() {
     let mut network = single_linear_relu_network(2, Some(vec![2.0, 1.0]), Some(3.0));
     let dataset = vec![vec![2.0, -2.0, 5.0], vec![6.0, -2.0, 5.0]];
-    let ret = network.errors_on_dataset(&dataset);
+    let ret = network.accuracy(&dataset, binary_accurate);
     assert!(ret > 0.499);
     assert!(ret < 0.501);
 }
@@ -234,8 +234,8 @@ fn learn_xor_sigmoid() {
         let ret = network.evaluate(inputs);
         assert!((ret[0] - inputs[label_index]).abs() < 0.1);
     }
-    let ret = network.errors_on_dataset(&dataset);
-    assert_eq!(ret, 0.0);
+    let ret = network.accuracy(&dataset, binary_accurate);
+    assert_eq!(ret, 1.0);
 }
 
 #[test]
@@ -301,8 +301,8 @@ fn learn_xor_regularized_sigmoid() {
         let ret = network.evaluate(inputs);
         assert!((ret[0] - inputs[label_index]).abs() < 0.1);
     }
-    let ret = network.errors_on_dataset(&dataset);
-    assert_eq!(ret, 0.0);
+    let ret = network.accuracy(&dataset, binary_accurate);
+    assert_eq!(ret, 1.0);
 }
 
 #[test]
@@ -369,6 +369,10 @@ fn learn_xor_relu() {
         let ret = network.evaluate(inputs);
         assert!((ret[0] - inputs[label_index]).abs() < 0.1);
     }
-    let ret = network.errors_on_dataset(&dataset);
-    assert_eq!(ret, 0.0);
+    let ret = network.accuracy(&dataset, binary_accurate);
+    assert_eq!(ret, 1.0);
+}
+
+fn binary_accurate(eval: Vec<f64>, label: Vec<f64>) -> bool {
+    (eval[0] - label[0]).abs() < 0.5
 }

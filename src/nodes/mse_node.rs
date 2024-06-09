@@ -6,6 +6,8 @@ use crate::node::{Node, NodeComputation};
 /// f(y, \hat{y}) = \frac{1}{n} \sum (y - \hat{y})^2
 /// ```
 pub fn mse_node(operands: Vec<Arc<Mutex<Node>>>) -> Node {
+    assert!(!operands.is_empty());
+    assert!(operands.len() % 2 == 0);
     let computation = MseNodeComputation {};
     Node::new(operands, Arc::new(computation), Vec::new())
 }

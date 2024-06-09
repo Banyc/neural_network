@@ -5,13 +5,13 @@ use std::{
 
 use crate::{
     node::Node,
-    param::ParamInjector,
+    param::ParamInjection,
     tensor::{NonZeroShape, OwnedShape, Stride, Tensor},
 };
 
 use super::{
     kernel_layer::{kernel_layer, KernelParams},
-    linear_node::{self, linear_node},
+    linear_node::linear_node,
 };
 
 #[derive(Clone)]
@@ -20,12 +20,6 @@ pub struct KernelConfig<'a> {
     pub initial_weights: Option<&'a dyn Fn() -> Vec<f64>>,
     pub initial_bias: Option<&'a dyn Fn() -> f64>,
     pub lambda: Option<f64>,
-}
-
-#[derive(Debug)]
-pub struct ParamInjection<'a> {
-    pub injector: &'a mut ParamInjector,
-    pub name: String,
 }
 
 pub fn conv_layer(
@@ -37,16 +31,10 @@ pub fn conv_layer(
     let create_filter = |params: KernelParams| -> Arc<Mutex<Node>> {
         let weights = kernel.initial_weights.as_ref().map(|f| f());
         let bias = kernel.initial_bias.as_ref().map(|f| f());
-        let param_injection = param_injection.as_mut().map(|x| {
-            let prefix = format!("{}:kernel.{}", x.name, params.i);
-            let weights_name = format!("{prefix}:weights");
-            let bias_name = format!("{prefix}:bias");
-            linear_node::ParamInjection {
-                injector: x.injector,
-                weights_name,
-                bias_name,
-            }
-        });
+
+        let param_injection = param_injection
+            .as_mut()
+            .map(|x| x.name_append(&format!(":kernel.{}", params.i)));
         let feature_node =
             linear_node(params.inputs, weights, bias, kernel.lambda, param_injection);
         feature_node.unwrap()
@@ -64,17 +52,9 @@ pub fn deep_conv_layer(
     let mut kernel_layers = vec![];
     let mut kernel_layer_shape = None;
     for depth in 0..depth.get() {
-        let param_injection = match &mut param_injection {
-            Some(x) => {
-                let name = &x.name;
-                let name = format!("{name}:depth.{depth}");
-                Some(ParamInjection {
-                    injector: x.injector,
-                    name,
-                })
-            }
-            None => None,
-        };
+        let param_injection = param_injection
+            .as_mut()
+            .map(|x| x.name_append(&format!(":depth.{depth}")));
         let (layer, shape) = conv_layer(inputs, stride, kernel.clone(), param_injection);
         if let Some(layer_shape) = &kernel_layer_shape {
             assert_eq!(&shape, layer_shape);

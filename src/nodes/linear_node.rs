@@ -1,18 +1,14 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    num::NonZeroUsize,
+    sync::{Arc, Mutex},
+};
 
-use crate::{node::Node, param::ParamInjector};
+use crate::{node::Node, param::ParamInjection};
 
 use super::{
     bias_node::bias_node,
     weight_node::{weight_node, WeightNodeError},
 };
-
-#[derive(Debug)]
-pub struct ParamInjection<'a> {
-    pub injector: &'a mut ParamInjector,
-    pub weights_name: String,
-    pub bias_name: String,
-}
 
 /// ```math
 /// f_{w,b} (x) = wx + b
@@ -32,13 +28,38 @@ pub fn linear_node(
         Arc::clone(&weight_node),
         initial_bias,
     )));
-    if let Some(param_injection) = param_injection {
+    if let Some(mut param_injection) = param_injection {
         param_injection
-            .injector
-            .insert_node(param_injection.weights_name, weight_node);
+            .name_append(":weights")
+            .insert_node(weight_node);
         param_injection
-            .injector
-            .insert_node(param_injection.bias_name, Arc::clone(&bias_node));
+            .name_append(":bias")
+            .insert_node(Arc::clone(&bias_node));
     }
     Ok(bias_node)
+}
+
+pub fn linear_layer(
+    input_nodes: Vec<Arc<Mutex<Node>>>,
+    depth: NonZeroUsize,
+    initial_weights: Option<&dyn Fn() -> Vec<f64>>,
+    initial_bias: Option<&dyn Fn() -> f64>,
+    lambda: Option<f64>,
+    mut param_injection: Option<ParamInjection<'_>>,
+) -> Result<Vec<Arc<Mutex<Node>>>, WeightNodeError> {
+    let mut layer = vec![];
+    for depth in 0..depth.get() {
+        let param_injection = param_injection
+            .as_mut()
+            .map(|x| x.name_append(&format!(":depth.{depth}")));
+        let linear_node = linear_node(
+            input_nodes.clone(),
+            initial_weights.as_ref().map(|f| f()),
+            initial_bias.as_ref().map(|f| f()),
+            lambda,
+            param_injection,
+        )?;
+        layer.push(linear_node);
+    }
+    Ok(layer)
 }

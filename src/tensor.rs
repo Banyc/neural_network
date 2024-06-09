@@ -48,20 +48,53 @@ impl<T> Clone for Tensor<'_, T> {
 }
 impl<T> Copy for Tensor<'_, T> {}
 
+pub fn append_tensors<T>(tensor_data: Vec<Vec<T>>, shape: &Shape) -> (Vec<T>, OwnedNonZeroShape) {
+    let new_dim = NonZeroUsize::new(tensor_data.len()).unwrap();
+    let mut appended_tensor_data = vec![];
+    for tensor_data in tensor_data {
+        Tensor::new(&tensor_data, shape).unwrap();
+        appended_tensor_data.extend(tensor_data);
+    }
+    let shape = canonical_shape(shape).unwrap();
+    let mut appended_shape = shape;
+    appended_shape.push(new_dim);
+    (appended_tensor_data, appended_shape)
+}
+
 pub type Index = [usize];
 pub type OwnedIndex = Vec<usize>;
 
 pub type Shape = [usize];
 pub type OwnedShape = Vec<usize>;
-
 pub type NonZeroShape = [NonZeroUsize];
 pub type OwnedNonZeroShape = Vec<NonZeroUsize>;
+/// Remove dimensions with length 1 and collapse empty shapes
+pub fn canonical_shape(shape: &Shape) -> Option<OwnedNonZeroShape> {
+    let mut canonical = vec![];
+    for x in shape.iter().copied() {
+        if x == 1 {
+            continue;
+        }
+        let x = NonZeroUsize::new(x)?;
+        canonical.push(x);
+    }
+    Some(canonical)
+}
+pub fn non_zero_to_shape(shape: &NonZeroShape) -> OwnedShape {
+    shape.iter().map(|x| x.get()).collect()
+}
+pub fn shape_to_non_zero(shape: &Shape) -> Option<OwnedNonZeroShape> {
+    shape.iter().copied().map(NonZeroUsize::new).collect()
+}
 
 pub type Range = [std::ops::Range<usize>];
 pub type OwnedRange = Vec<std::ops::Range<usize>>;
 
 pub type Stride = [NonZeroUsize];
 pub type OwnedStride = Vec<NonZeroUsize>;
+pub fn primitive_to_stride(stride: &[usize]) -> Option<OwnedStride> {
+    stride.iter().copied().map(NonZeroUsize::new).collect()
+}
 
 #[derive(Debug, Clone)]
 pub struct IndexIter<'a> {

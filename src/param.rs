@@ -6,6 +6,26 @@ use std::{
 use crate::node::Node;
 
 #[derive(Debug)]
+pub struct ParamInjection<'a> {
+    pub injector: &'a mut ParamInjector,
+    pub name: String,
+}
+impl<'a> ParamInjection<'a> {
+    pub fn name_append(&mut self, postfix: &str) -> ParamInjection {
+        let mut name = self.name.clone();
+        name.push_str(postfix);
+        ParamInjection {
+            injector: &mut *self.injector,
+            name,
+        }
+    }
+
+    pub fn insert_node(self, node: Arc<Mutex<Node>>) {
+        self.injector.insert_node(self.name, node);
+    }
+}
+
+#[derive(Debug)]
 pub struct ParamInjector {
     params: HashMap<String, Vec<f64>>,
     nodes: HashMap<String, Arc<Mutex<Node>>>,

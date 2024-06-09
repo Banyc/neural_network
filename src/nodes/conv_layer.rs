@@ -28,7 +28,7 @@ pub fn conv_layer(
     inputs: Tensor<'_, Arc<Mutex<Node>>>,
     stride: &Stride,
     kernel: KernelConfig,
-    mut param_injection: Option<ParamInjection<'_>>,
+    param_injection: Option<ParamInjection<'_>>,
 ) -> (Vec<Arc<Mutex<Node>>>, OwnedShape) {
     let weights = kernel
         .initial_weights
@@ -44,17 +44,22 @@ pub fn conv_layer(
         .as_ref()
         .map(|f| f())
         .unwrap_or_else(|| Arc::new(Mutex::new(vec![default_bias()])));
+    if let Some(mut param_injection) = param_injection {
+        param_injection
+            .name_append(":weights")
+            .insert_params(Arc::clone(&weights));
+        param_injection
+            .name_append(":bias")
+            .insert_params(Arc::clone(&bias));
+    }
 
     let create_filter = |params: KernelParams| -> Arc<Mutex<Node>> {
-        let param_injection = param_injection
-            .as_mut()
-            .map(|x| x.name_append(&format!(":kernel.{}", params.i)));
         let feature_node = linear_node(
             params.inputs,
             Some(Arc::clone(&weights)),
             Some(Arc::clone(&bias)),
             kernel.lambda,
-            param_injection,
+            None,
         );
         feature_node.unwrap()
     };

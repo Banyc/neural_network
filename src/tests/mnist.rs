@@ -15,7 +15,7 @@ use crate::{
         input_node::{input_node_batch, InputNodeBatchParams},
         linear_node, max_pooling_layer,
         mse_node::mse_node,
-        sigmoid_node::sigmoid_node,
+        relu_node::relu_node,
     },
     tensor::{append_tensors, non_zero_to_shape, primitive_to_stride, shape_to_non_zero, Tensor},
 };
@@ -105,12 +105,12 @@ fn neural_network(step_size: f64) -> NeuralNetwork {
     };
     let shape = non_zero_to_shape(&shape);
     assert_eq!(shape, [24, 24, 6]);
-    let sigmoid_layer = conv_layer
+    let relu_layer = conv_layer
         .into_iter()
-        .map(|x| Arc::new(Mutex::new(sigmoid_node(x))))
+        .map(|x| Arc::new(Mutex::new(relu_node(x))))
         .collect::<Vec<Arc<Mutex<Node>>>>();
     let (max_pooling_layer, shape) = {
-        let inputs = Tensor::new(&sigmoid_layer, &shape).unwrap();
+        let inputs = Tensor::new(&relu_layer, &shape).unwrap();
         let stride = primitive_to_stride(&[2, 2, 1]).unwrap();
         let kernel_shape = shape_to_non_zero(&[2, 2, 1]).unwrap();
         max_pooling_layer::max_pooling_layer(inputs, &stride, &kernel_shape)
@@ -132,12 +132,12 @@ fn neural_network(step_size: f64) -> NeuralNetwork {
     };
     let shape = non_zero_to_shape(&shape);
     assert_eq!(shape, [8, 8, 16]);
-    let sigmoid_layer = conv_layer
+    let relu_layer = conv_layer
         .into_iter()
-        .map(|x| Arc::new(Mutex::new(sigmoid_node(x))))
+        .map(|x| Arc::new(Mutex::new(relu_node(x))))
         .collect::<Vec<Arc<Mutex<Node>>>>();
     let (max_pooling_layer, shape) = {
-        let inputs = Tensor::new(&sigmoid_layer, &shape).unwrap();
+        let inputs = Tensor::new(&relu_layer, &shape).unwrap();
         let stride = primitive_to_stride(&[2, 2, 1]).unwrap();
         let kernel_shape = shape_to_non_zero(&[2, 2, 1]).unwrap();
         max_pooling_layer::max_pooling_layer(inputs, &stride, &kernel_shape)
@@ -148,22 +148,22 @@ fn neural_network(step_size: f64) -> NeuralNetwork {
         linear_node::linear_layer(max_pooling_layer, depth, None, None, None, None).unwrap()
     };
     assert_eq!(linear_layer.len(), 120);
-    let sigmoid_layer = linear_layer
+    let relu_layer = linear_layer
         .into_iter()
-        .map(|x| Arc::new(Mutex::new(sigmoid_node(x))))
+        .map(|x| Arc::new(Mutex::new(relu_node(x))))
         .collect::<Vec<Arc<Mutex<Node>>>>();
     let linear_layer = {
         let depth = NonZeroUsize::new(84).unwrap();
-        linear_node::linear_layer(sigmoid_layer, depth, None, None, None, None).unwrap()
+        linear_node::linear_layer(relu_layer, depth, None, None, None, None).unwrap()
     };
     assert_eq!(linear_layer.len(), 84);
-    let sigmoid_layer = linear_layer
+    let relu_layer = linear_layer
         .into_iter()
-        .map(|x| Arc::new(Mutex::new(sigmoid_node(x))))
+        .map(|x| Arc::new(Mutex::new(relu_node(x))))
         .collect::<Vec<Arc<Mutex<Node>>>>();
     let linear_layer = {
         let depth = NonZeroUsize::new(CLASSES).unwrap();
-        linear_node::linear_layer(sigmoid_layer, depth, None, None, None, None).unwrap()
+        linear_node::linear_layer(relu_layer, depth, None, None, None, None).unwrap()
     };
     assert_eq!(linear_layer.len(), CLASSES);
     let label_nodes = input_node_batch(InputNodeBatchParams {

@@ -1,13 +1,16 @@
 use std::sync::{Arc, Mutex};
 
-use crate::node::{Node, NodeComputation};
+use crate::{
+    node::{Node, NodeComputation},
+    param::empty_shared_params,
+};
 
 /// ```math
 /// f(x) = ax
 /// ```
 pub fn coeff_node(operand: Arc<Mutex<Node>>, coefficient: f64) -> Node {
     let computation = Arc::new(CoeffNodeComputation { coefficient });
-    Node::new(vec![operand], computation, vec![])
+    Node::new(vec![operand], computation, empty_shared_params())
 }
 
 #[derive(Debug)]

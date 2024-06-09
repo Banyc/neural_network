@@ -1,13 +1,16 @@
 use std::sync::{Arc, Mutex};
 
-use crate::node::{Node, NodeComputation};
+use crate::{
+    node::{Node, NodeComputation},
+    param::empty_shared_params,
+};
 
 /// ```math
 /// f(x) = \frac{e^{x_i}}{\sum e^x}
 /// ```
 pub fn softmax_node(operand: Arc<Mutex<Node>>, operand_index: usize) -> Node {
     let computation = SoftmaxNodeComputation { operand_index };
-    Node::new(vec![operand], Arc::new(computation), Vec::new())
+    Node::new(vec![operand], Arc::new(computation), empty_shared_params())
 }
 
 #[derive(Debug)]

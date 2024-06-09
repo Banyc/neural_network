@@ -1,13 +1,16 @@
 use std::sync::{Arc, Mutex};
 
-use crate::node::{Node, NodeComputation};
+use crate::{
+    node::{Node, NodeComputation},
+    param::empty_shared_params,
+};
 
 /// ```math
 /// f(x) = a^x
 /// ```
 pub fn exp_node(operand: Arc<Mutex<Node>>, base: f64) -> Node {
     let computation = ExpNodeComputation { base };
-    Node::new(vec![operand], Arc::new(computation), Vec::new())
+    Node::new(vec![operand], Arc::new(computation), empty_shared_params())
 }
 
 #[derive(Debug)]

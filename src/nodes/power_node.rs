@@ -1,13 +1,16 @@
 use std::sync::{Arc, Mutex};
 
-use crate::node::{Node, NodeComputation};
+use crate::{
+    node::{Node, NodeComputation},
+    param::empty_shared_params,
+};
 
 /// ```math
 /// f(x) = x^a
 /// ```
 pub fn power_node(operand: Arc<Mutex<Node>>, power: f64) -> Node {
     let computation = PowerNodeComputation { power };
-    Node::new(vec![operand], Arc::new(computation), Vec::new())
+    Node::new(vec![operand], Arc::new(computation), empty_shared_params())
 }
 
 #[derive(Debug)]

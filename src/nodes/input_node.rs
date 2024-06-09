@@ -1,13 +1,16 @@
 use std::sync::{Arc, Mutex};
 
-use crate::node::{Node, NodeComputation};
+use crate::{
+    node::{Node, NodeComputation},
+    param::empty_shared_params,
+};
 
 /// ```math
 /// f(x) = x[i]
 /// ```
 pub fn input_node(input_index: usize) -> Node {
     let computation = InputNodeComputation { input_index };
-    Node::new(Vec::new(), Arc::new(computation), Vec::new())
+    Node::new(Vec::new(), Arc::new(computation), empty_shared_params())
 }
 
 #[derive(Debug, Clone)]

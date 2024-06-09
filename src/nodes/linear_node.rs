@@ -3,7 +3,10 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::{node::Node, param::ParamInjection};
+use crate::{
+    node::Node,
+    param::{ParamInjection, SharedParams},
+};
 
 use super::{
     bias_node::bias_node,
@@ -17,24 +20,22 @@ use super::{
 /// - `lambda`: for regularization
 pub fn linear_node(
     input_nodes: Vec<Arc<Mutex<Node>>>,
-    initial_weights: Option<Vec<f64>>,
-    initial_bias: Option<f64>,
+    initial_weights: Option<SharedParams>,
+    initial_bias: Option<SharedParams>,
     lambda: Option<f64>,
     param_injection: Option<ParamInjection<'_>>,
 ) -> Result<Arc<Mutex<Node>>, WeightNodeError> {
     let weight_node = weight_node(input_nodes, initial_weights, lambda)?;
+    let weights = Arc::clone(weight_node.parameters());
     let weight_node = Arc::new(Mutex::new(weight_node));
-    let bias_node = Arc::new(Mutex::new(bias_node(
-        Arc::clone(&weight_node),
-        initial_bias,
-    )));
+    let bias_node = bias_node(Arc::clone(&weight_node), initial_bias);
+    let bias = Arc::clone(bias_node.parameters());
+    let bias_node = Arc::new(Mutex::new(bias_node));
     if let Some(mut param_injection) = param_injection {
         param_injection
             .name_append(":weights")
-            .insert_node(weight_node);
-        param_injection
-            .name_append(":bias")
-            .insert_node(Arc::clone(&bias_node));
+            .insert_params(weights);
+        param_injection.name_append(":bias").insert_params(bias);
     }
     Ok(bias_node)
 }
@@ -42,8 +43,8 @@ pub fn linear_node(
 pub fn linear_layer(
     input_nodes: Vec<Arc<Mutex<Node>>>,
     depth: NonZeroUsize,
-    initial_weights: Option<&dyn Fn() -> Vec<f64>>,
-    initial_bias: Option<&dyn Fn() -> f64>,
+    initial_weights: Option<&dyn Fn() -> SharedParams>,
+    initial_bias: Option<&dyn Fn() -> SharedParams>,
     lambda: Option<f64>,
     mut param_injection: Option<ParamInjection<'_>>,
 ) -> Result<Vec<Arc<Mutex<Node>>>, WeightNodeError> {

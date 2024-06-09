@@ -12,12 +12,13 @@ use crate::{
         sigmoid_node::sigmoid_node,
         weight_node::weight_node,
     },
+    param::SharedParams,
 };
 
 fn single_linear_relu(
     input_nodes: Vec<Arc<Mutex<Node>>>,
-    initial_weights: Option<Vec<f64>>,
-    initial_bias: Option<f64>,
+    initial_weights: Option<SharedParams>,
+    initial_bias: Option<SharedParams>,
 ) -> Node {
     let linear_node = linear_node(input_nodes, initial_weights, initial_bias, None, None).unwrap();
     relu_node(linear_node)
@@ -25,8 +26,8 @@ fn single_linear_relu(
 
 fn single_linear_relu_network(
     node_count: usize,
-    initial_weights: Option<Vec<f64>>,
-    initial_bias: Option<f64>,
+    initial_weights: Option<SharedParams>,
+    initial_bias: Option<SharedParams>,
 ) -> NeuralNetwork {
     let input_nodes = input_node_batch(InputNodeBatchParams {
         start: 0,
@@ -41,7 +42,11 @@ fn single_linear_relu_network(
 
 #[test]
 fn evaluate() {
-    let mut network = single_linear_relu_network(3, Some(vec![3.0, 2.0, 1.0]), Some(-20.0));
+    let initial_weights = vec![3.0, 2.0, 1.0];
+    let initial_weights = Arc::new(Mutex::new(initial_weights));
+    let initial_bias = -20.0;
+    let initial_bias = Arc::new(Mutex::new(vec![initial_bias]));
+    let mut network = single_linear_relu_network(3, Some(initial_weights), Some(initial_bias));
     let ret = network.evaluate(&[1.0, 2.0, 3.0]);
     assert_eq!(ret[0], 0.0);
 }
@@ -65,7 +70,11 @@ fn error() {
 
 #[test]
 fn cache_reset() {
-    let mut network = single_linear_relu_network(2, Some(vec![2.0, 1.0]), Some(3.0));
+    let initial_weights = vec![2.0, 1.0];
+    let initial_weights = Arc::new(Mutex::new(initial_weights));
+    let initial_bias = 3.0;
+    let initial_bias = Arc::new(Mutex::new(vec![initial_bias]));
+    let mut network = single_linear_relu_network(2, Some(initial_weights), Some(initial_bias));
     let ret = network.evaluate(&[2.0, -2.0]);
     assert_eq!(ret[0], 5.0);
     let ret = network.evaluate(&[6.0, -2.0]);
@@ -74,7 +83,11 @@ fn cache_reset() {
 
 #[test]
 fn errors_on_dataset() {
-    let mut network = single_linear_relu_network(2, Some(vec![2.0, 1.0]), Some(3.0));
+    let initial_weights = vec![2.0, 1.0];
+    let initial_weights = Arc::new(Mutex::new(initial_weights));
+    let initial_bias = 3.0;
+    let initial_bias = Arc::new(Mutex::new(vec![initial_bias]));
+    let mut network = single_linear_relu_network(2, Some(initial_weights), Some(initial_bias));
     let dataset = vec![vec![2.0, -2.0, 5.0], vec![6.0, -2.0, 5.0]];
     let ret = network.accuracy(&dataset, binary_accurate);
     assert!(ret > 0.499);
@@ -89,9 +102,11 @@ fn gradients() {
         len: label_index,
     });
     let initial_weights = vec![2.0, 1.0];
+    let initial_weights = Arc::new(Mutex::new(initial_weights));
     let weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
     let weight_node = Arc::new(Mutex::new(weight_node));
     let initial_bias = 3.0;
+    let initial_bias = Arc::new(Mutex::new(vec![initial_bias]));
     let bias_node = bias_node(Arc::clone(&weight_node), Some(initial_bias));
     let bias_node = Arc::new(Mutex::new(bias_node));
     let relu_node = relu_node(Arc::clone(&bias_node));
@@ -120,9 +135,11 @@ fn backpropagation_step() {
         len: label_index,
     });
     let initial_weights = vec![2.0, 1.0];
+    let initial_weights = Arc::new(Mutex::new(initial_weights));
     let weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
     let weight_node = Arc::new(Mutex::new(weight_node));
     let initial_bias = 3.0;
+    let initial_bias = Arc::new(Mutex::new(vec![initial_bias]));
     let bias_node = bias_node(Arc::clone(&weight_node), Some(initial_bias));
     let bias_node = Arc::new(Mutex::new(bias_node));
     let relu_node = relu_node(Arc::clone(&bias_node));
@@ -142,11 +159,13 @@ fn backpropagation_step() {
     network.backpropagation_step(&[&inputs]);
     {
         let weight_node = weight_node.lock().unwrap();
-        assert_eq!(weight_node.parameters(), &[-6.0, 9.0])
+        let weights = weight_node.parameters().lock().unwrap();
+        assert_eq!(*weights, &[-6.0, 9.0])
     }
     {
         let bias_node = bias_node.lock().unwrap();
-        assert_eq!(bias_node.parameters(), &[-1.0])
+        let bias = bias_node.parameters().lock().unwrap();
+        assert_eq!(*bias, &[-1.0])
     }
 }
 
@@ -158,9 +177,11 @@ fn backpropagation_step2() {
         len: label_index,
     });
     let initial_weights1 = vec![2.0];
+    let initial_weights1 = Arc::new(Mutex::new(initial_weights1));
     let weight_node1 = weight_node(input_nodes, Some(initial_weights1), None).unwrap();
     let weight_node1 = Arc::new(Mutex::new(weight_node1));
     let initial_weights2 = vec![3.0];
+    let initial_weights2 = Arc::new(Mutex::new(initial_weights2));
     let weight_node2 = weight_node(
         vec![Arc::clone(&weight_node1)],
         Some(initial_weights2),
@@ -183,11 +204,13 @@ fn backpropagation_step2() {
     network.backpropagation_step(&[&inputs]);
     {
         let weight_node = weight_node2.lock().unwrap();
-        assert_eq!(weight_node.parameters(), &[-41.0]); // 3 - 0.5 * 88
+        let weights = weight_node.parameters().lock().unwrap();
+        assert_eq!(*weights, &[-41.0]); // 3 - 0.5 * 88
     }
     {
         let weight_node = weight_node1.lock().unwrap();
-        assert_eq!(weight_node.parameters(), &[-64.0]); // 2 - 0.5 * 121
+        let weights = weight_node.parameters().lock().unwrap();
+        assert_eq!(*weights, &[-64.0]); // 2 - 0.5 * 121
     }
 }
 

@@ -1,6 +1,9 @@
 use std::sync::{Arc, Mutex};
 
-use crate::node::{Node, NodeComputation};
+use crate::{
+    node::{Node, NodeComputation},
+    param::empty_shared_params,
+};
 
 /// ```math
 /// f(x) = \begin{cases}
@@ -10,7 +13,7 @@ use crate::node::{Node, NodeComputation};
 /// ```
 pub fn relu_node(operand: Arc<Mutex<Node>>) -> Node {
     let computation = ReluNodeComputation {};
-    Node::new(vec![operand], Arc::new(computation), Vec::new())
+    Node::new(vec![operand], Arc::new(computation), empty_shared_params())
 }
 
 #[derive(Debug)]
@@ -91,7 +94,9 @@ mod tests {
         let mut relu = relu_node(Arc::new(Mutex::new(input_node)));
         let batch_index = 0;
         relu.evaluate_once(&[3.0], batch_index);
-        let ret = relu.gradient_of_this_at_operand(batch_index).unwrap();
+        let ret = relu
+            .gradient_of_this_at_operand(batch_index, &relu.parameters().lock().unwrap())
+            .unwrap();
         assert!(ret[0] >= 1.0);
         assert!(ret[0] <= 1.0);
     }
@@ -102,7 +107,9 @@ mod tests {
         let mut relu = relu_node(Arc::new(Mutex::new(input_node)));
         let batch_index = 0;
         relu.evaluate_once(&[-3.0], batch_index);
-        let ret = relu.gradient_of_this_at_operand(batch_index).unwrap();
+        let ret = relu
+            .gradient_of_this_at_operand(batch_index, &relu.parameters().lock().unwrap())
+            .unwrap();
         assert!(ret[0] >= 0.0);
         assert!(ret[0] <= 0.0);
     }
@@ -113,7 +120,9 @@ mod tests {
         let mut relu = relu_node(Arc::new(Mutex::new(input_node)));
         let batch_index = 0;
         relu.evaluate_once(&[3.0], batch_index);
-        let ret = relu.gradient_of_this_at_parameter(0).unwrap();
+        let ret = relu
+            .gradient_of_this_at_parameter(0, &relu.parameters().lock().unwrap())
+            .unwrap();
         assert_eq!(ret.len(), 0);
     }
 }

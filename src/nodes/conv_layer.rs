@@ -5,20 +5,22 @@ use std::{
 
 use crate::{
     node::Node,
-    param::ParamInjection,
+    param::{ParamInjection, SharedParams},
     tensor::{NonZeroShape, OwnedShape, Stride, Tensor},
 };
 
 use super::{
+    bias_node::default_bias,
     kernel_layer::{kernel_layer, KernelParams},
     linear_node::linear_node,
+    weight_node::rnd_weights,
 };
 
 #[derive(Clone)]
 pub struct KernelConfig<'a> {
     pub shape: &'a NonZeroShape,
-    pub initial_weights: Option<&'a dyn Fn() -> Vec<f64>>,
-    pub initial_bias: Option<&'a dyn Fn() -> f64>,
+    pub initial_weights: Option<&'a dyn Fn() -> SharedParams>,
+    pub initial_bias: Option<&'a dyn Fn() -> SharedParams>,
     pub lambda: Option<f64>,
 }
 
@@ -28,15 +30,32 @@ pub fn conv_layer(
     kernel: KernelConfig,
     mut param_injection: Option<ParamInjection<'_>>,
 ) -> (Vec<Arc<Mutex<Node>>>, OwnedShape) {
-    let create_filter = |params: KernelParams| -> Arc<Mutex<Node>> {
-        let weights = kernel.initial_weights.as_ref().map(|f| f());
-        let bias = kernel.initial_bias.as_ref().map(|f| f());
+    let weights = kernel
+        .initial_weights
+        .as_ref()
+        .map(|f| f())
+        .unwrap_or_else(|| {
+            let num_kernel_params = kernel.shape.iter().map(|x| x.get()).product();
+            let weights = rnd_weights(num_kernel_params);
+            Arc::new(Mutex::new(weights))
+        });
+    let bias = kernel
+        .initial_bias
+        .as_ref()
+        .map(|f| f())
+        .unwrap_or_else(|| Arc::new(Mutex::new(vec![default_bias()])));
 
+    let create_filter = |params: KernelParams| -> Arc<Mutex<Node>> {
         let param_injection = param_injection
             .as_mut()
             .map(|x| x.name_append(&format!(":kernel.{}", params.i)));
-        let feature_node =
-            linear_node(params.inputs, weights, bias, kernel.lambda, param_injection);
+        let feature_node = linear_node(
+            params.inputs,
+            Some(Arc::clone(&weights)),
+            Some(Arc::clone(&bias)),
+            kernel.lambda,
+            param_injection,
+        );
         feature_node.unwrap()
     };
     kernel_layer(inputs, stride, kernel.shape, create_filter)

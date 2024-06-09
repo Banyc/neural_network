@@ -1,13 +1,20 @@
 use std::sync::{Arc, Mutex};
 
-use crate::node::{Node, NodeComputation};
+use crate::{
+    node::{Node, NodeComputation},
+    param::empty_shared_params,
+};
 
 /// ```math
 /// f(x, l) = (x - l)^2
 /// ```
 pub fn l2_error_node(operand: Arc<Mutex<Node>>, label: Arc<Mutex<Node>>) -> Node {
     let computation = L2ErrorNodeComputation {};
-    Node::new(vec![operand, label], Arc::new(computation), Vec::new())
+    Node::new(
+        vec![operand, label],
+        Arc::new(computation),
+        empty_shared_params(),
+    )
 }
 
 #[derive(Debug)]

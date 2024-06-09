@@ -5,8 +5,10 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use strict_num::FiniteF64;
+
 use crate::{
-    neural_network::{NeuralNetwork, TrainOption},
+    neural_network::{AccurateFnParams, EvalOption, NeuralNetwork, TrainOption},
     node::Node,
     nodes::{
         conv_layer::{self, deep_conv_layer},
@@ -30,10 +32,22 @@ fn mnist() {
     let train_dataset = read_mnist(TRAIN_IMAGE, TRAIN_LABEL).unwrap();
     let test_dataset = read_mnist(TEST_IMAGE, TEST_LABEL).unwrap();
     {
-        let mut nn = neural_network(0.01);
-        let max_steps = 1024;
+        println!("inputs: {:?}", train_dataset[0]);
+        let mut nn = neural_network(0.1);
+        let _acc = nn.accuracy(&train_dataset[0..1], accurate);
+        {
+            let option = EvalOption::ClearCache;
+            let loss = nn.compute_error(&train_dataset[0], option, 0);
+            println!("loss: {loss}");
+        }
+        let max_steps = 128;
         let option = TrainOption::StochasticGradientDescent;
         nn.train(&train_dataset[0..1], max_steps, option);
+        {
+            let option = EvalOption::ClearCache;
+            let loss = nn.compute_error(&train_dataset[0], option, 0);
+            println!("loss: {loss}");
+        }
         let acc = nn.accuracy(&train_dataset[0..1], accurate);
         println!("acc: {acc}");
         assert_eq!(acc, 1.);
@@ -138,8 +152,7 @@ fn neural_network(step_size: f64) -> NeuralNetwork {
         .chain(label_nodes)
         .collect::<Vec<Arc<Mutex<Node>>>>();
     let error_node = Arc::new(Mutex::new(mse_node(error_node_inputs)));
-    let label_indices = (CLASSES..(CLASSES * 2)).collect();
-    NeuralNetwork::new(linear_layer, error_node, label_indices, step_size)
+    NeuralNetwork::new(linear_layer, error_node, step_size)
 }
 
 fn read_mnist(image: impl AsRef<Path>, label: impl AsRef<Path>) -> std::io::Result<Vec<Vec<f64>>> {
@@ -218,11 +231,15 @@ fn one_hot(i: usize, space_size: usize) -> Vec<f64> {
     vec
 }
 
-fn accurate(eval: Vec<f64>, label: Vec<f64>) -> bool {
+fn accurate(params: AccurateFnParams<'_>) -> bool {
+    let eval = params.outputs;
+    let label = &params.inputs[params.inputs.len() - CLASSES..];
+    println!("eval: {eval:?}");
+    println!("label: {label:?}");
     assert_eq!(eval.len(), label.len());
     assert!(!eval.is_empty());
     let eval_max_i = max_i(&eval);
-    let label_max_i = max_i(&label);
+    let label_max_i = max_i(label);
     eval_max_i == label_max_i
 }
 
@@ -231,6 +248,7 @@ fn max_i(x: &[f64]) -> usize {
     let mut max = x[0];
     let mut max_i = 0;
     for (i, x) in x.iter().copied().enumerate() {
+        FiniteF64::new(x).unwrap();
         if max < x {
             max = x;
             max_i = i;

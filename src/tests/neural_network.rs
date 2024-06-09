@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use crate::{
-    neural_network::{EvalOption, NeuralNetwork, TrainOption},
+    neural_network::{AccurateFnParams, EvalOption, NeuralNetwork, TrainOption},
     node::{clone_node_batch, Node},
     nodes::{
         bias_node::bias_node,
@@ -33,12 +33,7 @@ fn single_linear_relu_network(
     let relu_node = Arc::new(Mutex::new(relu_node));
     let label_node = input_node(node_count);
     let error_node = l2_error_node(Arc::clone(&relu_node), Arc::new(Mutex::new(label_node)));
-    NeuralNetwork::new(
-        vec![relu_node],
-        Arc::new(Mutex::new(error_node)),
-        vec![node_count],
-        1e-2,
-    )
+    NeuralNetwork::new(vec![relu_node], Arc::new(Mutex::new(error_node)), 1e-2)
 }
 
 #[test]
@@ -56,7 +51,7 @@ fn error() {
     let label = input_node(1);
     let error = l2_error_node(Arc::clone(&relu), Arc::new(Mutex::new(label)));
     let error = Arc::new(Mutex::new(error));
-    let mut network = NeuralNetwork::new(vec![relu], error, vec![1], 1e-2);
+    let mut network = NeuralNetwork::new(vec![relu], error, 1e-2);
     let inputs = vec![-2.0, 1.0];
     let ret = network.evaluate(&inputs);
     assert_eq!(ret[0], 0.0);
@@ -99,12 +94,8 @@ fn gradients() {
     let label_node = Arc::new(Mutex::new(label_node));
     let error_node = l2_error_node(Arc::clone(&relu_node), label_node);
     let error_node = Arc::new(Mutex::new(error_node));
-    let mut network = NeuralNetwork::new(
-        vec![Arc::clone(&relu_node)],
-        Arc::clone(&error_node),
-        vec![label_index],
-        1e-2,
-    );
+    let mut network =
+        NeuralNetwork::new(vec![Arc::clone(&relu_node)], Arc::clone(&error_node), 1e-2);
 
     let inputs = vec![2.0, -2.0, 1.0];
 
@@ -135,7 +126,6 @@ fn backpropagation_step() {
     let mut network = NeuralNetwork::new(
         vec![Arc::clone(&relu_node)],
         Arc::clone(&error_node),
-        vec![label_index],
         step_size,
     );
 
@@ -174,7 +164,6 @@ fn backpropagation_step2() {
     let mut network = NeuralNetwork::new(
         vec![Arc::clone(&weight_node2)],
         Arc::clone(&error_node),
-        vec![label_index],
         step_size,
     );
 
@@ -214,12 +203,7 @@ fn learn_xor_sigmoid() {
     let label_node = input_node(label_index);
     let error_node = l2_error_node(Arc::clone(&output), Arc::new(Mutex::new(label_node)));
     let step_size = 0.5;
-    let mut network = NeuralNetwork::new(
-        vec![output],
-        Arc::new(Mutex::new(error_node)),
-        vec![label_index],
-        step_size,
-    );
+    let mut network = NeuralNetwork::new(vec![output], Arc::new(Mutex::new(error_node)), step_size);
 
     let dataset = vec![
         vec![0.0, 0.0, 0.0],
@@ -281,12 +265,7 @@ fn learn_xor_regularized_sigmoid() {
     let label_node = input_node(label_index);
     let error_node = l2_error_node(Arc::clone(&output), Arc::new(Mutex::new(label_node)));
     let step_size = 0.5;
-    let mut network = NeuralNetwork::new(
-        vec![output],
-        Arc::new(Mutex::new(error_node)),
-        vec![label_index],
-        step_size,
-    );
+    let mut network = NeuralNetwork::new(vec![output], Arc::new(Mutex::new(error_node)), step_size);
 
     let dataset = vec![
         vec![-1.0, -1.0, 0.0],
@@ -349,12 +328,7 @@ fn learn_xor_relu() {
     let label_node = input_node(label_index);
     let error_node = l2_error_node(Arc::clone(&output), Arc::new(Mutex::new(label_node)));
     let step_size = 0.05;
-    let mut network = NeuralNetwork::new(
-        vec![output],
-        Arc::new(Mutex::new(error_node)),
-        vec![label_index],
-        step_size,
-    );
+    let mut network = NeuralNetwork::new(vec![output], Arc::new(Mutex::new(error_node)), step_size);
 
     let dataset = vec![
         vec![0.0, 0.0, 0.0],
@@ -373,6 +347,9 @@ fn learn_xor_relu() {
     assert_eq!(ret, 1.0);
 }
 
-fn binary_accurate(eval: Vec<f64>, label: Vec<f64>) -> bool {
-    (eval[0] - label[0]).abs() < 0.5
+fn binary_accurate(params: AccurateFnParams<'_>) -> bool {
+    assert_eq!(params.outputs.len(), 1);
+    let eval = params.outputs[0];
+    let label = params.inputs.last().unwrap();
+    (eval - label).abs() < 0.5
 }

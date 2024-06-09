@@ -15,8 +15,6 @@ pub struct NeuralNetwork {
     terminal_nodes: Vec<Arc<Mutex<Node>>>,
     /// output: the error between the prediction and the label
     error_node: Arc<Mutex<Node>>,
-    /// the index of the input node which accepts a label
-    label_indices: Vec<usize>,
     /// learning rate
     step_size: f64,
 }
@@ -26,14 +24,11 @@ impl NeuralNetwork {
     pub fn new(
         terminal_nodes: Vec<Arc<Mutex<Node>>>,
         error_node: Arc<Mutex<Node>>,
-        label_indices: Vec<usize>,
         step_size: f64,
     ) -> NeuralNetwork {
-        assert_eq!(terminal_nodes.len(), label_indices.len());
         let this = NeuralNetwork {
             terminal_nodes,
             error_node,
-            label_indices,
             step_size,
         };
         this.check_rep();
@@ -106,7 +101,7 @@ impl NeuralNetwork {
     pub fn accuracy<S>(
         &mut self,
         dataset: &[S],
-        accurate: impl Fn(Vec<f64>, Vec<f64>) -> bool,
+        accurate: impl Fn(AccurateFnParams<'_>) -> bool,
     ) -> f64
     where
         S: AsRef<[f64]>,
@@ -115,13 +110,11 @@ impl NeuralNetwork {
         let mut accurate_count = 0;
         for (i, inputs) in dataset.iter().enumerate() {
             let eval = self.evaluate(inputs.as_ref());
-            let label = self
-                .label_indices
-                .iter()
-                .copied()
-                .map(|i| inputs.as_ref()[i])
-                .collect::<Vec<f64>>();
-            if accurate(eval, label) {
+            let params = AccurateFnParams {
+                inputs: inputs.as_ref(),
+                outputs: eval,
+            };
+            if accurate(params) {
                 accurate_count += 1;
             }
             progress_printer.print_progress(i, dataset.len());
@@ -129,6 +122,12 @@ impl NeuralNetwork {
         self.check_rep();
         accurate_count as f64 / dataset.len() as f64
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct AccurateFnParams<'a> {
+    pub inputs: &'a [f64],
+    pub outputs: Vec<f64>,
 }
 
 #[derive(Debug, Clone, Copy)]

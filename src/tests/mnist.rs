@@ -17,7 +17,10 @@ use crate::{
         mse::mse_node,
         relu::relu_node,
     },
-    tensor::{append_tensors, non_zero_to_shape, primitive_to_stride, shape_to_non_zero, Tensor},
+    tensor::{
+        append_tensors, non_zero_to_shape, primitive_to_stride, shape_to_non_zero, NonZeroShape,
+        OwnedShape, Shape, Stride, Tensor,
+    },
 };
 
 const CLASSES: usize = 10;
@@ -81,6 +84,7 @@ fn mnist() {
     }
 }
 
+/// a LeNet variant
 fn neural_network(step_size: f64) -> NeuralNetwork {
     let width = 28;
     let height = 28;
@@ -88,95 +92,111 @@ fn neural_network(step_size: f64) -> NeuralNetwork {
         start: 0,
         len: width * height,
     });
-    let (conv_layer, shape) = {
+    let (layer, shape) = {
         let shape = [width, height];
         let inputs = Tensor::new(&input_nodes, &shape).unwrap();
-        let stride = primitive_to_stride(&[1, 1]).unwrap();
-        let kernel_shape = shape_to_non_zero(&[5, 5]).unwrap();
-        let kernel = conv::KernelConfig {
-            shape: &kernel_shape,
-            initial_weights: None,
-            initial_bias: None,
-            lambda: None,
+        let conv = ConvConfig {
+            stride: &primitive_to_stride(&[1, 1]).unwrap(),
+            kernel_shape: &shape_to_non_zero(&[5, 5]).unwrap(),
+            depth: NonZeroUsize::new(6).unwrap(),
+            output_shape: &[24, 24, 6],
         };
-        let depth = NonZeroUsize::new(6).unwrap();
-        let (layers, shape) = deep_conv_layer(inputs, &stride, kernel, depth, None);
-        append_tensors(layers, &shape)
-    };
-    let shape = non_zero_to_shape(&shape);
-    assert_eq!(shape, [24, 24, 6]);
-    let relu_layer = conv_layer
-        .into_iter()
-        .map(|x| Arc::new(Mutex::new(relu_node(x))))
-        .collect::<Vec<SharedNode>>();
-    let (max_pooling_layer, shape) = {
-        let inputs = Tensor::new(&relu_layer, &shape).unwrap();
-        let stride = primitive_to_stride(&[2, 2, 1]).unwrap();
-        let kernel_shape = shape_to_non_zero(&[2, 2, 1]).unwrap();
-        max_pooling::max_pooling_layer(inputs, &stride, &kernel_shape)
-    };
-    assert_eq!(shape, [12, 12, 6]);
-    let (conv_layer, shape) = {
-        let inputs = Tensor::new(&max_pooling_layer, &shape).unwrap();
-        let stride = primitive_to_stride(&[1, 1, 1]).unwrap();
-        let kernel_shape = shape_to_non_zero(&[5, 5, 6]).unwrap();
-        let kernel = conv::KernelConfig {
-            shape: &kernel_shape,
-            initial_weights: None,
-            initial_bias: None,
-            lambda: None,
+        let max_pooling = MaxPoolingConfig {
+            stride: &primitive_to_stride(&[2, 2, 1]).unwrap(),
+            kernel_shape: &shape_to_non_zero(&[2, 2, 1]).unwrap(),
+            output_shape: &[12, 12, 6],
         };
-        let depth = NonZeroUsize::new(16).unwrap();
-        let (layers, shape) = deep_conv_layer(inputs, &stride, kernel, depth, None);
-        append_tensors(layers, &shape)
+        conv_relu_max_pooling(inputs, conv, max_pooling)
     };
-    let shape = non_zero_to_shape(&shape);
-    assert_eq!(shape, [8, 8, 16]);
-    let relu_layer = conv_layer
-        .into_iter()
-        .map(|x| Arc::new(Mutex::new(relu_node(x))))
-        .collect::<Vec<SharedNode>>();
-    let (max_pooling_layer, shape) = {
-        let inputs = Tensor::new(&relu_layer, &shape).unwrap();
-        let stride = primitive_to_stride(&[2, 2, 1]).unwrap();
-        let kernel_shape = shape_to_non_zero(&[2, 2, 1]).unwrap();
-        max_pooling::max_pooling_layer(inputs, &stride, &kernel_shape)
+    let (layer, _shape) = {
+        let inputs = Tensor::new(&layer, &shape).unwrap();
+        let conv = ConvConfig {
+            stride: &primitive_to_stride(&[1, 1, 1]).unwrap(),
+            kernel_shape: &shape_to_non_zero(&[5, 5, 6]).unwrap(),
+            depth: NonZeroUsize::new(16).unwrap(),
+            output_shape: &[8, 8, 16],
+        };
+        let max_pooling = MaxPoolingConfig {
+            stride: &primitive_to_stride(&[2, 2, 1]).unwrap(),
+            kernel_shape: &shape_to_non_zero(&[2, 2, 1]).unwrap(),
+            output_shape: &[4, 4, 16],
+        };
+        conv_relu_max_pooling(inputs, conv, max_pooling)
     };
-    assert_eq!(shape, [4, 4, 16]);
-    let linear_layer = {
+    let layer = {
         let depth = NonZeroUsize::new(120).unwrap();
-        linear::linear_layer(max_pooling_layer, depth, None, None, None, None).unwrap()
+        dense_relu(layer, depth)
     };
-    assert_eq!(linear_layer.len(), 120);
-    let relu_layer = linear_layer
-        .into_iter()
-        .map(|x| Arc::new(Mutex::new(relu_node(x))))
-        .collect::<Vec<SharedNode>>();
-    let linear_layer = {
+    let layer = {
         let depth = NonZeroUsize::new(84).unwrap();
-        linear::linear_layer(relu_layer, depth, None, None, None, None).unwrap()
+        dense_relu(layer, depth)
     };
-    assert_eq!(linear_layer.len(), 84);
-    let relu_layer = linear_layer
-        .into_iter()
-        .map(|x| Arc::new(Mutex::new(relu_node(x))))
-        .collect::<Vec<SharedNode>>();
-    let linear_layer = {
+    let outputs = {
         let depth = NonZeroUsize::new(CLASSES).unwrap();
-        linear::linear_layer(relu_layer, depth, None, None, None, None).unwrap()
+        dense_relu(layer, depth)
     };
-    assert_eq!(linear_layer.len(), CLASSES);
     let label_nodes = input_node_batch(InputNodeBatchParams {
         start: input_nodes.len(),
         len: CLASSES,
     });
-    let error_node_inputs = linear_layer
+    let error_node_inputs = outputs
         .iter()
         .cloned()
         .chain(label_nodes)
         .collect::<Vec<SharedNode>>();
     let error_node = Arc::new(Mutex::new(mse_node(error_node_inputs)));
-    NeuralNetwork::new(linear_layer, error_node, step_size)
+    NeuralNetwork::new(outputs, error_node, step_size)
+}
+
+#[derive(Debug, Clone)]
+struct ConvConfig<'a> {
+    pub stride: &'a Stride,
+    pub kernel_shape: &'a NonZeroShape,
+    pub depth: NonZeroUsize,
+    pub output_shape: &'a Shape,
+}
+#[derive(Debug, Clone)]
+struct MaxPoolingConfig<'a> {
+    pub stride: &'a Stride,
+    pub kernel_shape: &'a NonZeroShape,
+    pub output_shape: &'a Shape,
+}
+fn conv_relu_max_pooling(
+    inputs: Tensor<'_, SharedNode>,
+    conv: ConvConfig<'_>,
+    max_pooling: MaxPoolingConfig<'_>,
+) -> (Vec<SharedNode>, OwnedShape) {
+    let (conv_layer, shape) = {
+        let kernel = conv::KernelConfig {
+            shape: conv.kernel_shape,
+            initial_weights: None,
+            initial_bias: None,
+            lambda: None,
+        };
+        let (layers, shape) = deep_conv_layer(inputs, conv.stride, kernel, conv.depth, None);
+        append_tensors(layers, &shape)
+    };
+    let shape = non_zero_to_shape(&shape);
+    assert_eq!(shape, conv.output_shape);
+    let relu_layer = conv_layer
+        .into_iter()
+        .map(|x| Arc::new(Mutex::new(relu_node(x))))
+        .collect::<Vec<SharedNode>>();
+    let (max_pooling_layer, shape) = {
+        let inputs = Tensor::new(&relu_layer, &shape).unwrap();
+        max_pooling::max_pooling_layer(inputs, max_pooling.stride, max_pooling.kernel_shape)
+    };
+    assert_eq!(shape, max_pooling.output_shape);
+    (max_pooling_layer, shape)
+}
+
+fn dense_relu(inputs: Vec<SharedNode>, depth: NonZeroUsize) -> Vec<SharedNode> {
+    let linear_layer = { linear::linear_layer(inputs, depth, None, None, None, None).unwrap() };
+    assert_eq!(linear_layer.len(), depth.get());
+    linear_layer
+        .into_iter()
+        .map(|x| Arc::new(Mutex::new(relu_node(x))))
+        .collect::<Vec<SharedNode>>()
 }
 
 fn read_mnist(image: impl AsRef<Path>, label: impl AsRef<Path>) -> std::io::Result<Vec<Vec<f64>>> {

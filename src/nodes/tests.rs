@@ -1,11 +1,8 @@
 use std::sync::{Arc, Mutex};
 
-use crate::nodes::input_node::InputNodeBatchParams;
+use crate::nodes::input::InputNodeBatchParams;
 
-use super::{
-    bias_node::bias_node, input_node::input_node_batch, relu_node::relu_node,
-    weight_node::weight_node,
-};
+use super::{bias::bias_node, input::input_node_batch, relu::relu_node, weights::weight_node};
 
 #[test]
 fn linear_evaluate() {

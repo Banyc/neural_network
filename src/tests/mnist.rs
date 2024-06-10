@@ -11,20 +11,20 @@ use crate::{
     neural_network::{AccurateFnParams, EvalOption, NeuralNetwork, TrainOption},
     node::SharedNode,
     nodes::{
-        conv_layer::{self, deep_conv_layer},
-        input_node::{input_node_batch, InputNodeBatchParams},
-        linear_node, max_pooling_layer,
-        mse_node::mse_node,
-        relu_node::relu_node,
+        conv::{self, deep_conv_layer},
+        input::{input_node_batch, InputNodeBatchParams},
+        linear, max_pooling,
+        mse::mse_node,
+        relu::relu_node,
     },
     tensor::{append_tensors, non_zero_to_shape, primitive_to_stride, shape_to_non_zero, Tensor},
 };
 
 const CLASSES: usize = 10;
-const TRAIN_IMAGE: &str = "local/train-images.idx3-ubyte";
-const TRAIN_LABEL: &str = "local/train-labels.idx1-ubyte";
-const TEST_IMAGE: &str = "local/t10k-images.idx3-ubyte";
-const TEST_LABEL: &str = "local/t10k-labels.idx1-ubyte";
+const TRAIN_IMAGE: &str = "local/mnist/train-images.idx3-ubyte";
+const TRAIN_LABEL: &str = "local/mnist/train-labels.idx1-ubyte";
+const TEST_IMAGE: &str = "local/mnist/t10k-images.idx3-ubyte";
+const TEST_LABEL: &str = "local/mnist/t10k-labels.idx1-ubyte";
 
 #[ignore]
 #[test]
@@ -93,7 +93,7 @@ fn neural_network(step_size: f64) -> NeuralNetwork {
         let inputs = Tensor::new(&input_nodes, &shape).unwrap();
         let stride = primitive_to_stride(&[1, 1]).unwrap();
         let kernel_shape = shape_to_non_zero(&[5, 5]).unwrap();
-        let kernel = conv_layer::KernelConfig {
+        let kernel = conv::KernelConfig {
             shape: &kernel_shape,
             initial_weights: None,
             initial_bias: None,
@@ -113,14 +113,14 @@ fn neural_network(step_size: f64) -> NeuralNetwork {
         let inputs = Tensor::new(&relu_layer, &shape).unwrap();
         let stride = primitive_to_stride(&[2, 2, 1]).unwrap();
         let kernel_shape = shape_to_non_zero(&[2, 2, 1]).unwrap();
-        max_pooling_layer::max_pooling_layer(inputs, &stride, &kernel_shape)
+        max_pooling::max_pooling_layer(inputs, &stride, &kernel_shape)
     };
     assert_eq!(shape, [12, 12, 6]);
     let (conv_layer, shape) = {
         let inputs = Tensor::new(&max_pooling_layer, &shape).unwrap();
         let stride = primitive_to_stride(&[1, 1, 1]).unwrap();
         let kernel_shape = shape_to_non_zero(&[5, 5, 6]).unwrap();
-        let kernel = conv_layer::KernelConfig {
+        let kernel = conv::KernelConfig {
             shape: &kernel_shape,
             initial_weights: None,
             initial_bias: None,
@@ -140,12 +140,12 @@ fn neural_network(step_size: f64) -> NeuralNetwork {
         let inputs = Tensor::new(&relu_layer, &shape).unwrap();
         let stride = primitive_to_stride(&[2, 2, 1]).unwrap();
         let kernel_shape = shape_to_non_zero(&[2, 2, 1]).unwrap();
-        max_pooling_layer::max_pooling_layer(inputs, &stride, &kernel_shape)
+        max_pooling::max_pooling_layer(inputs, &stride, &kernel_shape)
     };
     assert_eq!(shape, [4, 4, 16]);
     let linear_layer = {
         let depth = NonZeroUsize::new(120).unwrap();
-        linear_node::linear_layer(max_pooling_layer, depth, None, None, None, None).unwrap()
+        linear::linear_layer(max_pooling_layer, depth, None, None, None, None).unwrap()
     };
     assert_eq!(linear_layer.len(), 120);
     let relu_layer = linear_layer
@@ -154,7 +154,7 @@ fn neural_network(step_size: f64) -> NeuralNetwork {
         .collect::<Vec<SharedNode>>();
     let linear_layer = {
         let depth = NonZeroUsize::new(84).unwrap();
-        linear_node::linear_layer(relu_layer, depth, None, None, None, None).unwrap()
+        linear::linear_layer(relu_layer, depth, None, None, None, None).unwrap()
     };
     assert_eq!(linear_layer.len(), 84);
     let relu_layer = linear_layer
@@ -163,7 +163,7 @@ fn neural_network(step_size: f64) -> NeuralNetwork {
         .collect::<Vec<SharedNode>>();
     let linear_layer = {
         let depth = NonZeroUsize::new(CLASSES).unwrap();
-        linear_node::linear_layer(relu_layer, depth, None, None, None, None).unwrap()
+        linear::linear_layer(relu_layer, depth, None, None, None, None).unwrap()
     };
     assert_eq!(linear_layer.len(), CLASSES);
     let label_nodes = input_node_batch(InputNodeBatchParams {

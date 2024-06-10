@@ -66,7 +66,7 @@ fn relu_derivative(x: f64) -> f64 {
 mod tests {
     use std::sync::Mutex;
 
-    use crate::nodes::input_node::input_node;
+    use crate::nodes::input::input_node;
 
     use super::*;
 

@@ -120,9 +120,9 @@ pub enum WeightNodeError {
 mod tests {
     use std::sync::{Arc, Mutex};
 
-    use crate::nodes::input_node::InputNodeBatchParams;
+    use crate::nodes::input::InputNodeBatchParams;
 
-    use super::{super::input_node::input_node_batch, weight_node};
+    use super::{super::input::input_node_batch, weight_node};
 
     #[test]
     fn evaluate() {

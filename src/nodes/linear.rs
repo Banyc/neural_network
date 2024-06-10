@@ -9,8 +9,8 @@ use crate::{
 };
 
 use super::{
-    bias_node::bias_node,
-    weight_node::{weight_node, WeightNodeError},
+    bias::bias_node,
+    weights::{weight_node, WeightNodeError},
 };
 
 /// ```math

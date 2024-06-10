@@ -10,10 +10,10 @@ use crate::{
 };
 
 use super::{
-    bias_node::default_bias,
-    kernel_layer::{kernel_layer, KernelParams},
-    linear_node::linear_node,
-    weight_node::rnd_weights,
+    bias::default_bias,
+    kernel::{kernel_layer, KernelParams},
+    linear::linear_node,
+    weights::rnd_weights,
 };
 
 #[derive(Clone)]

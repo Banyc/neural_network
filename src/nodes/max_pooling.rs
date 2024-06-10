@@ -6,8 +6,8 @@ use crate::{
 };
 
 use super::{
-    kernel_layer::{kernel_layer, KernelParams},
-    max_node::max_node,
+    kernel::{kernel_layer, KernelParams},
+    max::max_node,
 };
 
 pub fn max_pooling_layer(
@@ -25,7 +25,7 @@ mod tests {
     use std::num::NonZeroUsize;
 
     use crate::{
-        nodes::input_node::{input_node_batch, InputNodeBatchParams},
+        nodes::input::{input_node_batch, InputNodeBatchParams},
         tensor::{OwnedNonZeroShape, OwnedStride},
     };
 

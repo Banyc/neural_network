@@ -1,5 +1,18 @@
 # Neural Network
 
+## MNIST
+
+- steps:
+  1.  Download MNIST dataset to:
+      - TRAIN_IMAGE: `local/mnist/train-images.idx3-ubyte`
+      - TRAIN_LABEL: `local/mnist/train-labels.idx1-ubyte`
+      - TEST_IMAGE: `local/mnist/t10k-images.idx3-ubyte`
+      - TEST_LABEL: `local/mnist/t10k-labels.idx1-ubyte`
+  1.  Run:
+      ```sh
+      cargo test --release -- --include-ignored --nocapture mnist
+      ```
+
 ## Backpropagation
 
 - distribution of addends of $\frac{\partial G}{\partial f_1}$:

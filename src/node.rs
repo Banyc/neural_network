@@ -81,12 +81,7 @@ impl Node {
             return;
         }
         for cache in &self.batch_cache {
-            match &cache {
-                Cache::Evaluate(x) => {
-                    assert_eq!(x.operand_outputs.len(), self.operands.len());
-                }
-                Cache::Backpropagate(_) => {}
-            }
+            assert_eq!(cache.eval().operand_outputs.len(), self.operands.len());
         }
     }
 
@@ -117,8 +112,8 @@ impl Node {
         let some = self.batch_cache.len() == batch_index + 1;
         assert!(none || some);
 
-        if let Some(Cache::Evaluate(cache)) = self.batch_cache.get(batch_index) {
-            return cache.output;
+        if let Some(cache) = self.batch_cache.get(batch_index) {
+            return cache.eval().output;
         }
 
         let mut operand_outputs = self.buf.take();
@@ -132,7 +127,7 @@ impl Node {
                 .compute_output(&parameters, &operand_outputs, inputs)
         };
 
-        self.batch_cache.push(Cache::Evaluate(EvaluateCache {
+        self.batch_cache.push(Cache::new(EvaluateCache {
             output,
             operand_outputs,
         }));
@@ -145,9 +140,12 @@ impl Node {
         if self.batch_cache.is_empty() {
             return Err(GradientDescentError::NoEvaluationOutputCaches);
         };
-        for cache in &mut self.batch_cache {
-            let cache = cache.transit_to_backpropagate();
-            if cache.gradient_of_root_at_this(self.successor_len).is_none() {
+        for cache in &self.batch_cache {
+            if cache
+                .backpropagate()
+                .gradient_of_root_at_this(self.successor_len)
+                .is_none()
+            {
                 return Err(
                     GradientDescentError::NotReceivingEnoughAddendsOfGradientFromSuccessors,
                 );
@@ -232,8 +230,7 @@ impl Node {
         batch_index: usize,
     ) {
         let cache = self.batch_cache.get_mut(batch_index).unwrap();
-        let cache = cache.transit_to_backpropagate();
-        cache.add_up(addend);
+        cache.backpropagate_mut().add_up(addend);
         self.check_rep();
     }
 
@@ -273,19 +270,19 @@ impl Node {
             );
         };
 
-        let gradient_of_root_at_this = match &cache {
-            Cache::Evaluate(_) => None,
-            Cache::Backpropagate(x) => x.gradient_of_root_at_this(self.successor_len),
-        };
-
-        Ok(match gradient_of_root_at_this {
-            Some(x) => x,
-            None => {
-                return Err(
+        Ok(
+            match cache
+                .backpropagate()
+                .gradient_of_root_at_this(self.successor_len)
+            {
+                Some(x) => x,
+                None => {
+                    return Err(
                     GradientOfRootAtThisError::NotReceivingEnoughAddendsOfGradientFromSuccessors,
                 );
-            }
-        })
+                }
+            },
+        )
     }
 
     /// ```math
@@ -337,19 +334,13 @@ impl Node {
     }
 
     pub fn operand_outputs(&self, batch_index: usize) -> Option<&Vec<f64>> {
-        Some(match &self.batch_cache.get(batch_index) {
-            Some(Cache::Evaluate(x)) => &x.operand_outputs,
-            Some(Cache::Backpropagate(x)) => &x.evaluate_cache.operand_outputs,
-            None => return None,
-        })
+        self.batch_cache
+            .get(batch_index)
+            .map(|x| &x.eval().operand_outputs)
     }
 
     pub fn output(&self, batch_index: usize) -> Option<f64> {
-        Some(match &self.batch_cache.get(batch_index) {
-            Some(Cache::Evaluate(x)) => x.output,
-            Some(Cache::Backpropagate(x)) => x.evaluate_cache.output,
-            None => return None,
-        })
+        self.batch_cache.get(batch_index).map(|x| x.eval().output)
     }
 
     pub fn parameters(&self) -> &SharedParams {
@@ -450,40 +441,30 @@ pub enum GradientOfThisAtOperandError {
 }
 
 #[derive(Debug, Clone)]
-enum Cache {
-    Evaluate(EvaluateCache),
-    Backpropagate(BackpropagateCache),
+struct Cache {
+    eval: EvaluateCache,
+    backpropagate: BackpropagateCache,
 }
 impl Cache {
-    pub fn transit_to_backpropagate(&mut self) -> &mut BackpropagateCache {
-        match self {
-            Cache::Evaluate(x) => {
-                let evaluate_cache = core::mem::replace(
-                    x,
-                    EvaluateCache {
-                        output: Default::default(),
-                        operand_outputs: Default::default(),
-                    },
-                );
-                *self = Cache::Backpropagate(BackpropagateCache::new(evaluate_cache));
-                let Cache::Backpropagate(x) = self else {
-                    unreachable!()
-                };
-                x
-            }
-            Cache::Backpropagate(x) => x,
+    pub fn new(eval: EvaluateCache) -> Self {
+        Self {
+            eval,
+            backpropagate: BackpropagateCache::new(),
         }
     }
 
     pub fn put_buf(self, buf: &mut ReusedBuffers<f64>) {
-        match self {
-            Cache::Evaluate(x) => {
-                buf.put(x.operand_outputs);
-            }
-            Cache::Backpropagate(x) => {
-                x.put_buf(buf);
-            }
-        }
+        buf.put(self.eval.operand_outputs);
+    }
+
+    pub fn eval(&self) -> &EvaluateCache {
+        &self.eval
+    }
+    pub fn backpropagate(&self) -> &BackpropagateCache {
+        &self.backpropagate
+    }
+    pub fn backpropagate_mut(&mut self) -> &mut BackpropagateCache {
+        &mut self.backpropagate
     }
 }
 
@@ -500,15 +481,12 @@ struct EvaluateCache {
 struct BackpropagateCache {
     sum_gradient_of_root_at_this: f64,
     times: usize,
-
-    evaluate_cache: EvaluateCache,
 }
 impl BackpropagateCache {
-    pub fn new(evaluate_cache: EvaluateCache) -> Self {
+    pub fn new() -> Self {
         Self {
             sum_gradient_of_root_at_this: 0.,
             times: 0,
-            evaluate_cache,
         }
     }
 
@@ -533,9 +511,5 @@ impl BackpropagateCache {
             return None;
         }
         Some(self.sum_gradient_of_root_at_this)
-    }
-
-    pub fn put_buf(self, buf: &mut ReusedBuffers<f64>) {
-        buf.put(self.evaluate_cache.operand_outputs);
     }
 }

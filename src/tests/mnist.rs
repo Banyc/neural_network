@@ -18,7 +18,10 @@ use crate::{
         linear::LinearLayerConfig,
         mse::mse_node,
     },
-    param::ParamInjection,
+    param::{
+        tests::{param_injector, save_params},
+        ParamInjection,
+    },
     tensor::{primitive_to_stride, shape_to_non_zero, Tensor},
 };
 
@@ -27,38 +30,48 @@ const TRAIN_IMAGE: &str = "local/mnist/train-images.idx3-ubyte";
 const TRAIN_LABEL: &str = "local/mnist/train-labels.idx1-ubyte";
 const TEST_IMAGE: &str = "local/mnist/t10k-images.idx3-ubyte";
 const TEST_LABEL: &str = "local/mnist/t10k-labels.idx1-ubyte";
+const PARAMS_BIN: &str = "local/mnist/params.bincode";
+const PARAMS_TXT: &str = "local/mnist/params.ron";
+
+#[ignore]
+#[test]
+fn mnist_converge() {
+    let train_dataset = read_mnist(TRAIN_IMAGE, TRAIN_LABEL).unwrap();
+    println!("inputs: {:?}", train_dataset[0]);
+    let mut nn = neural_network(0.1, None);
+    let _acc = nn.accuracy(&train_dataset[0..1], accurate);
+    {
+        let option = EvalOption::ClearCache;
+        let loss = nn.compute_error(&train_dataset[0], option, 0);
+        println!("loss: {loss}");
+    }
+    let max_steps = 128;
+    let option = TrainOption::StochasticGradientDescent;
+    nn.train(&train_dataset[0..1], max_steps, option);
+    {
+        let option = EvalOption::ClearCache;
+        let loss = nn.compute_error(&train_dataset[0], option, 0);
+        println!("loss: {loss}");
+    }
+    let eval = nn.evaluate(&train_dataset[0]);
+    println!("eval: {eval:?}");
+    let acc = nn.accuracy(&train_dataset[0..1], accurate);
+    println!("acc: {acc}");
+    assert_eq!(acc, 1.);
+}
 
 #[ignore]
 #[test]
 fn mnist() {
     let train_dataset = read_mnist(TRAIN_IMAGE, TRAIN_LABEL).unwrap();
     let test_dataset = read_mnist(TEST_IMAGE, TEST_LABEL).unwrap();
-    // convergence
-    {
-        println!("inputs: {:?}", train_dataset[0]);
-        let mut nn = neural_network(0.1, None);
-        let _acc = nn.accuracy(&train_dataset[0..1], accurate);
-        {
-            let option = EvalOption::ClearCache;
-            let loss = nn.compute_error(&train_dataset[0], option, 0);
-            println!("loss: {loss}");
-        }
-        let max_steps = 128;
-        let option = TrainOption::StochasticGradientDescent;
-        nn.train(&train_dataset[0..1], max_steps, option);
-        {
-            let option = EvalOption::ClearCache;
-            let loss = nn.compute_error(&train_dataset[0], option, 0);
-            println!("loss: {loss}");
-        }
-        let eval = nn.evaluate(&train_dataset[0]);
-        println!("eval: {eval:?}");
-        let acc = nn.accuracy(&train_dataset[0..1], accurate);
-        println!("acc: {acc}");
-        assert_eq!(acc, 1.);
-    }
     // epochs
-    let mut nn = neural_network(0.1, None);
+    let mut param_injector = param_injector(PARAMS_BIN);
+    let param_injection = ParamInjection {
+        injector: &mut param_injector,
+        name: "".into(),
+    };
+    let mut nn = neural_network(0.1, Some(param_injection));
     for i in 0.. {
         println!("epoch: {i}");
         let max_steps = 2 << 10;
@@ -80,6 +93,7 @@ fn mnist() {
                 .sum::<f64>();
             println!("loss: {loss}");
         }
+        save_params(&param_injector.collect_parameters(), PARAMS_BIN, PARAMS_TXT).unwrap();
     }
 }
 

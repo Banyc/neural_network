@@ -12,6 +12,7 @@
       ```sh
       cargo test --release -- --include-ignored --nocapture mnist
       ```
+  1.  Inspect parameters at: `local/mnist/params.ron`
 
 ## Backpropagation
 

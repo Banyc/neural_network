@@ -63,3 +63,44 @@ impl ParamInjector {
         collected
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+    use std::{io::Write, path::Path};
+
+    use super::*;
+
+    pub fn param_injector(path: impl AsRef<Path>) -> ParamInjector {
+        let read_params = || {
+            let params_bin = std::fs::File::options().read(true).open(path).ok()?;
+            let params: HashMap<String, Vec<f64>> = bincode::deserialize_from(params_bin).ok()?;
+            Some(params)
+        };
+        let params = read_params().unwrap_or_default();
+        ParamInjector::new(params)
+    }
+
+    pub fn save_params(
+        params: &HashMap<String, Vec<f64>>,
+        bin_path: impl AsRef<Path>,
+        txt_path: impl AsRef<Path>,
+    ) -> std::io::Result<()> {
+        let txt = ron::to_string(params).unwrap();
+        let mut file = std::fs::File::options()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(txt_path)?;
+        file.write_all(txt.as_bytes())?;
+
+        let bin = bincode::serialize(params).unwrap();
+        let mut file = std::fs::File::options()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(bin_path)?;
+        file.write_all(&bin)?;
+
+        Ok(())
+    }
+}

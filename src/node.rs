@@ -78,6 +78,9 @@ pub struct Node {
 
 impl Node {
     fn check_rep(&self) {
+        if !cfg!(debug_assertions) {
+            return;
+        }
         for cache in &self.batch_cache {
             match &cache {
                 Cache::Evaluate(x) => {

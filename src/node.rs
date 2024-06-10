@@ -85,9 +85,7 @@ impl Node {
                 Cache::Evaluate(x) => {
                     assert_eq!(x.operand_outputs.len(), self.operands.len());
                 }
-                Cache::Backpropagate(x) => {
-                    assert!(x.addends_of_gradient_of_root_at_this.len() <= self.successor_len);
-                }
+                Cache::Backpropagate(_) => {}
             }
         }
     }
@@ -147,22 +145,12 @@ impl Node {
         if self.batch_cache.is_empty() {
             return Err(GradientDescentError::NoEvaluationOutputCaches);
         };
-        for cache in &self.batch_cache {
-            match cache {
-                Cache::Evaluate(_) => {
-                    if self.successor_len != 0 {
-                        return Err(
-                            GradientDescentError::NotReceivingEnoughAddendsOfGradientFromSuccessors,
-                        );
-                    }
-                }
-                Cache::Backpropagate(x) => {
-                    if self.successor_len > x.addends_of_gradient_of_root_at_this.len() {
-                        return Err(
-                            GradientDescentError::NotReceivingEnoughAddendsOfGradientFromSuccessors,
-                        );
-                    }
-                }
+        for cache in &mut self.batch_cache {
+            let cache = cache.transit_to_backpropagate();
+            if cache.gradient_of_root_at_this(self.successor_len).is_none() {
+                return Err(
+                    GradientDescentError::NotReceivingEnoughAddendsOfGradientFromSuccessors,
+                );
             }
         }
         self.adjust_parameters(step_size);
@@ -244,7 +232,8 @@ impl Node {
         batch_index: usize,
     ) {
         let cache = self.batch_cache.get_mut(batch_index).unwrap();
-        cache.add_addend_of_partial_derivative_of_root_at_this(addend, self.buf.take());
+        let cache = cache.transit_to_backpropagate();
+        cache.add_up(addend);
         self.check_rep();
     }
 
@@ -284,22 +273,18 @@ impl Node {
             );
         };
 
-        let addends_of_gradient_of_root_at_this = match &cache {
-            Cache::Evaluate(_) => &[],
-            Cache::Backpropagate(x) => x.addends_of_gradient_of_root_at_this.as_slice(),
+        let gradient_of_root_at_this = match &cache {
+            Cache::Evaluate(_) => None,
+            Cache::Backpropagate(x) => x.gradient_of_root_at_this(self.successor_len),
         };
 
-        if self.successor_len != addends_of_gradient_of_root_at_this.len() {
-            return Err(
-                GradientOfRootAtThisError::NotReceivingEnoughAddendsOfGradientFromSuccessors,
-            );
-        }
-
-        Ok(if self.successor_len == 0 {
-            // this is the root node
-            1.0
-        } else {
-            addends_of_gradient_of_root_at_this.iter().sum()
+        Ok(match gradient_of_root_at_this {
+            Some(x) => x,
+            None => {
+                return Err(
+                    GradientOfRootAtThisError::NotReceivingEnoughAddendsOfGradientFromSuccessors,
+                );
+            }
         })
     }
 
@@ -470,8 +455,8 @@ enum Cache {
     Backpropagate(BackpropagateCache),
 }
 impl Cache {
-    pub fn add_addend_of_partial_derivative_of_root_at_this(&mut self, addend: f64, buf: Vec<f64>) {
-        let cache = match self {
+    pub fn transit_to_backpropagate(&mut self) -> &mut BackpropagateCache {
+        match self {
             Cache::Evaluate(x) => {
                 let evaluate_cache = core::mem::replace(
                     x,
@@ -480,18 +465,14 @@ impl Cache {
                         operand_outputs: Default::default(),
                     },
                 );
-                *self = Cache::Backpropagate(BackpropagateCache {
-                    addends_of_gradient_of_root_at_this: buf,
-                    evaluate_cache,
-                });
+                *self = Cache::Backpropagate(BackpropagateCache::new(evaluate_cache));
                 let Cache::Backpropagate(x) = self else {
                     unreachable!()
                 };
                 x
             }
             Cache::Backpropagate(x) => x,
-        };
-        cache.addends_of_gradient_of_root_at_this.push(addend);
+        }
     }
 
     pub fn put_buf(self, buf: &mut ReusedBuffers<f64>) {
@@ -500,8 +481,7 @@ impl Cache {
                 buf.put(x.operand_outputs);
             }
             Cache::Backpropagate(x) => {
-                buf.put(x.addends_of_gradient_of_root_at_this);
-                buf.put(x.evaluate_cache.operand_outputs);
+                x.put_buf(buf);
             }
         }
     }
@@ -518,13 +498,44 @@ struct EvaluateCache {
 
 #[derive(Debug, Clone)]
 struct BackpropagateCache {
+    sum_gradient_of_root_at_this: f64,
+    times: usize,
+
+    evaluate_cache: EvaluateCache,
+}
+impl BackpropagateCache {
+    pub fn new(evaluate_cache: EvaluateCache) -> Self {
+        Self {
+            sum_gradient_of_root_at_this: 0.,
+            times: 0,
+            evaluate_cache,
+        }
+    }
+
+    pub fn add_up(&mut self, addend: f64) {
+        self.sum_gradient_of_root_at_this += addend;
+        self.times += 1;
+    }
+
     /// ```math
     /// (\frac{\partial E}{\partial h_i} \cdot \frac{\partial h_i}{\partial f})
     /// ```
     ///
     /// - $h_i$: the $i$-th immediate successor of this node
     /// - $f$: this node
-    pub addends_of_gradient_of_root_at_this: Vec<f64>,
+    pub fn gradient_of_root_at_this(&self, successor_len: usize) -> Option<f64> {
+        assert!(self.times <= successor_len);
+        if successor_len == 0 {
+            // this is the root node
+            return Some(1.);
+        }
+        if self.times < successor_len {
+            return None;
+        }
+        Some(self.sum_gradient_of_root_at_this)
+    }
 
-    pub evaluate_cache: EvaluateCache,
+    pub fn put_buf(self, buf: &mut ReusedBuffers<f64>) {
+        buf.put(self.evaluate_cache.operand_outputs);
+    }
 }

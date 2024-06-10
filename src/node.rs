@@ -189,18 +189,18 @@ impl Node {
             let partial_derivative_of_root_at_this = self
                 .partial_derivative_of_root_at_this(batch_index)
                 .unwrap();
-            (0..self.operands.len()).for_each(|i| {
+            for (i, operand) in self.operands.iter().enumerate() {
                 // ```math
                 // \frac{\partial E}{\partial f} \cdot \frac{\partial f}{\partial z}
                 // ```
                 let addend_of_partial_derivative_of_root_at_operand =
                     partial_derivative_of_root_at_this * gradient_of_this_at_operand[i];
-                let mut operand = self.operands[i].borrow_mut();
+                let mut operand = operand.borrow_mut();
                 operand.add_addend_of_partial_derivative_of_root_at_this(
                     addend_of_partial_derivative_of_root_at_operand,
                     batch_index,
                 );
-            });
+            }
             self.buf.put(gradient_of_this_at_operand);
         }
 

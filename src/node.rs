@@ -204,7 +204,9 @@ impl Node {
             self.buf.put(gradient_of_this_at_operand);
         }
 
-        let mut partial_derivative_of_root_at_parameter = vec![0.; parameters.len()];
+        let mut partial_derivative_of_root_at_parameter = self.buf.take();
+        partial_derivative_of_root_at_parameter
+            .extend(core::iter::repeat(0.).take(parameters.len()));
         for batch_index in 0..batch_size {
             let buf = self.buf.take();
             let gradient_of_root_at_parameter = self
@@ -220,24 +222,18 @@ impl Node {
         }
         for (i, partial_derivative_of_root_at_parameter_i) in
             partial_derivative_of_root_at_parameter
-                .into_iter()
+                .iter()
+                .copied()
                 .enumerate()
         {
             let regularization = self.computation.regularization(parameters[i]);
             parameters[i] -=
                 step_size * (partial_derivative_of_root_at_parameter_i + regularization);
         }
+        self.buf.put(partial_derivative_of_root_at_parameter);
         // Clear batch cache
         while let Some(cache) = self.batch_cache.pop() {
-            match cache {
-                Cache::Evaluate(x) => {
-                    self.buf.put(x.operand_outputs);
-                }
-                Cache::Backpropagate(x) => {
-                    self.buf.put(x.addends_of_gradient_of_root_at_this);
-                    self.buf.put(x.evaluate_cache.operand_outputs);
-                }
-            }
+            cache.put_buf(&mut self.buf);
         }
         self.check_rep();
     }
@@ -248,19 +244,7 @@ impl Node {
         batch_index: usize,
     ) {
         let cache = self.batch_cache.get_mut(batch_index).unwrap();
-        let cache = match cache {
-            Cache::Evaluate(x) => {
-                *self.batch_cache.get_mut(batch_index).unwrap() =
-                    Cache::Backpropagate(BackpropagateCache {
-                        addends_of_gradient_of_root_at_this: self.buf.take(),
-                        evaluate_cache: x.clone(),
-                    });
-                self.add_addend_of_partial_derivative_of_root_at_this(addend, batch_index);
-                return;
-            }
-            Cache::Backpropagate(x) => x,
-        };
-        cache.addends_of_gradient_of_root_at_this.push(addend);
+        cache.add_addend_of_partial_derivative_of_root_at_this(addend, self.buf.take());
         self.check_rep();
     }
 
@@ -484,6 +468,43 @@ pub enum GradientOfThisAtOperandError {
 enum Cache {
     Evaluate(EvaluateCache),
     Backpropagate(BackpropagateCache),
+}
+impl Cache {
+    pub fn add_addend_of_partial_derivative_of_root_at_this(&mut self, addend: f64, buf: Vec<f64>) {
+        let cache = match self {
+            Cache::Evaluate(x) => {
+                let evaluate_cache = core::mem::replace(
+                    x,
+                    EvaluateCache {
+                        output: Default::default(),
+                        operand_outputs: Default::default(),
+                    },
+                );
+                *self = Cache::Backpropagate(BackpropagateCache {
+                    addends_of_gradient_of_root_at_this: buf,
+                    evaluate_cache,
+                });
+                let Cache::Backpropagate(x) = self else {
+                    unreachable!()
+                };
+                x
+            }
+            Cache::Backpropagate(x) => x,
+        };
+        cache.addends_of_gradient_of_root_at_this.push(addend);
+    }
+
+    pub fn put_buf(self, buf: &mut ReusedBuffers<f64>) {
+        match self {
+            Cache::Evaluate(x) => {
+                buf.put(x.operand_outputs);
+            }
+            Cache::Backpropagate(x) => {
+                buf.put(x.addends_of_gradient_of_root_at_this);
+                buf.put(x.evaluate_cache.operand_outputs);
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

@@ -1,4 +1,6 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+
+use parking_lot::Mutex;
 
 use crate::{
     node::SharedNode,
@@ -67,7 +69,7 @@ mod tests {
         let (max_pooling_layer, _layer_shape) = max_pooling_layer(inputs, kernel_layer_config);
         let mut outputs = vec![];
         for output_node in &max_pooling_layer {
-            let mut output_node = output_node.lock().unwrap();
+            let mut output_node = output_node.lock();
             let output = output_node.evaluate_once(&image, 0);
             outputs.push(output);
         }

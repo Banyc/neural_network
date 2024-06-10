@@ -1,10 +1,6 @@
-use std::{
-    io::Read,
-    num::NonZeroUsize,
-    path::Path,
-    sync::{Arc, Mutex},
-};
+use std::{io::Read, num::NonZeroUsize, path::Path, sync::Arc};
 
+use parking_lot::Mutex;
 use strict_num::FiniteF64;
 
 use crate::{

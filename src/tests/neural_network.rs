@@ -1,4 +1,6 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+
+use parking_lot::Mutex;
 
 use crate::{
     neural_network::{AccurateFnParams, NeuralNetwork, TrainOption},
@@ -151,13 +153,13 @@ fn backpropagation_step() {
     let inputs = vec![2.0, -2.0, 1.0];
     network.backpropagation_step(&[&inputs], step_size);
     {
-        let weight_node = weight_node.lock().unwrap();
-        let weights = weight_node.parameters().lock().unwrap();
+        let weight_node = weight_node.lock();
+        let weights = weight_node.parameters().lock();
         assert_eq!(*weights, &[-6.0, 9.0])
     }
     {
-        let bias_node = bias_node.lock().unwrap();
-        let bias = bias_node.parameters().lock().unwrap();
+        let bias_node = bias_node.lock();
+        let bias = bias_node.parameters().lock();
         assert_eq!(*bias, &[-1.0])
     }
 }
@@ -192,13 +194,13 @@ fn backpropagation_step2() {
     let inputs = vec![2.0, 1.0];
     network.backpropagation_step(&[&inputs], step_size);
     {
-        let weight_node = weight_node2.lock().unwrap();
-        let weights = weight_node.parameters().lock().unwrap();
+        let weight_node = weight_node2.lock();
+        let weights = weight_node.parameters().lock();
         assert_eq!(*weights, &[-41.0]); // 3 - 0.5 * 88
     }
     {
-        let weight_node = weight_node1.lock().unwrap();
-        let weights = weight_node.parameters().lock().unwrap();
+        let weight_node = weight_node1.lock();
+        let weights = weight_node.parameters().lock();
         assert_eq!(*weights, &[-64.0]); // 2 - 0.5 * 121
     }
 }

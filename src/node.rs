@@ -8,11 +8,9 @@
 //! - $E$: the outmost function represented by the root node of the computation graph
 //!   - "root" in code
 
-use std::{
-    collections::VecDeque,
-    sync::{Arc, Mutex},
-};
+use std::{collections::VecDeque, sync::Arc};
 
+use parking_lot::Mutex;
 use thiserror::Error;
 
 use crate::{param::SharedParams, reused_buf::ReusedBuffers};
@@ -98,7 +96,7 @@ impl Node {
         parameters: Arc<Mutex<Vec<f64>>>,
     ) -> Node {
         operands.iter().for_each(|operand| {
-            let mut operand = operand.lock().unwrap();
+            let mut operand = operand.lock();
             operand.increment_successor_len();
         });
         let this = Self {
@@ -125,11 +123,11 @@ impl Node {
 
         let mut operand_outputs = self.buf.take();
         operand_outputs.extend(self.operands.iter_mut().map(|operand| {
-            let mut operand = operand.lock().unwrap();
+            let mut operand = operand.lock();
             operand.evaluate_once(inputs, batch_index)
         }));
         let output = {
-            let parameters = self.parameters.lock().unwrap();
+            let parameters = self.parameters.lock();
             self.computation
                 .compute_output(&parameters, &operand_outputs, inputs)
         };
@@ -178,7 +176,7 @@ impl Node {
     fn adjust_parameters(&mut self, step_size: f64) {
         let batch_size = self.batch_cache.len();
 
-        let mut parameters = self.parameters.lock().unwrap();
+        let mut parameters = self.parameters.lock();
 
         // Distribute addends of partial derivatives of root at operands to operands
         for batch_index in 0..batch_size {
@@ -195,7 +193,7 @@ impl Node {
                 // ```
                 let addend_of_partial_derivative_of_root_at_operand =
                     partial_derivative_of_root_at_this * gradient_of_this_at_operand[i];
-                let mut operand = self.operands[i].lock().unwrap();
+                let mut operand = self.operands[i].lock();
                 operand.add_addend_of_partial_derivative_of_root_at_this(
                     addend_of_partial_derivative_of_root_at_operand,
                     batch_index,
@@ -411,7 +409,7 @@ fn bfs_operands(root_node: &SharedNode, f: impl Fn(&mut Node) -> bool) {
     q.push_back(Arc::clone(root_node));
 
     while let Some(n) = q.pop_front() {
-        let mut n = n.lock().unwrap();
+        let mut n = n.lock();
         n.set_is_in_bfs_queue(false);
         let should_visit_children = f(&mut n);
         if !should_visit_children {
@@ -419,7 +417,7 @@ fn bfs_operands(root_node: &SharedNode, f: impl Fn(&mut Node) -> bool) {
         }
         for op in &n.operands {
             {
-                let mut op = op.lock().unwrap();
+                let mut op = op.lock();
                 if op.is_in_bfs_queue() {
                     continue;
                 }

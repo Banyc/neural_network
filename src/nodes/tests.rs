@@ -1,4 +1,6 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+
+use parking_lot::Mutex;
 
 use crate::nodes::input::InputNodeBatchParams;
 
@@ -32,7 +34,7 @@ fn linear_gradient_of_this_at_operand() {
     let batch_index = 0;
     bias_node.evaluate_once(&inputs, batch_index);
     let ret = bias_node
-        .gradient_of_this_at_operand(batch_index, &bias_node.parameters().lock().unwrap(), vec![])
+        .gradient_of_this_at_operand(batch_index, &bias_node.parameters().lock(), vec![])
         .unwrap();
     assert_eq!(&ret, &[1.0]);
 }
@@ -50,7 +52,7 @@ fn linear_gradient_of_this_at_parameter() {
     let batch_index = 0;
     bias_node.evaluate_once(&inputs, batch_index);
     let ret = bias_node
-        .gradient_of_this_at_parameter(batch_index, &bias_node.parameters().lock().unwrap(), vec![])
+        .gradient_of_this_at_parameter(batch_index, &bias_node.parameters().lock(), vec![])
         .unwrap();
     assert_eq!(&ret, &[1.0]);
 }
@@ -71,7 +73,7 @@ fn linear_with_relu_evaluate() {
     let ret = relu_node.evaluate_once(&inputs, batch_index);
     assert_eq!(ret, 0.0);
     {
-        let mut bias_node = bias_node.lock().unwrap();
+        let mut bias_node = bias_node.lock();
         let ret = bias_node.evaluate_once(&inputs, batch_index);
         assert_eq!(ret, -10.0);
     }

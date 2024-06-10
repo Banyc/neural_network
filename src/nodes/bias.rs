@@ -1,4 +1,6 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+
+use parking_lot::Mutex;
 
 use crate::{
     node::{Node, NodeComputation, SharedNode},
@@ -15,7 +17,7 @@ pub fn default_bias() -> f64 {
 pub fn bias_node(operand: SharedNode, bias: Option<SharedParams>) -> Node {
     let computation = BiasNodeComputation {};
     let bias = bias.unwrap_or(Arc::new(Mutex::new(vec![default_bias()])));
-    assert_eq!(bias.lock().unwrap().len(), 1);
+    assert_eq!(bias.lock().len(), 1);
     Node::new(vec![operand], Arc::new(computation), bias)
 }
 

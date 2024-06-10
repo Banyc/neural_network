@@ -1,5 +1,6 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
+use parking_lot::Mutex;
 use rand::Rng;
 use thiserror::Error;
 
@@ -36,7 +37,7 @@ pub fn weight_node(
     lambda: Option<f64>,
 ) -> Result<Node, WeightNodeError> {
     if let Some(weights) = &weights {
-        if operands.len() != weights.lock().unwrap().len() {
+        if operands.len() != weights.lock().len() {
             return Err(WeightNodeError::ParameterSizeNotMatched);
         }
     }
@@ -122,11 +123,11 @@ pub enum WeightNodeError {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{Arc, Mutex};
+    use super::*;
 
-    use crate::nodes::input::InputNodeBatchParams;
+    use std::sync::Arc;
 
-    use super::{super::input::input_node_batch, weight_node};
+    use crate::nodes::input::{input_node_batch, InputNodeBatchParams};
 
     #[test]
     fn evaluate() {
@@ -150,11 +151,7 @@ mod tests {
         let batch_index = 0;
         weight_node.evaluate_once(&inputs, batch_index);
         let ret = weight_node
-            .gradient_of_this_at_operand(
-                batch_index,
-                &weight_node.parameters().lock().unwrap(),
-                vec![],
-            )
+            .gradient_of_this_at_operand(batch_index, &weight_node.parameters().lock(), vec![])
             .unwrap();
         assert_eq!(&ret, &[3.0, 2.0, 1.0]);
     }
@@ -169,11 +166,7 @@ mod tests {
         let batch_index = 0;
         weight_node.evaluate_once(&inputs, batch_index);
         let ret = weight_node
-            .gradient_of_this_at_parameter(
-                batch_index,
-                &weight_node.parameters().lock().unwrap(),
-                vec![],
-            )
+            .gradient_of_this_at_parameter(batch_index, &weight_node.parameters().lock(), vec![])
             .unwrap();
         assert_eq!(&ret, &[1.0, 2.0, 3.0]);
     }

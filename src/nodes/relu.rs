@@ -67,7 +67,7 @@ fn relu_derivative(x: f64) -> f64 {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Mutex;
+    use parking_lot::Mutex;
 
     use crate::nodes::input::input_node;
 
@@ -100,7 +100,7 @@ mod tests {
         let batch_index = 0;
         relu.evaluate_once(&[3.0], batch_index);
         let ret = relu
-            .gradient_of_this_at_operand(batch_index, &relu.parameters().lock().unwrap(), vec![])
+            .gradient_of_this_at_operand(batch_index, &relu.parameters().lock(), vec![])
             .unwrap();
         assert!(ret[0] >= 1.0);
         assert!(ret[0] <= 1.0);
@@ -113,7 +113,7 @@ mod tests {
         let batch_index = 0;
         relu.evaluate_once(&[-3.0], batch_index);
         let ret = relu
-            .gradient_of_this_at_operand(batch_index, &relu.parameters().lock().unwrap(), vec![])
+            .gradient_of_this_at_operand(batch_index, &relu.parameters().lock(), vec![])
             .unwrap();
         assert!(ret[0] >= 0.0);
         assert!(ret[0] <= 0.0);
@@ -126,7 +126,7 @@ mod tests {
         let batch_index = 0;
         relu.evaluate_once(&[3.0], batch_index);
         let ret = relu
-            .gradient_of_this_at_parameter(0, &relu.parameters().lock().unwrap(), vec![])
+            .gradient_of_this_at_parameter(0, &relu.parameters().lock(), vec![])
             .unwrap();
         assert_eq!(ret.len(), 0);
     }

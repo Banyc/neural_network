@@ -1,7 +1,6 @@
-use std::{
-    num::NonZeroUsize,
-    sync::{Arc, Mutex},
-};
+use std::{num::NonZeroUsize, sync::Arc};
+
+use parking_lot::Mutex;
 
 use crate::{
     node::SharedNode,

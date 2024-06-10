@@ -1,7 +1,6 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use std::{collections::HashMap, sync::Arc};
+
+use parking_lot::Mutex;
 
 pub type SharedParams = Arc<Mutex<Vec<f64>>>;
 pub fn empty_shared_params() -> SharedParams {
@@ -50,7 +49,7 @@ impl ParamInjector {
     pub fn insert_params(&mut self, name: String, params: SharedParams) {
         assert!(!self.params.contains_key(&name));
         if let Some(p) = self.prev_params.get(&name) {
-            *params.lock().unwrap() = p.clone();
+            *params.lock() = p.clone();
         }
         self.params.insert(name, params);
     }
@@ -58,7 +57,7 @@ impl ParamInjector {
     pub fn collect_parameters(&self) -> HashMap<String, Vec<f64>> {
         let mut collected = HashMap::new();
         for (name, params) in &self.params {
-            collected.insert(name.clone(), params.lock().unwrap().clone());
+            collected.insert(name.clone(), params.lock().clone());
         }
         collected
     }

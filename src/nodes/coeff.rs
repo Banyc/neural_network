@@ -33,19 +33,22 @@ impl NodeComputation for CoeffNodeComputation {
         &self,
         parameters: &[f64],
         operand_outputs: &[f64],
+        mut buf: Vec<f64>,
     ) -> Vec<f64> {
         assert!(parameters.is_empty());
         assert_eq!(operand_outputs.len(), 1);
-        vec![self.coefficient]
+        buf.extend([self.coefficient]);
+        buf
     }
 
     fn compute_gradient_of_this_at_parameter(
         &self,
         parameters: &[f64],
         operand_outputs: &[f64],
+        buf: Vec<f64>,
     ) -> Vec<f64> {
         assert!(parameters.is_empty());
         assert_eq!(operand_outputs.len(), 1);
-        vec![]
+        buf
     }
 }

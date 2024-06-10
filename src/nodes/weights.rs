@@ -70,18 +70,20 @@ impl NodeComputation for WeightNodeComputation {
         &self,
         parameters: &[f64],
         operand_outputs: &[f64],
+        buf: Vec<f64>,
     ) -> Vec<f64> {
         assert_eq!(operand_outputs.len(), parameters.len());
-        weight_derivative(parameters)
+        weight_derivative(parameters, buf)
     }
 
     fn compute_gradient_of_this_at_parameter(
         &self,
         parameters: &[f64],
         operand_outputs: &[f64],
+        buf: Vec<f64>,
     ) -> Vec<f64> {
         assert_eq!(operand_outputs.len(), parameters.len());
-        derivative_of_w(operand_outputs)
+        derivative_of_w(operand_outputs, buf)
     }
 
     fn regularization(&self, parameter: f64) -> f64 {
@@ -98,12 +100,14 @@ fn weight(x: &[f64], w: &[f64]) -> f64 {
         .sum()
 }
 
-fn weight_derivative(w: &[f64]) -> Vec<f64> {
-    w.to_vec()
+fn weight_derivative(w: &[f64], mut buf: Vec<f64>) -> Vec<f64> {
+    buf.extend(w);
+    buf
 }
 
-fn derivative_of_w(x: &[f64]) -> Vec<f64> {
-    x.to_vec()
+fn derivative_of_w(x: &[f64], mut buf: Vec<f64>) -> Vec<f64> {
+    buf.extend(x);
+    buf
 }
 
 fn derivative_of_l2_regularization(w: f64, lambda: f64) -> f64 {
@@ -146,7 +150,11 @@ mod tests {
         let batch_index = 0;
         weight_node.evaluate_once(&inputs, batch_index);
         let ret = weight_node
-            .gradient_of_this_at_operand(batch_index, &weight_node.parameters().lock().unwrap())
+            .gradient_of_this_at_operand(
+                batch_index,
+                &weight_node.parameters().lock().unwrap(),
+                vec![],
+            )
             .unwrap();
         assert_eq!(&ret, &[3.0, 2.0, 1.0]);
     }
@@ -161,7 +169,11 @@ mod tests {
         let batch_index = 0;
         weight_node.evaluate_once(&inputs, batch_index);
         let ret = weight_node
-            .gradient_of_this_at_parameter(batch_index, &weight_node.parameters().lock().unwrap())
+            .gradient_of_this_at_parameter(
+                batch_index,
+                &weight_node.parameters().lock().unwrap(),
+                vec![],
+            )
             .unwrap();
         assert_eq!(&ret, &[1.0, 2.0, 3.0]);
     }

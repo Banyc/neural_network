@@ -37,20 +37,24 @@ impl NodeComputation for BiasNodeComputation {
         &self,
         parameters: &[f64],
         operand_outputs: &[f64],
+        mut buf: Vec<f64>,
     ) -> Vec<f64> {
         assert_eq!(operand_outputs.len(), 1);
         assert_eq!(parameters.len(), 1);
-        vec![bias_derivative()]
+        buf.extend([bias_derivative()]);
+        buf
     }
 
     fn compute_gradient_of_this_at_parameter(
         &self,
         parameters: &[f64],
         operand_outputs: &[f64],
+        mut buf: Vec<f64>,
     ) -> Vec<f64> {
         assert_eq!(operand_outputs.len(), 1);
         assert_eq!(parameters.len(), 1);
-        vec![1.0]
+        buf.extend([1.0]);
+        buf
     }
 }
 

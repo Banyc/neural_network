@@ -15,7 +15,7 @@ use std::{
 
 use thiserror::Error;
 
-use crate::param::SharedParams;
+use crate::{param::SharedParams, reused_buf::ReusedBuffers};
 
 pub type SharedNode = Arc<Mutex<Node>>;
 
@@ -41,6 +41,7 @@ pub trait NodeComputation: core::fmt::Debug {
         &self,
         parameters: &[f64],
         operand_outputs: &[f64],
+        buf: Vec<f64>,
     ) -> Vec<f64>;
 
     /// ```math
@@ -53,6 +54,7 @@ pub trait NodeComputation: core::fmt::Debug {
         &self,
         parameters: &[f64],
         operand_outputs: &[f64],
+        buf: Vec<f64>,
     ) -> Vec<f64>;
 
     fn regularization(&self, _parameter: f64) -> f64 {
@@ -71,6 +73,8 @@ pub struct Node {
     successor_len: usize,
     batch_cache: Vec<Cache>,
     computation: Arc<dyn NodeComputation + Sync + Send>,
+
+    buf: ReusedBuffers<f64>,
 }
 
 impl Node {
@@ -102,6 +106,7 @@ impl Node {
             successor_len: 0,
             batch_cache: vec![],
             computation,
+            buf: ReusedBuffers::new(u8::MAX as _),
         };
         this.check_rep();
         this
@@ -116,14 +121,11 @@ impl Node {
             return cache.output;
         }
 
-        let operand_outputs: Vec<f64> = self
-            .operands
-            .iter_mut()
-            .map(|operand| {
-                let mut operand = operand.lock().unwrap();
-                operand.evaluate_once(inputs, batch_index)
-            })
-            .collect();
+        let mut operand_outputs = self.buf.take();
+        operand_outputs.extend(self.operands.iter_mut().map(|operand| {
+            let mut operand = operand.lock().unwrap();
+            operand.evaluate_once(inputs, batch_index)
+        }));
         let output = {
             let parameters = self.parameters.lock().unwrap();
             self.computation
@@ -178,8 +180,9 @@ impl Node {
 
         // Distribute addends of partial derivatives of root at operands to operands
         for batch_index in 0..batch_size {
+            let buf = self.buf.take();
             let gradient_of_this_at_operand = self
-                .gradient_of_this_at_operand(batch_index, &parameters)
+                .gradient_of_this_at_operand(batch_index, &parameters, buf)
                 .unwrap();
             let partial_derivative_of_root_at_this = self
                 .partial_derivative_of_root_at_this(batch_index)
@@ -196,12 +199,14 @@ impl Node {
                     batch_index,
                 );
             });
+            self.buf.put(gradient_of_this_at_operand);
         }
 
         let mut partial_derivative_of_root_at_parameter = vec![0.; parameters.len()];
         for batch_index in 0..batch_size {
+            let buf = self.buf.take();
             let gradient_of_root_at_parameter = self
-                .gradient_of_root_at_parameter(batch_index, &parameters)
+                .gradient_of_root_at_parameter(batch_index, &parameters, buf)
                 .unwrap();
             gradient_of_root_at_parameter.iter().enumerate().for_each(
                 |(i, partial_derivative_of_root_at_parameter_i)| {
@@ -209,6 +214,7 @@ impl Node {
                         partial_derivative_of_root_at_parameter_i / (batch_size as f64);
                 },
             );
+            self.buf.put(gradient_of_root_at_parameter);
         }
         for (i, partial_derivative_of_root_at_parameter_i) in
             partial_derivative_of_root_at_parameter
@@ -219,7 +225,18 @@ impl Node {
             parameters[i] -=
                 step_size * (partial_derivative_of_root_at_parameter_i + regularization);
         }
-        self.batch_cache.clear();
+        // Clear batch cache
+        while let Some(cache) = self.batch_cache.pop() {
+            match cache {
+                Cache::Evaluate(x) => {
+                    self.buf.put(x.operand_outputs);
+                }
+                Cache::Backpropagate(x) => {
+                    self.buf.put(x.addends_of_gradient_of_root_at_this);
+                    self.buf.put(x.evaluate_cache.operand_outputs);
+                }
+            }
+        }
         self.check_rep();
     }
 
@@ -233,7 +250,7 @@ impl Node {
             Cache::Evaluate(x) => {
                 *self.batch_cache.get_mut(batch_index).unwrap() =
                     Cache::Backpropagate(BackpropagateCache {
-                        addends_of_gradient_of_root_at_this: vec![],
+                        addends_of_gradient_of_root_at_this: self.buf.take(),
                         evaluate_cache: x.clone(),
                     });
                 self.add_addend_of_partial_derivative_of_root_at_this(addend, batch_index);
@@ -255,13 +272,14 @@ impl Node {
         &self,
         batch_index: usize,
         parameters: &[f64],
+        buf: Vec<f64>,
     ) -> Result<Vec<f64>, GradientOfThisAtOperandError> {
         let operand_outputs = self
             .operand_outputs(batch_index)
             .ok_or(GradientOfThisAtOperandError::NoEvaluationOutputCaches)?;
         Ok(self
             .computation
-            .compute_gradient_of_this_at_operand(parameters, operand_outputs))
+            .compute_gradient_of_this_at_operand(parameters, operand_outputs, buf))
     }
 
     /// ```math
@@ -309,13 +327,16 @@ impl Node {
         &self,
         batch_index: usize,
         parameters: &[f64],
+        buf: Vec<f64>,
     ) -> Result<Vec<f64>, GradientOfThisAtParameterError> {
         let operand_outputs = self
             .operand_outputs(batch_index)
             .ok_or(GradientOfThisAtParameterError::NoEvaluationOutputCaches)?;
-        Ok(self
-            .computation
-            .compute_gradient_of_this_at_parameter(parameters, operand_outputs.as_ref()))
+        Ok(self.computation.compute_gradient_of_this_at_parameter(
+            parameters,
+            operand_outputs.as_ref(),
+            buf,
+        ))
     }
 
     /// ```math
@@ -327,19 +348,21 @@ impl Node {
         &self,
         batch_index: usize,
         parameters: &[f64],
+        buf: Vec<f64>,
     ) -> Result<Vec<f64>, GradientOfRootAtParameterError> {
         let gradient_of_this_at_parameter = self
-            .gradient_of_this_at_parameter(batch_index, parameters)
+            .gradient_of_this_at_parameter(batch_index, parameters, buf)
             .map_err(GradientOfRootAtParameterError::GradientOfThisAtParameter)?;
         let partial_derivative_of_root_at_this = self
             .partial_derivative_of_root_at_this(batch_index)
             .map_err(GradientOfRootAtParameterError::GradientOfRootAtThis)?;
-        Ok(gradient_of_this_at_parameter
-            .iter()
-            .map(|partial_derivative_of_this_at_parameter_i| {
-                partial_derivative_of_root_at_this * *partial_derivative_of_this_at_parameter_i
-            })
-            .collect())
+        let mut gradient_of_root_at_parameter = gradient_of_this_at_parameter;
+        gradient_of_root_at_parameter.iter_mut().for_each(
+            |partial_derivative_of_this_at_parameter_i| {
+                *partial_derivative_of_this_at_parameter_i *= partial_derivative_of_root_at_this
+            },
+        );
+        Ok(gradient_of_root_at_parameter)
     }
 
     pub fn operand_outputs(&self, batch_index: usize) -> Option<&Vec<f64>> {

@@ -68,20 +68,22 @@ impl NodeComputation for InputNodeComputation {
         &self,
         parameters: &[f64],
         operand_outputs: &[f64],
+        buf: Vec<f64>,
     ) -> Vec<f64> {
         assert!(parameters.is_empty());
         assert!(operand_outputs.is_empty());
-        Vec::new()
+        buf
     }
 
     fn compute_gradient_of_this_at_parameter(
         &self,
         parameters: &[f64],
         operand_outputs: &[f64],
+        buf: Vec<f64>,
     ) -> Vec<f64> {
         assert!(parameters.is_empty());
         assert!(operand_outputs.is_empty());
-        Vec::new()
+        buf
     }
 }
 

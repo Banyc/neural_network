@@ -34,20 +34,23 @@ impl NodeComputation for ReluNodeComputation {
         &self,
         parameters: &[f64],
         operand_outputs: &[f64],
+        mut buf: Vec<f64>,
     ) -> Vec<f64> {
         assert!(parameters.is_empty());
         assert_eq!(operand_outputs.len(), 1);
-        vec![relu_derivative(operand_outputs[0])]
+        buf.extend([relu_derivative(operand_outputs[0])]);
+        buf
     }
 
     fn compute_gradient_of_this_at_parameter(
         &self,
         parameters: &[f64],
         operand_outputs: &[f64],
+        buf: Vec<f64>,
     ) -> Vec<f64> {
         assert!(parameters.is_empty());
         assert_eq!(operand_outputs.len(), 1);
-        Vec::new()
+        buf
     }
 }
 
@@ -97,7 +100,7 @@ mod tests {
         let batch_index = 0;
         relu.evaluate_once(&[3.0], batch_index);
         let ret = relu
-            .gradient_of_this_at_operand(batch_index, &relu.parameters().lock().unwrap())
+            .gradient_of_this_at_operand(batch_index, &relu.parameters().lock().unwrap(), vec![])
             .unwrap();
         assert!(ret[0] >= 1.0);
         assert!(ret[0] <= 1.0);
@@ -110,7 +113,7 @@ mod tests {
         let batch_index = 0;
         relu.evaluate_once(&[-3.0], batch_index);
         let ret = relu
-            .gradient_of_this_at_operand(batch_index, &relu.parameters().lock().unwrap())
+            .gradient_of_this_at_operand(batch_index, &relu.parameters().lock().unwrap(), vec![])
             .unwrap();
         assert!(ret[0] >= 0.0);
         assert!(ret[0] <= 0.0);
@@ -123,7 +126,7 @@ mod tests {
         let batch_index = 0;
         relu.evaluate_once(&[3.0], batch_index);
         let ret = relu
-            .gradient_of_this_at_parameter(0, &relu.parameters().lock().unwrap())
+            .gradient_of_this_at_parameter(0, &relu.parameters().lock().unwrap(), vec![])
             .unwrap();
         assert_eq!(ret.len(), 0);
     }

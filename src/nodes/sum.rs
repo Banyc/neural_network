@@ -30,19 +30,21 @@ impl NodeComputation for SumNodeComputation {
         &self,
         parameters: &[f64],
         operand_outputs: &[f64],
+        buf: Vec<f64>,
     ) -> Vec<f64> {
         assert!(parameters.is_empty());
-        sum_derivative(operand_outputs)
+        sum_derivative(operand_outputs, buf)
     }
 
     fn compute_gradient_of_this_at_parameter(
         &self,
         parameters: &[f64],
         operand_outputs: &[f64],
+        buf: Vec<f64>,
     ) -> Vec<f64> {
         assert!(parameters.is_empty());
         assert_eq!(operand_outputs.len(), 1);
-        vec![]
+        buf
     }
 }
 
@@ -50,6 +52,7 @@ fn sum(x: &[f64]) -> f64 {
     x.iter().sum()
 }
 
-fn sum_derivative(x: &[f64]) -> Vec<f64> {
-    x.iter().map(|_| 1.).collect()
+fn sum_derivative(x: &[f64], mut buf: Vec<f64>) -> Vec<f64> {
+    buf.extend(x.iter().map(|_| 1.));
+    buf
 }

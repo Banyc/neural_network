@@ -30,19 +30,21 @@ impl NodeComputation for ProductNodeComputation {
         &self,
         parameters: &[f64],
         operand_outputs: &[f64],
+        buf: Vec<f64>,
     ) -> Vec<f64> {
         assert!(parameters.is_empty());
-        product_derivative(operand_outputs)
+        product_derivative(operand_outputs, buf)
     }
 
     fn compute_gradient_of_this_at_parameter(
         &self,
         parameters: &[f64],
         operand_outputs: &[f64],
+        buf: Vec<f64>,
     ) -> Vec<f64> {
         assert!(parameters.is_empty());
         assert_eq!(operand_outputs.len(), 1);
-        vec![]
+        buf
     }
 }
 
@@ -50,13 +52,12 @@ fn product(x: &[f64]) -> f64 {
     x.iter().product()
 }
 
-fn product_derivative(x: &[f64]) -> Vec<f64> {
-    let mut der = vec![];
+fn product_derivative(x: &[f64], mut buf: Vec<f64>) -> Vec<f64> {
     for i in 0..x.len() {
         let d = product_except(x, i);
-        der.push(d);
+        buf.push(d);
     }
-    der
+    buf
 }
 fn product_except(x: &[f64], ind: usize) -> f64 {
     let mut prod = 1.;

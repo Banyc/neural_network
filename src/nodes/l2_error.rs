@@ -35,23 +35,26 @@ impl NodeComputation for L2ErrorNodeComputation {
         &self,
         parameters: &[f64],
         operand_outputs: &[f64],
+        mut buf: Vec<f64>,
     ) -> Vec<f64> {
         assert!(parameters.is_empty());
         assert_eq!(operand_outputs.len(), 2);
-        vec![
+        buf.extend([
             l2_error_derivative(operand_outputs[0], operand_outputs[1]),
             -l2_error_derivative(operand_outputs[0], operand_outputs[1]),
-        ]
+        ]);
+        buf
     }
 
     fn compute_gradient_of_this_at_parameter(
         &self,
         parameters: &[f64],
         operand_outputs: &[f64],
+        buf: Vec<f64>,
     ) -> Vec<f64> {
         assert!(parameters.is_empty());
         assert_eq!(operand_outputs.len(), 2);
-        Vec::new()
+        buf
     }
 }
 

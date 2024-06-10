@@ -33,20 +33,23 @@ impl NodeComputation for LogNodeComputation {
         &self,
         parameters: &[f64],
         operand_outputs: &[f64],
+        mut buf: Vec<f64>,
     ) -> Vec<f64> {
         assert!(parameters.is_empty());
         assert_eq!(operand_outputs.len(), 1);
-        vec![log_derivative(operand_outputs[0], self.base)]
+        buf.extend([log_derivative(operand_outputs[0], self.base)]);
+        buf
     }
 
     fn compute_gradient_of_this_at_parameter(
         &self,
         parameters: &[f64],
         operand_outputs: &[f64],
+        buf: Vec<f64>,
     ) -> Vec<f64> {
         assert!(parameters.is_empty());
         assert_eq!(operand_outputs.len(), 1);
-        vec![]
+        buf
     }
 }
 

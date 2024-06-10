@@ -33,20 +33,22 @@ impl NodeComputation for SoftmaxNodeComputation {
         &self,
         parameters: &[f64],
         operand_outputs: &[f64],
+        buf: Vec<f64>,
     ) -> Vec<f64> {
         assert!(parameters.is_empty());
         assert!(!operand_outputs.is_empty());
-        softmax_derivative(operand_outputs, self.operand_index)
+        softmax_derivative(operand_outputs, self.operand_index, buf)
     }
 
     fn compute_gradient_of_this_at_parameter(
         &self,
         parameters: &[f64],
         operand_outputs: &[f64],
+        buf: Vec<f64>,
     ) -> Vec<f64> {
         assert!(parameters.is_empty());
         assert!(!operand_outputs.is_empty());
-        Vec::new()
+        buf
     }
 }
 
@@ -56,9 +58,8 @@ fn softmax(x: &[f64], i: usize) -> f64 {
     e_x_i / e_x.into_iter().sum::<f64>()
 }
 
-fn softmax_derivative(x: &[f64], i: usize) -> Vec<f64> {
+fn softmax_derivative(x: &[f64], i: usize, mut buf: Vec<f64>) -> Vec<f64> {
     let p_i = softmax(x, i);
-    let mut der = vec![];
     for j in 0..x.len() {
         let d = if i == j {
             p_i * (1. - p_i)
@@ -66,7 +67,7 @@ fn softmax_derivative(x: &[f64], i: usize) -> Vec<f64> {
             let p_j = softmax(x, j);
             -p_i * p_j
         };
-        der.push(d);
+        buf.push(d);
     }
-    der
+    buf
 }

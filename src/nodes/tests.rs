@@ -32,7 +32,7 @@ fn linear_gradient_of_this_at_operand() {
     let batch_index = 0;
     bias_node.evaluate_once(&inputs, batch_index);
     let ret = bias_node
-        .gradient_of_this_at_operand(batch_index, &bias_node.parameters().lock().unwrap())
+        .gradient_of_this_at_operand(batch_index, &bias_node.parameters().lock().unwrap(), vec![])
         .unwrap();
     assert_eq!(&ret, &[1.0]);
 }
@@ -50,7 +50,7 @@ fn linear_gradient_of_this_at_parameter() {
     let batch_index = 0;
     bias_node.evaluate_once(&inputs, batch_index);
     let ret = bias_node
-        .gradient_of_this_at_parameter(batch_index, &bias_node.parameters().lock().unwrap())
+        .gradient_of_this_at_parameter(batch_index, &bias_node.parameters().lock().unwrap(), vec![])
         .unwrap();
     assert_eq!(&ret, &[1.0]);
 }

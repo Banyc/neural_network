@@ -1,6 +1,5 @@
-use std::{io::Read, num::NonZeroUsize, path::Path, sync::Arc};
+use std::{cell::RefCell, io::Read, num::NonZeroUsize, path::Path, sync::Arc};
 
-use parking_lot::Mutex;
 use strict_num::FiniteF64;
 
 use crate::{
@@ -181,7 +180,7 @@ fn neural_network(mut param_injection: Option<ParamInjection<'_>>) -> NeuralNetw
         .cloned()
         .chain(label_nodes)
         .collect::<Vec<SharedNode>>();
-    let error_node = Arc::new(Mutex::new(mse_node(error_node_inputs)));
+    let error_node = Arc::new(RefCell::new(mse_node(error_node_inputs)));
     NeuralNetwork::new(outputs, error_node)
 }
 

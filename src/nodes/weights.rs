@@ -1,6 +1,5 @@
-use std::sync::Arc;
+use std::{cell::RefCell, sync::Arc};
 
-use parking_lot::Mutex;
 use rand::Rng;
 use thiserror::Error;
 
@@ -37,7 +36,7 @@ pub fn weight_node(
     lambda: Option<f64>,
 ) -> Result<Node, WeightNodeError> {
     if let Some(weights) = &weights {
-        if operands.len() != weights.lock().len() {
+        if operands.len() != weights.borrow().len() {
             return Err(WeightNodeError::ParameterSizeNotMatched);
         }
     }
@@ -46,7 +45,7 @@ pub fn weight_node(
     };
     let weights = match weights.take() {
         Some(x) => x,
-        None => Arc::new(Mutex::new(rnd_weights(operands.len()))),
+        None => Arc::new(RefCell::new(rnd_weights(operands.len()))),
     };
     let node = Node::new(operands, Arc::new(computation), weights);
     Ok(node)
@@ -125,7 +124,7 @@ pub enum WeightNodeError {
 mod tests {
     use super::*;
 
-    use std::sync::Arc;
+    use std::{cell::RefCell, sync::Arc};
 
     use crate::nodes::input::{input_node_batch, InputNodeBatchParams};
 
@@ -134,7 +133,7 @@ mod tests {
         let input_nodes = input_node_batch(InputNodeBatchParams { start: 0, len: 3 });
         let inputs = vec![1.0, 2.0, 3.0];
         let initial_weights = vec![3.0, 2.0, 1.0];
-        let initial_weights = Arc::new(Mutex::new(initial_weights));
+        let initial_weights = Arc::new(RefCell::new(initial_weights));
         let mut weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
         let batch_index = 0;
         let ret = weight_node.evaluate_once(&inputs, batch_index);
@@ -146,12 +145,12 @@ mod tests {
         let input_nodes = input_node_batch(InputNodeBatchParams { start: 0, len: 3 });
         let inputs = vec![1.0, 2.0, 3.0];
         let initial_weights = vec![3.0, 2.0, 1.0];
-        let initial_weights = Arc::new(Mutex::new(initial_weights));
+        let initial_weights = Arc::new(RefCell::new(initial_weights));
         let mut weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
         let batch_index = 0;
         weight_node.evaluate_once(&inputs, batch_index);
         let ret = weight_node
-            .gradient_of_this_at_operand(batch_index, &weight_node.parameters().lock(), vec![])
+            .gradient_of_this_at_operand(batch_index, &weight_node.parameters().borrow(), vec![])
             .unwrap();
         assert_eq!(&ret, &[3.0, 2.0, 1.0]);
     }
@@ -161,12 +160,12 @@ mod tests {
         let input_nodes = input_node_batch(InputNodeBatchParams { start: 0, len: 3 });
         let inputs = vec![1.0, 2.0, 3.0];
         let initial_weights = vec![3.0, 2.0, 1.0];
-        let initial_weights = Arc::new(Mutex::new(initial_weights));
+        let initial_weights = Arc::new(RefCell::new(initial_weights));
         let mut weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
         let batch_index = 0;
         weight_node.evaluate_once(&inputs, batch_index);
         let ret = weight_node
-            .gradient_of_this_at_parameter(batch_index, &weight_node.parameters().lock(), vec![])
+            .gradient_of_this_at_parameter(batch_index, &weight_node.parameters().borrow(), vec![])
             .unwrap();
         assert_eq!(&ret, &[1.0, 2.0, 3.0]);
     }

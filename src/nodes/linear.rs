@@ -1,6 +1,4 @@
-use std::{num::NonZeroUsize, sync::Arc};
-
-use parking_lot::Mutex;
+use std::{cell::RefCell, num::NonZeroUsize, sync::Arc};
 
 use crate::{
     node::SharedNode,
@@ -26,10 +24,10 @@ pub fn linear_node(
 ) -> Result<SharedNode, WeightNodeError> {
     let weight_node = weight_node(input_nodes, initial_weights, lambda)?;
     let weights = Arc::clone(weight_node.parameters());
-    let weight_node = Arc::new(Mutex::new(weight_node));
+    let weight_node = Arc::new(RefCell::new(weight_node));
     let bias_node = bias_node(Arc::clone(&weight_node), initial_bias);
     let bias = Arc::clone(bias_node.parameters());
-    let bias_node = Arc::new(Mutex::new(bias_node));
+    let bias_node = Arc::new(RefCell::new(bias_node));
     if let Some(mut param_injection) = param_injection {
         param_injection
             .name_append(":weights")

@@ -1,3 +1,5 @@
+#![allow(clippy::arc_with_non_send_sync)]
+
 pub mod layers;
 pub mod neural_network;
 pub mod node;

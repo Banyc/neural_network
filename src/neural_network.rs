@@ -42,7 +42,7 @@ impl NeuralNetwork {
         let mut outputs = vec![];
 
         for terminal_node in &self.terminal_nodes {
-            let mut terminal_node = terminal_node.lock();
+            let mut terminal_node = terminal_node.borrow_mut();
             let batch_index = 0;
             let output = terminal_node.evaluate_once(inputs, batch_index);
             outputs.push(output);
@@ -71,7 +71,7 @@ impl NeuralNetwork {
     }
 
     fn compute_error(&mut self, inputs: &[f64], option: EvalOption, batch_index: usize) -> f64 {
-        let mut error_node = self.error_node.lock();
+        let mut error_node = self.error_node.borrow_mut();
         let output = error_node.evaluate_once(inputs, batch_index);
         drop(error_node);
         if matches!(option, EvalOption::ClearCache) {

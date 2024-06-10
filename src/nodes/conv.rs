@@ -1,6 +1,4 @@
-use std::{num::NonZeroUsize, sync::Arc};
-
-use parking_lot::Mutex;
+use std::{cell::RefCell, num::NonZeroUsize, sync::Arc};
 
 use crate::{
     node::SharedNode,
@@ -39,13 +37,13 @@ pub fn conv_layer(
                 .map(|x| x.get())
                 .product();
             let weights = rnd_weights(num_kernel_params);
-            Arc::new(Mutex::new(weights))
+            Arc::new(RefCell::new(weights))
         });
     let bias = config
         .initial_bias
         .as_ref()
         .map(|f| f())
-        .unwrap_or_else(|| Arc::new(Mutex::new(vec![default_bias()])));
+        .unwrap_or_else(|| Arc::new(RefCell::new(vec![default_bias()])));
     if let Some(mut param_injection) = param_injection {
         param_injection
             .name_append(":weights")

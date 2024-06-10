@@ -1,6 +1,4 @@
-use std::sync::Arc;
-
-use parking_lot::Mutex;
+use std::{cell::RefCell, sync::Arc};
 
 use crate::{
     node::SharedNode,
@@ -24,7 +22,7 @@ pub fn conv_relu_max_pooling_layer(
     let (conv_layer, shape) = deep_conv_layer(inputs, conv, param_injection);
     let relu_layer = conv_layer
         .into_iter()
-        .map(|x| Arc::new(Mutex::new(relu_node(x))))
+        .map(|x| Arc::new(RefCell::new(relu_node(x))))
         .collect::<Vec<SharedNode>>();
     {
         let inputs = Tensor::new(&relu_layer, &shape).unwrap();
@@ -42,6 +40,6 @@ pub fn dense_relu_layer(
     assert_eq!(linear_layer.len(), depth.get());
     linear_layer
         .into_iter()
-        .map(|x| Arc::new(Mutex::new(relu_node(x))))
+        .map(|x| Arc::new(RefCell::new(relu_node(x))))
         .collect::<Vec<SharedNode>>()
 }

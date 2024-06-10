@@ -1,14 +1,14 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use crate::{
-    node::{Node, NodeComputation},
+    node::{Node, NodeComputation, SharedNode},
     param::empty_shared_params,
 };
 
 /// ```math
 /// f(x) = \log_a x
 /// ```
-pub fn log_node(operand: Arc<Mutex<Node>>, base: f64) -> Node {
+pub fn log_node(operand: SharedNode, base: f64) -> Node {
     let computation = LogNodeComputation { base };
     Node::new(vec![operand], Arc::new(computation), empty_shared_params())
 }

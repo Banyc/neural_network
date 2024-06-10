@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    node::Node,
+    node::SharedNode,
     param::{ParamInjection, SharedParams},
     tensor::{NonZeroShape, OwnedShape, Stride, Tensor},
 };
@@ -25,11 +25,11 @@ pub struct KernelConfig<'a> {
 }
 
 pub fn conv_layer(
-    inputs: Tensor<'_, Arc<Mutex<Node>>>,
+    inputs: Tensor<'_, SharedNode>,
     stride: &Stride,
     kernel: KernelConfig,
     param_injection: Option<ParamInjection<'_>>,
-) -> (Vec<Arc<Mutex<Node>>>, OwnedShape) {
+) -> (Vec<SharedNode>, OwnedShape) {
     let weights = kernel
         .initial_weights
         .as_ref()
@@ -53,7 +53,7 @@ pub fn conv_layer(
             .insert_params(Arc::clone(&bias));
     }
 
-    let create_filter = |params: KernelParams| -> Arc<Mutex<Node>> {
+    let create_filter = |params: KernelParams| -> SharedNode {
         let feature_node = linear_node(
             params.inputs,
             Some(Arc::clone(&weights)),
@@ -67,12 +67,12 @@ pub fn conv_layer(
 }
 
 pub fn deep_conv_layer(
-    inputs: Tensor<'_, Arc<Mutex<Node>>>,
+    inputs: Tensor<'_, SharedNode>,
     stride: &Stride,
     kernel: KernelConfig,
     depth: NonZeroUsize,
     mut param_injection: Option<ParamInjection<'_>>,
-) -> (Vec<Vec<Arc<Mutex<Node>>>>, OwnedShape) {
+) -> (Vec<Vec<SharedNode>>, OwnedShape) {
     let mut kernel_layers = vec![];
     let mut kernel_layer_shape = None;
     for depth in 0..depth.get() {

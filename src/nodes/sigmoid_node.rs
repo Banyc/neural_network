@@ -1,14 +1,14 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use crate::{
-    node::{Node, NodeComputation},
+    node::{Node, NodeComputation, SharedNode},
     param::empty_shared_params,
 };
 
 /// ```math
 /// f(x) = 1 + e^x
 /// ```
-pub fn sigmoid_node(operand: Arc<Mutex<Node>>) -> Node {
+pub fn sigmoid_node(operand: SharedNode) -> Node {
     let computation = SigmoidNodeComputation {};
     Node::new(vec![operand], Arc::new(computation), empty_shared_params())
 }

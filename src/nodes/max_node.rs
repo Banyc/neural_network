@@ -1,16 +1,16 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use strict_num::FiniteF64;
 
 use crate::{
-    node::{Node, NodeComputation},
+    node::{Node, NodeComputation, SharedNode},
     param::empty_shared_params,
 };
 
 /// ```math
 /// f(x) = \max x
 /// ```
-pub fn max_node(operands: Vec<Arc<Mutex<Node>>>) -> Node {
+pub fn max_node(operands: Vec<SharedNode>) -> Node {
     assert!(!operands.is_empty());
     let computation = MaxNodeComputation {};
     Node::new(operands, Arc::new(computation), empty_shared_params())

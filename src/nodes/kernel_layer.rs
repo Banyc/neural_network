@@ -1,19 +1,16 @@
-use std::{
-    num::NonZeroUsize,
-    sync::{Arc, Mutex},
-};
+use std::{num::NonZeroUsize, sync::Arc};
 
 use crate::{
-    node::Node,
+    node::SharedNode,
     tensor::{IndexIter, NonZeroShape, OwnedShape, OwnedStride, Stride, Tensor},
 };
 
 pub fn kernel_layer(
-    inputs: Tensor<'_, Arc<Mutex<Node>>>,
+    inputs: Tensor<'_, SharedNode>,
     stride: &Stride,
     kernel_shape: &NonZeroShape,
-    mut create_kernel: impl FnMut(KernelParams) -> Arc<Mutex<Node>>,
-) -> (Vec<Arc<Mutex<Node>>>, OwnedShape) {
+    mut create_kernel: impl FnMut(KernelParams) -> SharedNode,
+) -> (Vec<SharedNode>, OwnedShape) {
     let mut shape = inputs.shape().to_vec();
     shape
         .iter_mut()
@@ -51,5 +48,5 @@ pub fn kernel_layer(
 #[derive(Debug, Clone)]
 pub struct KernelParams {
     pub i: usize,
-    pub inputs: Vec<Arc<Mutex<Node>>>,
+    pub inputs: Vec<SharedNode>,
 }

@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use crate::{
-    node::{Node, NodeComputation},
+    node::{Node, NodeComputation, SharedNode},
     param::empty_shared_params,
 };
 
@@ -18,7 +18,7 @@ pub struct InputNodeBatchParams {
     pub start: usize,
     pub len: usize,
 }
-pub fn input_node_batch(params: InputNodeBatchParams) -> Vec<Arc<Mutex<Node>>> {
+pub fn input_node_batch(params: InputNodeBatchParams) -> Vec<SharedNode> {
     (0..params.len)
         .map(|i| {
             let node = input_node(params.start + i);

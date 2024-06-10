@@ -1,20 +1,17 @@
-use std::{
-    sync::{Arc, Mutex},
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use rand::Rng;
 
-use crate::node::graph_delete_caches;
+use crate::node::{graph_delete_caches, SharedNode};
 
-use super::node::{graph_do_gradient_descent_steps, Node};
+use super::node::graph_do_gradient_descent_steps;
 
 #[derive(Debug)]
 pub struct NeuralNetwork {
     /// output: a prediction
-    terminal_nodes: Vec<Arc<Mutex<Node>>>,
+    terminal_nodes: Vec<SharedNode>,
     /// output: the error between the prediction and the label
-    error_node: Arc<Mutex<Node>>,
+    error_node: SharedNode,
     /// learning rate
     step_size: f64,
 }
@@ -22,8 +19,8 @@ impl NeuralNetwork {
     fn check_rep(&self) {}
 
     pub fn new(
-        terminal_nodes: Vec<Arc<Mutex<Node>>>,
-        error_node: Arc<Mutex<Node>>,
+        terminal_nodes: Vec<SharedNode>,
+        error_node: SharedNode,
         step_size: f64,
     ) -> NeuralNetwork {
         let this = NeuralNetwork {

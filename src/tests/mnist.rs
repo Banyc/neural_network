@@ -9,7 +9,7 @@ use strict_num::FiniteF64;
 
 use crate::{
     neural_network::{AccurateFnParams, EvalOption, NeuralNetwork, TrainOption},
-    node::Node,
+    node::SharedNode,
     nodes::{
         conv_layer::{self, deep_conv_layer},
         input_node::{input_node_batch, InputNodeBatchParams},
@@ -108,7 +108,7 @@ fn neural_network(step_size: f64) -> NeuralNetwork {
     let relu_layer = conv_layer
         .into_iter()
         .map(|x| Arc::new(Mutex::new(relu_node(x))))
-        .collect::<Vec<Arc<Mutex<Node>>>>();
+        .collect::<Vec<SharedNode>>();
     let (max_pooling_layer, shape) = {
         let inputs = Tensor::new(&relu_layer, &shape).unwrap();
         let stride = primitive_to_stride(&[2, 2, 1]).unwrap();
@@ -135,7 +135,7 @@ fn neural_network(step_size: f64) -> NeuralNetwork {
     let relu_layer = conv_layer
         .into_iter()
         .map(|x| Arc::new(Mutex::new(relu_node(x))))
-        .collect::<Vec<Arc<Mutex<Node>>>>();
+        .collect::<Vec<SharedNode>>();
     let (max_pooling_layer, shape) = {
         let inputs = Tensor::new(&relu_layer, &shape).unwrap();
         let stride = primitive_to_stride(&[2, 2, 1]).unwrap();
@@ -151,7 +151,7 @@ fn neural_network(step_size: f64) -> NeuralNetwork {
     let relu_layer = linear_layer
         .into_iter()
         .map(|x| Arc::new(Mutex::new(relu_node(x))))
-        .collect::<Vec<Arc<Mutex<Node>>>>();
+        .collect::<Vec<SharedNode>>();
     let linear_layer = {
         let depth = NonZeroUsize::new(84).unwrap();
         linear_node::linear_layer(relu_layer, depth, None, None, None, None).unwrap()
@@ -160,7 +160,7 @@ fn neural_network(step_size: f64) -> NeuralNetwork {
     let relu_layer = linear_layer
         .into_iter()
         .map(|x| Arc::new(Mutex::new(relu_node(x))))
-        .collect::<Vec<Arc<Mutex<Node>>>>();
+        .collect::<Vec<SharedNode>>();
     let linear_layer = {
         let depth = NonZeroUsize::new(CLASSES).unwrap();
         linear_node::linear_layer(relu_layer, depth, None, None, None, None).unwrap()
@@ -174,7 +174,7 @@ fn neural_network(step_size: f64) -> NeuralNetwork {
         .iter()
         .cloned()
         .chain(label_nodes)
-        .collect::<Vec<Arc<Mutex<Node>>>>();
+        .collect::<Vec<SharedNode>>();
     let error_node = Arc::new(Mutex::new(mse_node(error_node_inputs)));
     NeuralNetwork::new(linear_layer, error_node, step_size)
 }

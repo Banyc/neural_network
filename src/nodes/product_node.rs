@@ -1,14 +1,14 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use crate::{
-    node::{Node, NodeComputation},
+    node::{Node, NodeComputation, SharedNode},
     param::empty_shared_params,
 };
 
 /// ```math
 /// f(x) = \prod x
 /// ```
-pub fn product_node(operands: Vec<Arc<Mutex<Node>>>) -> Node {
+pub fn product_node(operands: Vec<SharedNode>) -> Node {
     let computation = ProductNodeComputation {};
     Node::new(operands, Arc::new(computation), empty_shared_params())
 }

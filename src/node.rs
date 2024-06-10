@@ -17,6 +17,8 @@ use thiserror::Error;
 
 use crate::param::SharedParams;
 
+pub type SharedNode = Arc<Mutex<Node>>;
+
 /// The function of this node should be
 /// ```math
 /// f : \mathbb{R}^n \to \mathbb{R}
@@ -65,7 +67,7 @@ pub trait NodeComputation: core::fmt::Debug {
 #[derive(Debug)]
 pub struct Node {
     parameters: SharedParams,
-    operands: Vec<Arc<Mutex<Node>>>,
+    operands: Vec<SharedNode>,
     successor_len: usize,
     batch_cache: Vec<Cache>,
     computation: Arc<dyn NodeComputation + Sync + Send>,
@@ -86,7 +88,7 @@ impl Node {
     }
 
     pub fn new(
-        operands: Vec<Arc<Mutex<Node>>>,
+        operands: Vec<SharedNode>,
         computation: Arc<dyn NodeComputation + Sync + Send>,
         parameters: Arc<Mutex<Vec<f64>>>,
     ) -> Node {
@@ -361,11 +363,11 @@ impl Node {
     }
 }
 
-pub fn clone_node_batch(nodes: &[Arc<Mutex<Node>>]) -> Vec<Arc<Mutex<Node>>> {
+pub fn clone_node_batch(nodes: &[SharedNode]) -> Vec<SharedNode> {
     nodes.iter().map(Arc::clone).collect()
 }
 
-pub fn graph_delete_caches(root_note: &Arc<Mutex<Node>>) {
+pub fn graph_delete_caches(root_note: &SharedNode) {
     let f = |n: &mut Node| {
         if n.batch_cache.is_empty() {
             return false;
@@ -376,7 +378,7 @@ pub fn graph_delete_caches(root_note: &Arc<Mutex<Node>>) {
     bfs_operands(root_note, f);
 }
 
-pub fn graph_do_gradient_descent_steps(root_note: &Arc<Mutex<Node>>, step_size: f64) {
+pub fn graph_do_gradient_descent_steps(root_note: &SharedNode, step_size: f64) {
     let f = |n: &mut Node| match n.do_gradient_descent_step(step_size) {
         Ok(_) => true,
         Err(e) => match e {
@@ -389,7 +391,7 @@ pub fn graph_do_gradient_descent_steps(root_note: &Arc<Mutex<Node>>, step_size: 
 }
 
 /// `f`: Return `false` to trim this branch
-fn bfs_operands(root_node: &Arc<Mutex<Node>>, f: impl Fn(&mut Node) -> bool) {
+fn bfs_operands(root_node: &SharedNode, f: impl Fn(&mut Node) -> bool) {
     let mut q = VecDeque::new();
     q.push_back(Arc::clone(root_node));
 

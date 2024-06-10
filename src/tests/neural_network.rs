@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::{
     neural_network::{AccurateFnParams, EvalOption, NeuralNetwork, TrainOption},
-    node::{clone_node_batch, Node},
+    node::{clone_node_batch, Node, SharedNode},
     nodes::{
         bias_node::bias_node,
         input_node::{input_node, input_node_batch, InputNodeBatchParams},
@@ -16,7 +16,7 @@ use crate::{
 };
 
 fn single_linear_relu(
-    input_nodes: Vec<Arc<Mutex<Node>>>,
+    input_nodes: Vec<SharedNode>,
     initial_weights: Option<SharedParams>,
     initial_bias: Option<SharedParams>,
 ) -> Node {

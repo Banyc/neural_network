@@ -4,7 +4,7 @@ use rand::Rng;
 use thiserror::Error;
 
 use crate::{
-    node::{Node, NodeComputation},
+    node::{Node, NodeComputation, SharedNode},
     param::SharedParams,
 };
 
@@ -31,7 +31,7 @@ pub fn rnd_weights(op_len: usize) -> Vec<f64> {
 ///
 /// - `lambda`: for regularization
 pub fn weight_node(
-    operands: Vec<Arc<Mutex<Node>>>,
+    operands: Vec<SharedNode>,
     mut weights: Option<SharedParams>,
     lambda: Option<f64>,
 ) -> Result<Node, WeightNodeError> {

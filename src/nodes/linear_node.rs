@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    node::Node,
+    node::SharedNode,
     param::{ParamInjection, SharedParams},
 };
 
@@ -19,12 +19,12 @@ use super::{
 ///
 /// - `lambda`: for regularization
 pub fn linear_node(
-    input_nodes: Vec<Arc<Mutex<Node>>>,
+    input_nodes: Vec<SharedNode>,
     initial_weights: Option<SharedParams>,
     initial_bias: Option<SharedParams>,
     lambda: Option<f64>,
     param_injection: Option<ParamInjection<'_>>,
-) -> Result<Arc<Mutex<Node>>, WeightNodeError> {
+) -> Result<SharedNode, WeightNodeError> {
     let weight_node = weight_node(input_nodes, initial_weights, lambda)?;
     let weights = Arc::clone(weight_node.parameters());
     let weight_node = Arc::new(Mutex::new(weight_node));
@@ -41,13 +41,13 @@ pub fn linear_node(
 }
 
 pub fn linear_layer(
-    input_nodes: Vec<Arc<Mutex<Node>>>,
+    input_nodes: Vec<SharedNode>,
     depth: NonZeroUsize,
     initial_weights: Option<&dyn Fn() -> SharedParams>,
     initial_bias: Option<&dyn Fn() -> SharedParams>,
     lambda: Option<f64>,
     mut param_injection: Option<ParamInjection<'_>>,
-) -> Result<Vec<Arc<Mutex<Node>>>, WeightNodeError> {
+) -> Result<Vec<SharedNode>, WeightNodeError> {
     let mut layer = vec![];
     for depth in 0..depth.get() {
         let param_injection = param_injection

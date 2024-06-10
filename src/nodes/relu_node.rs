@@ -1,7 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use crate::{
-    node::{Node, NodeComputation},
+    node::{Node, NodeComputation, SharedNode},
     param::empty_shared_params,
 };
 
@@ -11,7 +11,7 @@ use crate::{
 ///   0 & x < 0 \\
 /// \end{cases}
 /// ```
-pub fn relu_node(operand: Arc<Mutex<Node>>) -> Node {
+pub fn relu_node(operand: SharedNode) -> Node {
     let computation = ReluNodeComputation {};
     Node::new(vec![operand], Arc::new(computation), empty_shared_params())
 }
@@ -64,6 +64,8 @@ fn relu_derivative(x: f64) -> f64 {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Mutex;
+
     use crate::nodes::input_node::input_node;
 
     use super::*;

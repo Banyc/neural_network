@@ -1,14 +1,14 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use crate::{
-    node::{Node, NodeComputation},
+    node::{Node, NodeComputation, SharedNode},
     param::empty_shared_params,
 };
 
 /// ```math
 /// f(y, \hat{y}) = \frac{1}{n} \sum (y - \hat{y})^2
 /// ```
-pub fn mse_node(operands: Vec<Arc<Mutex<Node>>>) -> Node {
+pub fn mse_node(operands: Vec<SharedNode>) -> Node {
     assert!(!operands.is_empty());
     assert!(operands.len() % 2 == 0);
     let computation = MseNodeComputation {};

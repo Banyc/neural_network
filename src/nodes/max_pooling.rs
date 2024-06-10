@@ -2,22 +2,21 @@ use std::sync::{Arc, Mutex};
 
 use crate::{
     node::SharedNode,
-    tensor::{NonZeroShape, OwnedShape, Stride, Tensor},
+    tensor::{OwnedShape, Tensor},
 };
 
 use super::{
-    kernel::{kernel_layer, KernelParams},
+    kernel::{kernel_layer, KernelLayerConfig, KernelParams},
     max::max_node,
 };
 
 pub fn max_pooling_layer(
     inputs: Tensor<'_, SharedNode>,
-    stride: &Stride,
-    kernel_shape: &NonZeroShape,
+    config: KernelLayerConfig<'_>,
 ) -> (Vec<SharedNode>, OwnedShape) {
     let create_filter =
         |params: KernelParams| -> SharedNode { Arc::new(Mutex::new(max_node(params.inputs))) };
-    kernel_layer(inputs, stride, kernel_shape, create_filter)
+    kernel_layer(inputs, config, create_filter)
 }
 
 #[cfg(test)]
@@ -60,8 +59,12 @@ mod tests {
             .into_iter()
             .map(|x| NonZeroUsize::new(x).unwrap())
             .collect::<OwnedNonZeroShape>();
-        let (max_pooling_layer, layer_shape) = max_pooling_layer(inputs, &stride, &kernel_shape);
-        assert_eq!(layer_shape, [2, 2]);
+        let kernel_layer_config = KernelLayerConfig {
+            stride: &stride,
+            kernel_shape: &kernel_shape,
+            assert_output_shape: Some(&[2, 2]),
+        };
+        let (max_pooling_layer, _layer_shape) = max_pooling_layer(inputs, kernel_layer_config);
         let mut outputs = vec![];
         for output_node in &max_pooling_layer {
             let mut output_node = output_node.lock().unwrap();

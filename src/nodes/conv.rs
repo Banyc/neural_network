@@ -6,40 +6,43 @@ use std::{
 use crate::{
     node::SharedNode,
     param::{ParamInjection, SharedParams},
-    tensor::{NonZeroShape, OwnedShape, Stride, Tensor},
+    tensor::{append_tensors, non_zero_to_shape, OwnedShape, Shape, Tensor},
 };
 
 use super::{
     bias::default_bias,
-    kernel::{kernel_layer, KernelParams},
+    kernel::{kernel_layer, KernelLayerConfig, KernelParams},
     linear::linear_node,
     weights::rnd_weights,
 };
 
 #[derive(Clone)]
-pub struct KernelConfig<'a> {
-    pub shape: &'a NonZeroShape,
+pub struct ConvLayerConfig<'a> {
+    pub kernel_layer: KernelLayerConfig<'a>,
     pub initial_weights: Option<&'a dyn Fn() -> SharedParams>,
     pub initial_bias: Option<&'a dyn Fn() -> SharedParams>,
     pub lambda: Option<f64>,
 }
-
 pub fn conv_layer(
     inputs: Tensor<'_, SharedNode>,
-    stride: &Stride,
-    kernel: KernelConfig,
+    config: ConvLayerConfig<'_>,
     param_injection: Option<ParamInjection<'_>>,
 ) -> (Vec<SharedNode>, OwnedShape) {
-    let weights = kernel
+    let weights = config
         .initial_weights
         .as_ref()
         .map(|f| f())
         .unwrap_or_else(|| {
-            let num_kernel_params = kernel.shape.iter().map(|x| x.get()).product();
+            let num_kernel_params = config
+                .kernel_layer
+                .kernel_shape
+                .iter()
+                .map(|x| x.get())
+                .product();
             let weights = rnd_weights(num_kernel_params);
             Arc::new(Mutex::new(weights))
         });
-    let bias = kernel
+    let bias = config
         .initial_bias
         .as_ref()
         .map(|f| f())
@@ -58,33 +61,42 @@ pub fn conv_layer(
             params.inputs,
             Some(Arc::clone(&weights)),
             Some(Arc::clone(&bias)),
-            kernel.lambda,
+            config.lambda,
             None,
         );
         feature_node.unwrap()
     };
-    kernel_layer(inputs, stride, kernel.shape, create_filter)
+    kernel_layer(inputs, config.kernel_layer, create_filter)
 }
 
+#[derive(Clone)]
+pub struct DeepConvLayerConfig<'a> {
+    pub depth: NonZeroUsize,
+    pub conv: ConvLayerConfig<'a>,
+    pub assert_output_shape: Option<&'a Shape>,
+}
 pub fn deep_conv_layer(
     inputs: Tensor<'_, SharedNode>,
-    stride: &Stride,
-    kernel: KernelConfig,
-    depth: NonZeroUsize,
+    config: DeepConvLayerConfig<'_>,
     mut param_injection: Option<ParamInjection<'_>>,
-) -> (Vec<Vec<SharedNode>>, OwnedShape) {
+) -> (Vec<SharedNode>, OwnedShape) {
     let mut kernel_layers = vec![];
     let mut kernel_layer_shape = None;
-    for depth in 0..depth.get() {
+    for depth in 0..config.depth.get() {
         let param_injection = param_injection
             .as_mut()
             .map(|x| x.name_append(&format!(":depth.{depth}")));
-        let (layer, shape) = conv_layer(inputs, stride, kernel.clone(), param_injection);
+        let (layer, shape) = conv_layer(inputs, config.conv.clone(), param_injection);
         if let Some(layer_shape) = &kernel_layer_shape {
             assert_eq!(&shape, layer_shape);
         }
         kernel_layer_shape = Some(shape);
         kernel_layers.push(layer);
     }
-    (kernel_layers, kernel_layer_shape.unwrap())
+    let (layer, shape) = append_tensors(kernel_layers, &kernel_layer_shape.unwrap());
+    let shape = non_zero_to_shape(&shape);
+    if let Some(assert_output_shape) = config.assert_output_shape {
+        assert_eq!(assert_output_shape, shape);
+    }
+    (layer, shape)
 }

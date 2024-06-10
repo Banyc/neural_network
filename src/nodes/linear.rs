@@ -40,24 +40,27 @@ pub fn linear_node(
     Ok(bias_node)
 }
 
+pub struct LinearLayerConfig<'a> {
+    pub depth: NonZeroUsize,
+    pub initial_weights: Option<&'a dyn Fn() -> SharedParams>,
+    pub initial_bias: Option<&'a dyn Fn() -> SharedParams>,
+    pub lambda: Option<f64>,
+}
 pub fn linear_layer(
     input_nodes: Vec<SharedNode>,
-    depth: NonZeroUsize,
-    initial_weights: Option<&dyn Fn() -> SharedParams>,
-    initial_bias: Option<&dyn Fn() -> SharedParams>,
-    lambda: Option<f64>,
+    config: LinearLayerConfig,
     mut param_injection: Option<ParamInjection<'_>>,
 ) -> Result<Vec<SharedNode>, WeightNodeError> {
     let mut layer = vec![];
-    for depth in 0..depth.get() {
+    for depth in 0..config.depth.get() {
         let param_injection = param_injection
             .as_mut()
             .map(|x| x.name_append(&format!(":depth.{depth}")));
         let linear_node = linear_node(
             input_nodes.clone(),
-            initial_weights.as_ref().map(|f| f()),
-            initial_bias.as_ref().map(|f| f()),
-            lambda,
+            config.initial_weights.as_ref().map(|f| f()),
+            config.initial_bias.as_ref().map(|f| f()),
+            config.lambda,
             param_injection,
         )?;
         layer.push(linear_node);

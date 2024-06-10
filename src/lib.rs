@@ -1,3 +1,4 @@
+pub mod layers;
 pub mod neural_network;
 pub mod node;
 pub mod nodes;

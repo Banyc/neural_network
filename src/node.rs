@@ -74,6 +74,7 @@ pub struct Node {
     batch_cache: Vec<Cache>,
     computation: Arc<dyn NodeComputation + Sync + Send>,
 
+    is_in_bfs_queue: bool,
     buf: ReusedBuffers<f64>,
 }
 
@@ -106,6 +107,7 @@ impl Node {
             successor_len: 0,
             batch_cache: vec![],
             computation,
+            is_in_bfs_queue: false,
             buf: ReusedBuffers::new(u8::MAX as _),
         };
         this.check_rep();
@@ -384,6 +386,12 @@ impl Node {
     pub fn parameters(&self) -> &SharedParams {
         &self.parameters
     }
+    pub fn is_in_bfs_queue(&self) -> bool {
+        self.is_in_bfs_queue
+    }
+    pub fn set_is_in_bfs_queue(&mut self, value: bool) {
+        self.is_in_bfs_queue = value;
+    }
 }
 
 pub fn clone_node_batch(nodes: &[SharedNode]) -> Vec<SharedNode> {
@@ -420,11 +428,19 @@ fn bfs_operands(root_node: &SharedNode, f: impl Fn(&mut Node) -> bool) {
 
     while let Some(n) = q.pop_front() {
         let mut n = n.lock().unwrap();
+        n.set_is_in_bfs_queue(false);
         let should_visit_children = f(&mut n);
         if !should_visit_children {
             continue;
         }
         for op in &n.operands {
+            {
+                let mut op = op.lock().unwrap();
+                if op.is_in_bfs_queue() {
+                    continue;
+                }
+                op.set_is_in_bfs_queue(true);
+            }
             q.push_back(Arc::clone(op));
         }
     }

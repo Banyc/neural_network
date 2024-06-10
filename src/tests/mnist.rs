@@ -9,7 +9,7 @@ use strict_num::FiniteF64;
 
 use crate::{
     layers::{conv_relu_max_pooling_layer, dense_relu_layer},
-    neural_network::{AccurateFnParams, EvalOption, NeuralNetwork, TrainOption},
+    neural_network::{AccurateFnParams, NeuralNetwork, TrainOption},
     node::SharedNode,
     nodes::{
         conv::{ConvLayerConfig, DeepConvLayerConfig},
@@ -35,29 +35,34 @@ const PARAMS_TXT: &str = "local/mnist/params.ron";
 
 #[ignore]
 #[test]
-fn mnist_converge() {
+fn converge() {
     let train_dataset = read_mnist(TRAIN_IMAGE, TRAIN_LABEL).unwrap();
     println!("inputs: {:?}", train_dataset[0]);
-    let mut nn = neural_network(0.1, None);
-    let _acc = nn.accuracy(&train_dataset[0..1], accurate);
-    {
-        let option = EvalOption::ClearCache;
-        let loss = nn.compute_error(&train_dataset[0], option, 0);
+    let mut nn = neural_network(None);
+    let loss = nn.error(&train_dataset[0..1]);
+    println!("loss: {loss}");
+    let mut step_size = loss;
+    let mut prev_loss = loss;
+    loop {
+        let max_steps = 32;
+        let option = TrainOption::StochasticGradientDescent;
+        nn.train(&train_dataset[0..1], step_size, max_steps, option);
+
+        let eval = nn.evaluate(&train_dataset[0]);
+        println!("eval: {eval:?}");
+        let acc = nn.accuracy(&train_dataset[0..1], accurate);
+        if acc == 1. {
+            break;
+        }
+        let loss = nn.error(&train_dataset[0..1]);
         println!("loss: {loss}");
+        if prev_loss == loss {
+            nn = neural_network(None);
+            continue;
+        }
+        prev_loss = loss;
+        step_size = loss;
     }
-    let max_steps = 128;
-    let option = TrainOption::StochasticGradientDescent;
-    nn.train(&train_dataset[0..1], max_steps, option);
-    {
-        let option = EvalOption::ClearCache;
-        let loss = nn.compute_error(&train_dataset[0], option, 0);
-        println!("loss: {loss}");
-    }
-    let eval = nn.evaluate(&train_dataset[0]);
-    println!("eval: {eval:?}");
-    let acc = nn.accuracy(&train_dataset[0..1], accurate);
-    println!("acc: {acc}");
-    assert_eq!(acc, 1.);
 }
 
 #[ignore]
@@ -71,37 +76,26 @@ fn mnist() {
         injector: &mut param_injector,
         name: "".into(),
     };
-    let mut nn = neural_network(0.1, Some(param_injection));
+    let mut nn = neural_network(Some(param_injection));
+    let loss = nn.error(&train_dataset[0..1]);
+    println!("loss: {loss}");
+    let mut step_size = loss;
     for i in 0.. {
         println!("epoch: {i}");
         let max_steps = 2 << 10;
         let option = TrainOption::StochasticGradientDescent;
-        nn.train(&train_dataset, max_steps, option);
+        nn.train(&train_dataset, step_size, max_steps, option);
         let acc = nn.accuracy(&test_dataset[..128], accurate);
         println!("acc: {acc}");
-        {
-            let mut losses = vec![];
-            for inputs in &test_dataset[..128] {
-                let option = EvalOption::ClearCache;
-                let loss = nn.compute_error(inputs, option, 0);
-                losses.push(loss);
-            }
-            let loss = losses
-                .iter()
-                .copied()
-                .map(|x| x / losses.len() as f64)
-                .sum::<f64>();
-            println!("loss: {loss}");
-        }
+        let loss = nn.error(&test_dataset[..128]);
+        println!("loss: {loss}");
+        step_size = loss;
         save_params(&param_injector.collect_parameters(), PARAMS_BIN, PARAMS_TXT).unwrap();
     }
 }
 
 /// a LeNet variant
-fn neural_network(
-    step_size: f64,
-    mut param_injection: Option<ParamInjection<'_>>,
-) -> NeuralNetwork {
+fn neural_network(mut param_injection: Option<ParamInjection<'_>>) -> NeuralNetwork {
     let width = 28;
     let height = 28;
     let input_nodes = input_node_batch(InputNodeBatchParams {
@@ -197,7 +191,7 @@ fn neural_network(
         .chain(label_nodes)
         .collect::<Vec<SharedNode>>();
     let error_node = Arc::new(Mutex::new(mse_node(error_node_inputs)));
-    NeuralNetwork::new(outputs, error_node, step_size)
+    NeuralNetwork::new(outputs, error_node)
 }
 
 fn read_mnist(image: impl AsRef<Path>, label: impl AsRef<Path>) -> std::io::Result<Vec<Vec<f64>>> {

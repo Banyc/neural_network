@@ -12,27 +12,21 @@ pub struct NeuralNetwork {
     terminal_nodes: Vec<SharedNode>,
     /// output: the error between the prediction and the label
     error_node: SharedNode,
-    /// learning rate
-    step_size: f64,
 }
 impl NeuralNetwork {
     fn check_rep(&self) {}
 
-    pub fn new(
-        terminal_nodes: Vec<SharedNode>,
-        error_node: SharedNode,
-        step_size: f64,
-    ) -> NeuralNetwork {
+    pub fn new(terminal_nodes: Vec<SharedNode>, error_node: SharedNode) -> NeuralNetwork {
         let this = NeuralNetwork {
             terminal_nodes,
             error_node,
-            step_size,
         };
         this.check_rep();
         this
     }
 
-    pub fn backpropagation_step<I>(&mut self, samples: &[I])
+    /// `step_size`: learning rate
+    pub fn backpropagation_step<I>(&mut self, samples: &[I], step_size: f64)
     where
         I: AsRef<[f64]>,
     {
@@ -40,7 +34,7 @@ impl NeuralNetwork {
             let inputs = inputs.as_ref();
             self.compute_error(inputs, EvalOption::KeepCache, batch_index);
         }
-        graph_do_gradient_descent_steps(&self.error_node, self.step_size);
+        graph_do_gradient_descent_steps(&self.error_node, step_size);
         self.check_rep();
     }
 
@@ -60,7 +54,23 @@ impl NeuralNetwork {
         outputs
     }
 
-    pub fn compute_error(&mut self, inputs: &[f64], option: EvalOption, batch_index: usize) -> f64 {
+    pub fn error<S>(&mut self, dataset: &[S]) -> f64
+    where
+        S: AsRef<[f64]>,
+    {
+        let option = EvalOption::ClearCache;
+        let batch_index = 0;
+        let mut progress_printer = ProgressPrinter::new();
+        let mut error = 0.;
+        for (i, inputs) in dataset.iter().enumerate() {
+            let err = self.compute_error(inputs.as_ref(), option, batch_index);
+            error += err / dataset.len() as f64;
+            progress_printer.print_progress(i, dataset.len());
+        }
+        error
+    }
+
+    fn compute_error(&mut self, inputs: &[f64], option: EvalOption, batch_index: usize) -> f64 {
         let mut error_node = self.error_node.lock().unwrap();
         let output = error_node.evaluate_once(inputs, batch_index);
         drop(error_node);
@@ -71,7 +81,7 @@ impl NeuralNetwork {
         output
     }
 
-    pub fn train<S>(&mut self, dataset: &[S], max_steps: usize, option: TrainOption)
+    pub fn train<S>(&mut self, dataset: &[S], step_size: f64, max_steps: usize, option: TrainOption)
     where
         S: AsRef<[f64]>,
     {
@@ -89,7 +99,7 @@ impl NeuralNetwork {
                 let dataset_index: usize = rng.gen_range(0..dataset.len());
                 batch_input.push(dataset[dataset_index].as_ref());
             }
-            self.backpropagation_step(&batch_input);
+            self.backpropagation_step(&batch_input, step_size);
             progress_printer.print_progress(i, max_steps);
         }
         self.check_rep();

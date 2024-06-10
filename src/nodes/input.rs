@@ -14,6 +14,27 @@ pub fn input_node(input_index: usize) -> Node {
 }
 
 #[derive(Debug, Clone)]
+pub struct InputNodeGen {
+    pub next_index: usize,
+}
+impl InputNodeGen {
+    pub fn new() -> Self {
+        Self { next_index: 0 }
+    }
+
+    pub fn gen(&mut self, len: usize) -> Vec<SharedNode> {
+        let start = self.next_index;
+        self.next_index = start + len;
+        input_node_batch(InputNodeBatchParams { start, len })
+    }
+}
+impl Default for InputNodeGen {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct InputNodeBatchParams {
     pub start: usize,
     pub len: usize,

@@ -13,7 +13,7 @@ use crate::{
     node::SharedNode,
     nodes::{
         conv::{ConvLayerConfig, DeepConvLayerConfig},
-        input::{input_node_batch, InputNodeBatchParams},
+        input::InputNodeGen,
         kernel::KernelLayerConfig,
         linear::LinearLayerConfig,
         mse::mse_node,
@@ -98,10 +98,8 @@ fn mnist() {
 fn neural_network(mut param_injection: Option<ParamInjection<'_>>) -> NeuralNetwork {
     let width = 28;
     let height = 28;
-    let input_nodes = input_node_batch(InputNodeBatchParams {
-        start: 0,
-        len: width * height,
-    });
+    let mut input_node_gen = InputNodeGen::new();
+    let input_nodes = input_node_gen.gen(width * height);
     let (layer, shape) = {
         let shape = [width, height];
         let inputs = Tensor::new(&input_nodes, &shape).unwrap();
@@ -181,10 +179,7 @@ fn neural_network(mut param_injection: Option<ParamInjection<'_>>) -> NeuralNetw
         let param_injection = param_injection.as_mut().map(|x| x.name_append(":dense.2"));
         dense_relu_layer(layer, config, param_injection)
     };
-    let label_nodes = input_node_batch(InputNodeBatchParams {
-        start: input_nodes.len(),
-        len: CLASSES,
-    });
+    let label_nodes = input_node_gen.gen(CLASSES);
     let error_node_inputs = outputs
         .iter()
         .cloned()

@@ -1,6 +1,7 @@
-use std::{cell::RefCell, sync::Arc};
+use std::sync::Arc;
 
 use crate::{
+    mut_cell::MutCell,
     node::{Node, NodeComputation, SharedNode},
     param::empty_shared_params,
 };
@@ -43,7 +44,7 @@ pub fn input_node_batch(params: InputNodeBatchParams) -> Vec<SharedNode> {
     (0..params.len)
         .map(|i| {
             let node = input_node(params.start + i);
-            Arc::new(RefCell::new(node))
+            Arc::new(MutCell::new(node))
         })
         .collect()
 }

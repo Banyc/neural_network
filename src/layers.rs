@@ -1,6 +1,7 @@
-use std::{cell::RefCell, sync::Arc};
+use std::sync::Arc;
 
 use crate::{
+    mut_cell::MutCell,
     node::SharedNode,
     nodes::{
         conv::{deep_conv_layer, DeepConvLayerConfig},
@@ -55,7 +56,7 @@ impl Activation {
                 Activation::ReLu => relu_node(x),
                 Activation::Swish => swish_node(x),
             })
-            .map(|x| Arc::new(RefCell::new(x)))
+            .map(|x| Arc::new(MutCell::new(x)))
             .collect::<Vec<SharedNode>>()
     }
 }

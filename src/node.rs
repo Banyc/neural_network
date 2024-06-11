@@ -8,13 +8,13 @@
 //! - $E$: the outmost function represented by the root node of the computation graph
 //!   - "root" in code
 
-use std::{cell::RefCell, collections::VecDeque, sync::Arc};
+use std::{collections::VecDeque, sync::Arc};
 
 use thiserror::Error;
 
-use crate::{param::SharedParams, reused_buf::ReusedBuffers};
+use crate::{mut_cell::MutCell, param::SharedParams, reused_buf::ReusedBuffers};
 
-pub type SharedNode = Arc<RefCell<Node>>;
+pub type SharedNode = Arc<MutCell<Node>>;
 
 /// The function of this node should be
 /// ```math
@@ -88,7 +88,7 @@ impl Node {
     pub fn new(
         operands: Vec<SharedNode>,
         computation: Arc<dyn NodeComputation + Sync + Send>,
-        parameters: Arc<RefCell<Vec<f64>>>,
+        parameters: Arc<MutCell<Vec<f64>>>,
     ) -> Node {
         operands.iter().for_each(|operand| {
             let mut operand = operand.borrow_mut();

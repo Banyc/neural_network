@@ -1,9 +1,10 @@
-use std::{cell::RefCell, io::Read, num::NonZeroUsize, path::Path, sync::Arc};
+use std::{io::Read, num::NonZeroUsize, path::Path, sync::Arc};
 
 use strict_num::FiniteF64;
 
 use crate::{
     layers::{conv_max_pooling_layer, dense_layer, Activation},
+    mut_cell::MutCell,
     neural_network::{AccurateFnParams, NeuralNetwork, TrainOption},
     node::SharedNode,
     nodes::{
@@ -180,7 +181,7 @@ fn neural_network(mut param_injection: Option<ParamInjection<'_>>) -> NeuralNetw
         .cloned()
         .chain(label_nodes)
         .collect::<Vec<SharedNode>>();
-    let error_node = Arc::new(RefCell::new(mse_node(error_node_inputs)));
+    let error_node = Arc::new(MutCell::new(mse_node(error_node_inputs)));
     NeuralNetwork::new(outputs, error_node)
 }
 

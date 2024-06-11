@@ -1,8 +1,10 @@
-use std::{cell::RefCell, collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
-pub type SharedParams = Arc<RefCell<Vec<f64>>>;
+use crate::mut_cell::MutCell;
+
+pub type SharedParams = Arc<MutCell<Vec<f64>>>;
 pub fn empty_shared_params() -> SharedParams {
-    Arc::new(RefCell::new(vec![]))
+    Arc::new(MutCell::new(vec![]))
 }
 
 #[derive(Debug)]

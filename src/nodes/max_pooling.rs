@@ -1,6 +1,7 @@
-use std::{cell::RefCell, sync::Arc};
+use std::sync::Arc;
 
 use crate::{
+    mut_cell::MutCell,
     node::SharedNode,
     tensor::{OwnedShape, Tensor},
 };
@@ -15,7 +16,7 @@ pub fn max_pooling_layer(
     config: KernelLayerConfig<'_>,
 ) -> (Vec<SharedNode>, OwnedShape) {
     let create_filter =
-        |params: KernelParams| -> SharedNode { Arc::new(RefCell::new(max_node(params.inputs))) };
+        |params: KernelParams| -> SharedNode { Arc::new(MutCell::new(max_node(params.inputs))) };
     kernel_layer(inputs, config, create_filter)
 }
 

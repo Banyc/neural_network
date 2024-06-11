@@ -3,7 +3,7 @@ use std::{cell::RefCell, io::Read, num::NonZeroUsize, path::Path, sync::Arc};
 use strict_num::FiniteF64;
 
 use crate::{
-    layers::{conv_relu_max_pooling_layer, dense_relu_layer},
+    layers::{conv_max_pooling_layer, dense_layer, Activation},
     neural_network::{AccurateFnParams, NeuralNetwork, TrainOption},
     node::SharedNode,
     nodes::{
@@ -90,6 +90,7 @@ fn train() {
 
 /// a LeNet variant
 fn neural_network(mut param_injection: Option<ParamInjection<'_>>) -> NeuralNetwork {
+    let activation = Activation::Swish;
     let width = 28;
     let height = 28;
     let mut input_node_gen = InputNodeGen::new();
@@ -117,7 +118,7 @@ fn neural_network(mut param_injection: Option<ParamInjection<'_>>) -> NeuralNetw
             assert_output_shape: Some(&[12, 12, 6]),
         };
         let param_injection = param_injection.as_mut().map(|x| x.name_append(":conv.0"));
-        conv_relu_max_pooling_layer(inputs, conv, max_pooling, param_injection)
+        conv_max_pooling_layer(inputs, conv, max_pooling, &activation, param_injection)
     };
     let (layer, _shape) = {
         let inputs = Tensor::new(&layer, &shape).unwrap();
@@ -141,7 +142,7 @@ fn neural_network(mut param_injection: Option<ParamInjection<'_>>) -> NeuralNetw
             assert_output_shape: Some(&[4, 4, 16]),
         };
         let param_injection = param_injection.as_mut().map(|x| x.name_append(":conv.1"));
-        conv_relu_max_pooling_layer(inputs, conv, max_pooling, param_injection)
+        conv_max_pooling_layer(inputs, conv, max_pooling, &activation, param_injection)
     };
     let layer = {
         let config = LinearLayerConfig {
@@ -151,7 +152,7 @@ fn neural_network(mut param_injection: Option<ParamInjection<'_>>) -> NeuralNetw
             lambda: None,
         };
         let param_injection = param_injection.as_mut().map(|x| x.name_append(":dense.0"));
-        dense_relu_layer(layer, config, param_injection)
+        dense_layer(layer, config, &activation, param_injection)
     };
     let layer = {
         let config = LinearLayerConfig {
@@ -161,7 +162,7 @@ fn neural_network(mut param_injection: Option<ParamInjection<'_>>) -> NeuralNetw
             lambda: None,
         };
         let param_injection = param_injection.as_mut().map(|x| x.name_append(":dense.1"));
-        dense_relu_layer(layer, config, param_injection)
+        dense_layer(layer, config, &activation, param_injection)
     };
     let outputs = {
         let config = LinearLayerConfig {
@@ -171,7 +172,7 @@ fn neural_network(mut param_injection: Option<ParamInjection<'_>>) -> NeuralNetw
             lambda: None,
         };
         let param_injection = param_injection.as_mut().map(|x| x.name_append(":dense.2"));
-        dense_relu_layer(layer, config, param_injection)
+        dense_layer(layer, config, &activation, param_injection)
     };
     let label_nodes = input_node_gen.gen(CLASSES);
     let error_node_inputs = outputs

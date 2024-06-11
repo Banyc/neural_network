@@ -5,17 +5,19 @@ use crate::{
     param::empty_shared_params,
 };
 
+use super::sigmoid::{sigmoid, sigmoid_derivative};
+
 /// ```math
-/// f(x) = 1 + e^x
+/// f(x) = x \text{sigmoid}(x)
 /// ```
-pub fn sigmoid_node(operand: SharedNode) -> Node {
-    let computation = SigmoidNodeComputation {};
+pub fn swish_node(operand: SharedNode) -> Node {
+    let computation = SwishNodeComputation {};
     Node::new(vec![operand], Arc::new(computation), empty_shared_params())
 }
 
 #[derive(Debug)]
-struct SigmoidNodeComputation {}
-impl NodeComputation for SigmoidNodeComputation {
+struct SwishNodeComputation {}
+impl NodeComputation for SwishNodeComputation {
     fn compute_output(
         &self,
         parameters: &[f64],
@@ -24,7 +26,7 @@ impl NodeComputation for SigmoidNodeComputation {
     ) -> f64 {
         assert!(parameters.is_empty());
         assert_eq!(operand_outputs.len(), 1);
-        sigmoid(operand_outputs[0])
+        swish(operand_outputs[0])
     }
 
     fn compute_gradient_of_this_at_operand(
@@ -35,7 +37,7 @@ impl NodeComputation for SigmoidNodeComputation {
     ) -> Vec<f64> {
         assert!(parameters.is_empty());
         assert_eq!(operand_outputs.len(), 1);
-        buf.extend([sigmoid_derivative(operand_outputs[0])]);
+        buf.extend([swish_derivative(operand_outputs[0])]);
         buf
     }
 
@@ -51,12 +53,10 @@ impl NodeComputation for SigmoidNodeComputation {
     }
 }
 
-pub fn sigmoid(x: f64) -> f64 {
-    let exp = x.exp();
-    exp / (exp + 1.0)
+fn swish(x: f64) -> f64 {
+    x * sigmoid(x)
 }
 
-pub fn sigmoid_derivative(x: f64) -> f64 {
-    let sigmoid = sigmoid(x);
-    (1.0 - sigmoid) * sigmoid
+fn swish_derivative(x: f64) -> f64 {
+    sigmoid(x) + x * sigmoid_derivative(x)
 }

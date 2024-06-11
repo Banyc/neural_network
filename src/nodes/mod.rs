@@ -16,6 +16,7 @@ pub mod relu;
 pub mod sigmoid;
 pub mod softmax;
 pub mod sum;
+pub mod swish;
 #[cfg(test)]
 mod tests;
 pub mod weights;

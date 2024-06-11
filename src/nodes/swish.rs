@@ -5,7 +5,7 @@ use crate::{
     param::empty_shared_params,
 };
 
-use super::sigmoid::{sigmoid, sigmoid_derivative};
+use super::sigmoid::sigmoid;
 
 /// ```math
 /// f(x) = x \text{sigmoid}(x)
@@ -58,5 +58,8 @@ fn swish(x: f64) -> f64 {
 }
 
 fn swish_derivative(x: f64) -> f64 {
-    sigmoid(x) + x * sigmoid_derivative(x)
+    // sigmoid(x) + x * sigmoid_derivative(x)
+
+    let swish = swish(x);
+    swish + sigmoid(x) * (1. - swish)
 }

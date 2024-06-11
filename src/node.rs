@@ -67,7 +67,7 @@ pub trait NodeComputation: core::fmt::Debug {
 pub struct Node {
     parameters: SharedParams,
     operands: Vec<SharedNode>,
-    successor_len: usize,
+    num_successors: usize,
     batch_cache: Vec<Cache>,
     computation: Arc<dyn NodeComputation + Sync + Send>,
 
@@ -92,16 +92,16 @@ impl Node {
     ) -> Node {
         operands.iter().for_each(|operand| {
             let mut operand = operand.borrow_mut();
-            operand.increment_successor_len();
+            operand.increment_num_successors();
         });
         let this = Self {
             parameters,
             operands,
-            successor_len: 0,
+            num_successors: 0,
             batch_cache: vec![],
             computation,
             is_in_bfs_queue: false,
-            buf: ReusedBuffers::new(u8::MAX as _),
+            buf: ReusedBuffers::new(u8::MAX.into()),
         };
         this.check_rep();
         this
@@ -143,7 +143,7 @@ impl Node {
         for cache in &self.batch_cache {
             if cache
                 .backpropagate()
-                .gradient_of_root_at_this(self.successor_len)
+                .gradient_of_root_at_this(self.num_successors)
                 .is_none()
             {
                 return Err(
@@ -156,8 +156,8 @@ impl Node {
         Ok(())
     }
 
-    fn increment_successor_len(&mut self) {
-        self.successor_len += 1;
+    fn increment_num_successors(&mut self) {
+        self.num_successors += 1;
         self.check_rep();
     }
 
@@ -273,7 +273,7 @@ impl Node {
         Ok(
             match cache
                 .backpropagate()
-                .gradient_of_root_at_this(self.successor_len)
+                .gradient_of_root_at_this(self.num_successors)
             {
                 Some(x) => x,
                 None => {
@@ -361,37 +361,47 @@ pub fn clone_node_batch(nodes: &[SharedNode]) -> Vec<SharedNode> {
 pub fn graph_delete_caches(root_note: &SharedNode) {
     let f = |n: &mut Node| {
         if n.batch_cache.is_empty() {
-            return false;
+            return BfsNextMove::Noop;
         }
         n.batch_cache.clear();
-        true
+        BfsNextMove::VisitChildren
     };
     bfs_operands(root_note, f);
 }
 
 pub fn graph_do_gradient_descent_steps(root_note: &SharedNode, step_size: f64) {
     let f = |n: &mut Node| match n.do_gradient_descent_step(step_size) {
-        Ok(_) => true,
+        Ok(_) => BfsNextMove::VisitChildren,
         Err(e) => match e {
-            GradientDescentError::NotReceivingEnoughAddendsOfGradientFromSuccessors => panic!(),
+            GradientDescentError::NotReceivingEnoughAddendsOfGradientFromSuccessors => {
+                BfsNextMove::Reschedule
+            }
             // This node has had it parameters updated already
-            GradientDescentError::NoEvaluationOutputCaches => false,
+            GradientDescentError::NoEvaluationOutputCaches => BfsNextMove::Noop,
         },
     };
     bfs_operands(root_note, f);
 }
 
-/// `f`: Return `false` to trim this branch
-fn bfs_operands(root_node: &SharedNode, f: impl Fn(&mut Node) -> bool) {
+fn bfs_operands<V>(root_node: &SharedNode, visit: V)
+where
+    V: Fn(&mut Node) -> BfsNextMove,
+{
     let mut q = VecDeque::new();
     q.push_back(Arc::clone(root_node));
 
-    while let Some(n) = q.pop_front() {
-        let mut n = n.borrow_mut();
+    while let Some(node) = q.pop_front() {
+        let mut n = node.borrow_mut();
         n.set_is_in_bfs_queue(false);
-        let should_visit_children = f(&mut n);
-        if !should_visit_children {
-            continue;
+        let next_move = visit(&mut n);
+        match next_move {
+            BfsNextMove::Reschedule => {
+                drop(n);
+                q.push_back(node);
+                continue;
+            }
+            BfsNextMove::Noop => continue,
+            BfsNextMove::VisitChildren => (),
         }
         for op in &n.operands {
             {
@@ -404,6 +414,12 @@ fn bfs_operands(root_node: &SharedNode, f: impl Fn(&mut Node) -> bool) {
             q.push_back(Arc::clone(op));
         }
     }
+}
+enum BfsNextMove {
+    /// Put self back to the queue
+    Reschedule,
+    Noop,
+    VisitChildren,
 }
 
 #[derive(Debug, Error)]
@@ -501,13 +517,13 @@ impl BackpropagateCache {
     ///
     /// - $h_i$: the $i$-th immediate successor of this node
     /// - $f$: this node
-    pub fn gradient_of_root_at_this(&self, successor_len: usize) -> Option<f64> {
-        assert!(self.times <= successor_len);
-        if successor_len == 0 {
+    pub fn gradient_of_root_at_this(&self, num_successors: usize) -> Option<f64> {
+        assert!(self.times <= num_successors);
+        if num_successors == 0 {
             // this is the root node
             return Some(1.);
         }
-        if self.times < successor_len {
+        if self.times < num_successors {
             return None;
         }
         Some(self.sum_gradient_of_root_at_this)

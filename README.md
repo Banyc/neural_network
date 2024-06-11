@@ -10,7 +10,7 @@
       - TEST_LABEL: `local/mnist/t10k-labels.idx1-ubyte`
   1.  Run:
       ```sh
-      cargo test --release -- --include-ignored --nocapture mnist
+      cargo test --release -- --include-ignored --nocapture mnist::train
       ```
   1.  Inspect parameters at: `local/mnist/params.ron`
 

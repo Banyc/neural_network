@@ -28,7 +28,6 @@ const TEST_LABEL: &str = "local/mnist/t10k-labels.idx1-ubyte";
 const PARAMS_BIN: &str = "local/mnist/params.bincode";
 const PARAMS_TXT: &str = "local/mnist/params.ron";
 
-#[ignore]
 #[test]
 fn converge() {
     let train_dataset = read_mnist(TRAIN_IMAGE, TRAIN_LABEL).unwrap();
@@ -39,7 +38,7 @@ fn converge() {
     let mut step_size = loss;
     let mut prev_loss = loss;
     loop {
-        let max_steps = 32;
+        let max_steps = 16;
         let option = TrainOption::StochasticGradientDescent;
         nn.train(&train_dataset[0..1], step_size, max_steps, option);
 
@@ -51,7 +50,7 @@ fn converge() {
         }
         let loss = nn.error(&train_dataset[0..1]);
         println!("loss: {loss}");
-        if prev_loss == loss {
+        if (prev_loss - loss).abs() < 0.001 {
             nn = neural_network(None);
             continue;
         }
@@ -62,7 +61,7 @@ fn converge() {
 
 #[ignore]
 #[test]
-fn mnist() {
+fn train() {
     let train_dataset = read_mnist(TRAIN_IMAGE, TRAIN_LABEL).unwrap();
     let test_dataset = read_mnist(TEST_IMAGE, TEST_LABEL).unwrap();
     // epochs

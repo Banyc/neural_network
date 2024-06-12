@@ -12,7 +12,9 @@ use std::{collections::VecDeque, sync::Arc};
 
 use thiserror::Error;
 
-use crate::{mut_cell::MutCell, param::SharedParams, reused_buf::ReusedBuffers};
+use crate::{
+    mut_cell::MutCell, param::SharedParams, reused_buf::ReusedBuffers, two_d_vec::TwoDVec,
+};
 
 pub type SharedNode = Arc<MutCell<Node>>;
 
@@ -62,21 +64,16 @@ pub trait NodeComputation: core::fmt::Debug {
 #[derive(Debug)]
 pub struct NodeContext {
     buf: ReusedBuffers<f64>,
-    buf_buf: ReusedBuffers<Vec<f64>>,
 }
 impl NodeContext {
     pub fn new() -> Self {
         Self {
             buf: ReusedBuffers::new(u16::MAX.into()),
-            buf_buf: ReusedBuffers::new(u16::MAX.into()),
         }
     }
 
     pub fn buf(&mut self) -> &mut ReusedBuffers<f64> {
         &mut self.buf
-    }
-    pub fn buf_buf(&mut self) -> &mut ReusedBuffers<Vec<f64>> {
-        &mut self.buf_buf
     }
 }
 impl Default for NodeContext {
@@ -147,18 +144,18 @@ impl Node {
             operand.evaluate_once(inputs_batch, cx);
         }
 
-        let mut operand_outputs_batch = cx.buf_buf().take();
+        let mut operand_outputs = cx.buf().take();
         for batch_index in 0..inputs_batch.len() {
-            let mut operand_outputs = cx.buf().take();
             for operand in &self.operands {
                 let operand = operand.as_ref().borrow();
                 operand_outputs.push(operand.output().unwrap()[batch_index])
             }
-            operand_outputs_batch.push(operand_outputs);
         }
+        let operand_outputs = TwoDVec::new(operand_outputs, self.operands.len());
 
         let mut output = cx.buf().take();
-        for (inputs, operand_outputs) in inputs_batch.iter().zip(&operand_outputs_batch) {
+        for (batch_index, inputs) in inputs_batch.iter().enumerate() {
+            let operand_outputs = operand_outputs.slice(batch_index);
             let parameters = self.parameters.as_ref().borrow();
             let o = self
                 .computation
@@ -169,7 +166,7 @@ impl Node {
         self.batch_cache = Some(Cache::new(
             EvaluateCache {
                 output,
-                operand_outputs: operand_outputs_batch,
+                operand_outputs,
             },
             cx.buf().take(),
         ));
@@ -372,9 +369,9 @@ impl Node {
         Ok(gradient_of_root_at_parameter)
     }
 
-    pub fn operand_outputs(&self, batch_index: usize) -> Option<&Vec<f64>> {
+    pub fn operand_outputs(&self, batch_index: usize) -> Option<&[f64]> {
         let cache = self.batch_cache.as_ref()?;
-        Some(&cache.eval().operand_outputs[batch_index])
+        Some(cache.eval().operand_outputs(batch_index))
     }
 
     pub fn output(&self) -> Option<&Vec<f64>> {
@@ -513,12 +510,9 @@ impl Cache {
         }
     }
 
-    pub fn put_buf(mut self, cx: &mut NodeContext) {
+    pub fn put_buf(self, cx: &mut NodeContext) {
         cx.buf().put(self.eval.output);
-        while let Some(o) = self.eval.operand_outputs.pop() {
-            cx.buf().put(o);
-        }
-        cx.buf_buf().put(self.eval.operand_outputs);
+        cx.buf().put(self.eval.operand_outputs.into_vec());
         cx.buf()
             .put(self.backpropagate.sum_gradient_of_root_at_this);
     }
@@ -542,7 +536,14 @@ struct EvaluateCache {
     /// the output of this node
     pub output: Vec<f64>,
     /// the output from operands
-    pub operand_outputs: Vec<Vec<f64>>,
+    ///
+    /// shape: (operands.len(), batch_size)
+    pub operand_outputs: TwoDVec<f64>,
+}
+impl EvaluateCache {
+    pub fn operand_outputs(&self, batch_index: usize) -> &[f64] {
+        self.operand_outputs.slice(batch_index)
+    }
 }
 
 #[derive(Debug, Clone)]

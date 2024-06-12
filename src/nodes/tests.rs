@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{mut_cell::MutCell, nodes::input::InputNodeBatchParams};
+use crate::{mut_cell::MutCell, node::NodeContext, nodes::input::InputNodeBatchParams};
 
 use super::{bias::bias_node, input::input_node_batch, relu::relu_node, weights::weight_node};
 
@@ -14,9 +14,10 @@ fn linear_evaluate() {
     let initial_bias = Arc::new(MutCell::new(vec![initial_bias]));
     let weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
     let mut bias_node = bias_node(Arc::new(MutCell::new(weight_node)), Some(initial_bias));
-    let batch_index = 0;
-    let ret = bias_node.evaluate_once(&inputs, batch_index);
-    assert_eq!(ret, (3.0 * 1.0 + 2.0 * 2.0 + 1.0 * 3.0) + 4.0);
+    let mut cx = NodeContext::new();
+    bias_node.evaluate_once(&[&inputs], &mut cx);
+    let output = bias_node.output().unwrap()[0];
+    assert_eq!(output, (3.0 * 1.0 + 2.0 * 2.0 + 1.0 * 3.0) + 4.0);
 }
 
 #[test]
@@ -29,12 +30,13 @@ fn linear_gradient_of_this_at_operand() {
     let initial_bias = Arc::new(MutCell::new(vec![initial_bias]));
     let weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
     let mut bias_node = bias_node(Arc::new(MutCell::new(weight_node)), Some(initial_bias));
+    let mut cx = NodeContext::new();
+    bias_node.evaluate_once(&[&inputs], &mut cx);
     let batch_index = 0;
-    bias_node.evaluate_once(&inputs, batch_index);
-    let ret = bias_node
-        .gradient_of_this_at_operand(batch_index, &bias_node.parameters().borrow(), vec![])
+    let grad = bias_node
+        .gradient_of_this_at_operand(batch_index, &bias_node.parameters().borrow(), &mut cx)
         .unwrap();
-    assert_eq!(&ret, &[1.0]);
+    assert_eq!(&grad, &[1.0]);
 }
 
 #[test]
@@ -47,12 +49,13 @@ fn linear_gradient_of_this_at_parameter() {
     let initial_bias = Arc::new(MutCell::new(vec![initial_bias]));
     let weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
     let mut bias_node = bias_node(Arc::new(MutCell::new(weight_node)), Some(initial_bias));
+    let mut cx = NodeContext::new();
+    bias_node.evaluate_once(&[&inputs], &mut cx);
     let batch_index = 0;
-    bias_node.evaluate_once(&inputs, batch_index);
-    let ret = bias_node
-        .gradient_of_this_at_parameter(batch_index, &bias_node.parameters().borrow(), vec![])
+    let grad = bias_node
+        .gradient_of_this_at_parameter(batch_index, &bias_node.parameters().borrow(), &mut cx)
         .unwrap();
-    assert_eq!(&ret, &[1.0]);
+    assert_eq!(&grad, &[1.0]);
 }
 
 #[test]
@@ -67,12 +70,14 @@ fn linear_with_relu_evaluate() {
     let bias_node = bias_node(Arc::new(MutCell::new(weight_node)), Some(initial_bias));
     let bias_node = Arc::new(MutCell::new(bias_node));
     let mut relu_node = relu_node(Arc::clone(&bias_node));
-    let batch_index = 0;
-    let ret = relu_node.evaluate_once(&inputs, batch_index);
-    assert_eq!(ret, 0.0);
+    let mut cx = NodeContext::new();
+    relu_node.evaluate_once(&[&inputs], &mut cx);
+    let output = relu_node.output().unwrap()[0];
+    assert_eq!(output, 0.0);
     {
         let mut bias_node = bias_node.borrow_mut();
-        let ret = bias_node.evaluate_once(&inputs, batch_index);
-        assert_eq!(ret, -10.0);
+        bias_node.evaluate_once(&[&inputs], &mut cx);
+        let output = bias_node.output().unwrap()[0];
+        assert_eq!(output, -10.0);
     }
 }

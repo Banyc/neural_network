@@ -127,7 +127,10 @@ mod tests {
 
     use std::sync::Arc;
 
-    use crate::nodes::input::{input_node_batch, InputNodeBatchParams};
+    use crate::{
+        node::NodeContext,
+        nodes::input::{input_node_batch, InputNodeBatchParams},
+    };
 
     #[test]
     fn evaluate() {
@@ -136,9 +139,10 @@ mod tests {
         let initial_weights = vec![3.0, 2.0, 1.0];
         let initial_weights = Arc::new(MutCell::new(initial_weights));
         let mut weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
-        let batch_index = 0;
-        let ret = weight_node.evaluate_once(&inputs, batch_index);
-        assert_eq!(ret, 3.0 * 1.0 + 2.0 * 2.0 + 1.0 * 3.0);
+        let mut cx = NodeContext::new();
+        weight_node.evaluate_once(&[&inputs], &mut cx);
+        let output = weight_node.output().unwrap()[0];
+        assert_eq!(output, 3.0 * 1.0 + 2.0 * 2.0 + 1.0 * 3.0);
     }
 
     #[test]
@@ -148,10 +152,11 @@ mod tests {
         let initial_weights = vec![3.0, 2.0, 1.0];
         let initial_weights = Arc::new(MutCell::new(initial_weights));
         let mut weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
+        let mut cx = NodeContext::new();
+        weight_node.evaluate_once(&[&inputs], &mut cx);
         let batch_index = 0;
-        weight_node.evaluate_once(&inputs, batch_index);
         let ret = weight_node
-            .gradient_of_this_at_operand(batch_index, &weight_node.parameters().borrow(), vec![])
+            .gradient_of_this_at_operand(batch_index, &weight_node.parameters().borrow(), &mut cx)
             .unwrap();
         assert_eq!(&ret, &[3.0, 2.0, 1.0]);
     }
@@ -163,10 +168,11 @@ mod tests {
         let initial_weights = vec![3.0, 2.0, 1.0];
         let initial_weights = Arc::new(MutCell::new(initial_weights));
         let mut weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
+        let mut cx = NodeContext::new();
+        weight_node.evaluate_once(&[&inputs], &mut cx);
         let batch_index = 0;
-        weight_node.evaluate_once(&inputs, batch_index);
         let ret = weight_node
-            .gradient_of_this_at_parameter(batch_index, &weight_node.parameters().borrow(), vec![])
+            .gradient_of_this_at_parameter(batch_index, &weight_node.parameters().borrow(), &mut cx)
             .unwrap();
         assert_eq!(&ret, &[1.0, 2.0, 3.0]);
     }

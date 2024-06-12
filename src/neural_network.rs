@@ -2,7 +2,7 @@ use std::time::{Duration, Instant};
 
 use rand::Rng;
 
-use crate::node::{graph_delete_caches, SharedNode};
+use crate::node::{graph_delete_caches, NodeContext, SharedNode};
 
 use super::node::graph_do_gradient_descent_steps;
 
@@ -12,14 +12,18 @@ pub struct NeuralNetwork {
     terminal_nodes: Vec<SharedNode>,
     /// output: the error between the prediction and the label
     error_node: SharedNode,
+    /// global necessity
+    cx: NodeContext,
 }
 impl NeuralNetwork {
     fn check_rep(&self) {}
 
     pub fn new(terminal_nodes: Vec<SharedNode>, error_node: SharedNode) -> NeuralNetwork {
+        let cx = NodeContext::new();
         let this = NeuralNetwork {
             terminal_nodes,
             error_node,
+            cx,
         };
         this.check_rep();
         this
@@ -30,22 +34,26 @@ impl NeuralNetwork {
     where
         I: AsRef<[f64]>,
     {
-        for (batch_index, inputs) in samples.iter().enumerate() {
-            let inputs = inputs.as_ref();
-            self.compute_error(inputs, EvalOption::KeepCache, batch_index);
-        }
-        graph_do_gradient_descent_steps(&self.error_node, step_size);
+        let err = self.compute_error(samples, EvalOption::KeepCache);
+        self.cx.buf().put(err);
+        graph_do_gradient_descent_steps(&self.error_node, step_size, &mut self.cx);
         self.check_rep();
     }
 
-    pub fn evaluate(&mut self, inputs: &[f64]) -> Vec<f64> {
+    /// Return outputs from all terminal nodes
+    ///
+    /// `evaluate()[i]`: outputs from terminal node $i$
+    pub fn evaluate<I>(&mut self, inputs: &[I]) -> Vec<Vec<f64>>
+    where
+        I: AsRef<[f64]>,
+    {
         let mut outputs = vec![];
 
         for terminal_node in &self.terminal_nodes {
             let mut terminal_node = terminal_node.borrow_mut();
-            let batch_index = 0;
-            let output = terminal_node.evaluate_once(inputs, batch_index);
-            outputs.push(output);
+            terminal_node.evaluate_once(inputs, &mut self.cx);
+            let output = terminal_node.output().unwrap();
+            outputs.push(output.clone());
         }
         for terminal_node in &self.terminal_nodes {
             graph_delete_caches(terminal_node);
@@ -59,20 +67,25 @@ impl NeuralNetwork {
         S: AsRef<[f64]>,
     {
         let option = EvalOption::ClearCache;
-        let batch_index = 0;
         let mut progress_printer = ProgressPrinter::new();
         let mut error = 0.;
         for (i, inputs) in dataset.iter().enumerate() {
-            let err = self.compute_error(inputs.as_ref(), option, batch_index);
-            error += err / dataset.len() as f64;
+            let err = self.compute_error(&[inputs.as_ref()], option);
+            error += err[0] / dataset.len() as f64;
+            self.cx.buf().put(err);
             progress_printer.print_progress(i, dataset.len());
         }
         error
     }
 
-    fn compute_error(&mut self, inputs: &[f64], option: EvalOption, batch_index: usize) -> f64 {
+    fn compute_error<I>(&mut self, inputs: &[I], option: EvalOption) -> Vec<f64>
+    where
+        I: AsRef<[f64]>,
+    {
         let mut error_node = self.error_node.borrow_mut();
-        let output = error_node.evaluate_once(inputs, batch_index);
+        error_node.evaluate_once(inputs, &mut self.cx);
+        let mut output = self.cx.buf().take();
+        output.extend(error_node.output().unwrap());
         drop(error_node);
         if matches!(option, EvalOption::ClearCache) {
             graph_delete_caches(&self.error_node);
@@ -116,7 +129,8 @@ impl NeuralNetwork {
         let mut progress_printer = ProgressPrinter::new();
         let mut accurate_count = 0;
         for (i, inputs) in dataset.iter().enumerate() {
-            let eval = self.evaluate(inputs.as_ref());
+            let eval = self.evaluate(&[inputs.as_ref()]);
+            let eval = eval.iter().map(|x| x[0]).collect::<Vec<f64>>();
             let params = AccurateFnParams {
                 inputs: inputs.as_ref(),
                 outputs: eval,

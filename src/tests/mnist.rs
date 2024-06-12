@@ -43,7 +43,8 @@ fn converge() {
         let option = TrainOption::StochasticGradientDescent;
         nn.train(&train_dataset[0..1], step_size, max_steps, option);
 
-        let eval = nn.evaluate(&train_dataset[0]);
+        let eval = nn.evaluate(&train_dataset[0..1]);
+        let eval = eval.iter().map(|x| x[0]).collect::<Vec<f64>>();
         println!("eval: {eval:?}");
         let acc = nn.accuracy(&train_dataset[0..1], accurate);
         if acc == 1. {

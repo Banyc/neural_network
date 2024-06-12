@@ -48,8 +48,8 @@ fn evaluate() {
     let initial_bias = -20.0;
     let initial_bias = Arc::new(MutCell::new(vec![initial_bias]));
     let mut network = single_linear_relu_network(3, Some(initial_weights), Some(initial_bias));
-    let ret = network.evaluate(&[1.0, 2.0, 3.0]);
-    assert_eq!(ret[0], 0.0);
+    let ret = network.evaluate(&[&[1.0, 2.0, 3.0]]);
+    assert_eq!(ret[0][0], 0.0);
 }
 
 #[test]
@@ -62,8 +62,8 @@ fn error() {
     let error = Arc::new(MutCell::new(error));
     let mut network = NeuralNetwork::new(vec![relu], error);
     let inputs = vec![-2.0, 1.0];
-    let ret = network.evaluate(&inputs);
-    assert_eq!(ret[0], 0.0);
+    let ret = network.evaluate(&[&inputs]);
+    assert_eq!(ret[0][0], 0.0);
     let ret = network.error(&[&inputs]);
     assert_eq!(ret, 1.0);
 }
@@ -75,10 +75,10 @@ fn cache_reset() {
     let initial_bias = 3.0;
     let initial_bias = Arc::new(MutCell::new(vec![initial_bias]));
     let mut network = single_linear_relu_network(2, Some(initial_weights), Some(initial_bias));
-    let ret = network.evaluate(&[2.0, -2.0]);
-    assert_eq!(ret[0], 5.0);
-    let ret = network.evaluate(&[6.0, -2.0]);
-    assert!(ret[0] != 5.0);
+    let ret = network.evaluate(&[&[2.0, -2.0]]);
+    assert_eq!(ret[0][0], 5.0);
+    let ret = network.evaluate(&[&[6.0, -2.0]]);
+    assert!(ret[0][0] != 5.0);
 }
 
 #[test]
@@ -119,8 +119,8 @@ fn gradients() {
 
     let inputs = vec![2.0, -2.0, 1.0];
 
-    let ret = network.evaluate(&inputs);
-    assert_eq!(ret[0], 5.0);
+    let ret = network.evaluate(&[&inputs]);
+    assert_eq!(ret[0][0], 5.0);
     let ret = network.error(&[&inputs]);
     assert_eq!(ret, 16.0);
 }
@@ -248,8 +248,8 @@ fn learn_xor_sigmoid() {
         TrainOption::StochasticGradientDescent,
     );
     for inputs in &dataset {
-        let ret = network.evaluate(inputs);
-        assert!((ret[0] - inputs[label_index]).abs() < 0.1);
+        let ret = network.evaluate(&[inputs]);
+        assert!((ret[0][0] - inputs[label_index]).abs() < 0.1);
     }
     let ret = network.accuracy(&dataset, binary_accurate);
     assert_eq!(ret, 1.0);
@@ -318,8 +318,8 @@ fn learn_xor_regularized_sigmoid() {
         TrainOption::StochasticGradientDescent,
     );
     for inputs in &dataset {
-        let ret = network.evaluate(inputs);
-        assert!((ret[0] - inputs[label_index]).abs() < 0.1);
+        let ret = network.evaluate(&[inputs]);
+        assert!((ret[0][0] - inputs[label_index]).abs() < 0.1);
     }
     let ret = network.accuracy(&dataset, binary_accurate);
     assert_eq!(ret, 1.0);
@@ -389,8 +389,8 @@ fn learn_xor_relu() {
         TrainOption::StochasticGradientDescent,
     );
     for inputs in &dataset {
-        let ret = network.evaluate(inputs);
-        assert!((ret[0] - inputs[label_index]).abs() < 0.1);
+        let ret = network.evaluate(&[inputs]);
+        assert!((ret[0][0] - inputs[label_index]).abs() < 0.1);
     }
     let ret = network.accuracy(&dataset, binary_accurate);
     assert_eq!(ret, 1.0);

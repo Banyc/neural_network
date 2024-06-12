@@ -25,6 +25,7 @@ mod tests {
     use std::num::NonZeroUsize;
 
     use crate::{
+        node::NodeContext,
         nodes::input::{input_node_batch, InputNodeBatchParams},
         tensor::{OwnedNonZeroShape, OwnedStride},
     };
@@ -67,9 +68,11 @@ mod tests {
         };
         let (max_pooling_layer, _layer_shape) = max_pooling_layer(inputs, kernel_layer_config);
         let mut outputs = vec![];
+        let mut cx = NodeContext::new();
         for output_node in &max_pooling_layer {
             let mut output_node = output_node.borrow_mut();
-            let output = output_node.evaluate_once(&image, 0);
+            output_node.evaluate_once(&[&image], &mut cx);
+            let output = output_node.output().unwrap()[0];
             outputs.push(output);
         }
         assert_eq!(

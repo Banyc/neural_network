@@ -59,6 +59,32 @@ pub trait NodeComputation: core::fmt::Debug {
     }
 }
 
+#[derive(Debug)]
+pub struct NodeContext {
+    buf: ReusedBuffers<f64>,
+    buf_buf: ReusedBuffers<Vec<f64>>,
+}
+impl NodeContext {
+    pub fn new() -> Self {
+        Self {
+            buf: ReusedBuffers::new(u16::MAX.into()),
+            buf_buf: ReusedBuffers::new(u16::MAX.into()),
+        }
+    }
+
+    pub fn buf(&mut self) -> &mut ReusedBuffers<f64> {
+        &mut self.buf
+    }
+    pub fn buf_buf(&mut self) -> &mut ReusedBuffers<Vec<f64>> {
+        &mut self.buf_buf
+    }
+}
+impl Default for NodeContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// The function of this node should be
 /// ```math
 /// f : \mathbb{R}^n \to \mathbb{R}
@@ -68,11 +94,10 @@ pub struct Node {
     parameters: SharedParams,
     operands: Vec<SharedNode>,
     num_successors: usize,
-    batch_cache: Vec<Cache>,
+    batch_cache: Option<Cache>,
     computation: Arc<dyn NodeComputation + Sync + Send>,
 
     is_in_bfs_queue: bool,
-    buf: ReusedBuffers<f64>,
 }
 
 impl Node {
@@ -80,8 +105,11 @@ impl Node {
         if !cfg!(debug_assertions) {
             return;
         }
-        for cache in &self.batch_cache {
-            assert_eq!(cache.eval().operand_outputs.len(), self.operands.len());
+        if let Some(cache) = &self.batch_cache {
+            assert_eq!(
+                cache.eval().output.len(),
+                cache.backpropagate().sum_gradient_of_root_at_this.len()
+            );
         }
     }
 
@@ -98,60 +126,73 @@ impl Node {
             parameters,
             operands,
             num_successors: 0,
-            batch_cache: vec![],
+            batch_cache: None,
             computation,
             is_in_bfs_queue: false,
-            buf: ReusedBuffers::new(u8::MAX.into()),
         };
         this.check_rep();
         this
     }
 
-    pub fn evaluate_once(&mut self, inputs: &[f64], batch_index: usize) -> f64 {
-        let none = self.batch_cache.len() == batch_index;
-        let some = self.batch_cache.len() == batch_index + 1;
-        assert!(none || some);
-
-        if let Some(cache) = self.batch_cache.get(batch_index) {
-            return cache.eval().output;
+    pub fn evaluate_once<I>(&mut self, inputs_batch: &[I], cx: &mut NodeContext)
+    where
+        I: AsRef<[f64]>,
+    {
+        if self.batch_cache.is_some() {
+            return;
         }
 
-        let mut operand_outputs = self.buf.take();
-        operand_outputs.extend(self.operands.iter_mut().map(|operand| {
+        for operand in &self.operands {
             let mut operand = operand.borrow_mut();
-            operand.evaluate_once(inputs, batch_index)
-        }));
-        let output = {
-            let parameters = self.parameters.borrow();
-            self.computation
-                .compute_output(&parameters, &operand_outputs, inputs)
-        };
+            operand.evaluate_once(inputs_batch, cx);
+        }
 
-        self.batch_cache.push(Cache::new(EvaluateCache {
-            output,
-            operand_outputs,
-        }));
+        let mut operand_outputs_batch = cx.buf_buf().take();
+        for batch_index in 0..inputs_batch.len() {
+            let mut operand_outputs = cx.buf().take();
+            for operand in &self.operands {
+                let operand = operand.as_ref().borrow();
+                operand_outputs.push(operand.output().unwrap()[batch_index])
+            }
+            operand_outputs_batch.push(operand_outputs);
+        }
 
+        let mut output = cx.buf().take();
+        for (inputs, operand_outputs) in inputs_batch.iter().zip(&operand_outputs_batch) {
+            let parameters = self.parameters.as_ref().borrow();
+            let o = self
+                .computation
+                .compute_output(&parameters, operand_outputs, inputs.as_ref());
+            output.push(o)
+        }
+
+        self.batch_cache = Some(Cache::new(
+            EvaluateCache {
+                output,
+                operand_outputs: operand_outputs_batch,
+            },
+            cx.buf().take(),
+        ));
         self.check_rep();
-        output
     }
 
-    pub fn do_gradient_descent_step(&mut self, step_size: f64) -> Result<(), GradientDescentError> {
-        if self.batch_cache.is_empty() {
+    pub fn do_gradient_descent_step(
+        &mut self,
+        step_size: f64,
+        cx: &mut NodeContext,
+    ) -> Result<(), GradientDescentError> {
+        let Some(cache) = &self.batch_cache else {
             return Err(GradientDescentError::NoEvaluationOutputCaches);
         };
-        for cache in &self.batch_cache {
-            if cache
+        if matches!(
+            cache
                 .backpropagate()
-                .gradient_of_root_at_this(self.num_successors)
-                .is_none()
-            {
-                return Err(
-                    GradientDescentError::NotReceivingEnoughAddendsOfGradientFromSuccessors,
-                );
-            }
+                .gradient_of_root_at_this(self.num_successors),
+            GradRootThis::NoEnoughAddends
+        ) {
+            return Err(GradientDescentError::NotReceivingEnoughAddendsOfGradientFromSuccessors);
         }
-        self.adjust_parameters(step_size);
+        self.adjust_parameters(step_size, cx);
         self.check_rep();
         Ok(())
     }
@@ -161,16 +202,15 @@ impl Node {
         self.check_rep();
     }
 
-    fn adjust_parameters(&mut self, step_size: f64) {
-        let batch_size = self.batch_cache.len();
+    fn adjust_parameters(&mut self, step_size: f64, cx: &mut NodeContext) {
+        let batch_size = self.batch_cache.as_ref().unwrap().batch_size();
 
         let mut parameters = self.parameters.borrow_mut();
 
         // Distribute addends of partial derivatives of root at operands to operands
         for batch_index in 0..batch_size {
-            let buf = self.buf.take();
             let gradient_of_this_at_operand = self
-                .gradient_of_this_at_operand(batch_index, &parameters, buf)
+                .gradient_of_this_at_operand(batch_index, &parameters, cx)
                 .unwrap();
             let partial_derivative_of_root_at_this = self
                 .partial_derivative_of_root_at_this(batch_index)
@@ -187,40 +227,34 @@ impl Node {
                     batch_index,
                 );
             }
-            self.buf.put(gradient_of_this_at_operand);
+            cx.buf().put(gradient_of_this_at_operand);
         }
 
-        let mut partial_derivative_of_root_at_parameter = self.buf.take();
+        let mut partial_derivative_of_root_at_parameter = cx.buf().take();
         partial_derivative_of_root_at_parameter
             .extend(core::iter::repeat(0.).take(parameters.len()));
         for batch_index in 0..batch_size {
-            let buf = self.buf.take();
             let gradient_of_root_at_parameter = self
-                .gradient_of_root_at_parameter(batch_index, &parameters, buf)
+                .gradient_of_root_at_parameter(batch_index, &parameters, cx)
                 .unwrap();
-            gradient_of_root_at_parameter.iter().enumerate().for_each(
-                |(i, partial_derivative_of_root_at_parameter_i)| {
-                    partial_derivative_of_root_at_parameter[i] +=
-                        partial_derivative_of_root_at_parameter_i / (batch_size as f64);
-                },
-            );
-            self.buf.put(gradient_of_root_at_parameter);
+            for (batch_sum, x) in partial_derivative_of_root_at_parameter
+                .iter_mut()
+                .zip(gradient_of_root_at_parameter.iter().copied())
+            {
+                *batch_sum += x / (batch_size as f64)
+            }
+            cx.buf().put(gradient_of_root_at_parameter);
         }
-        for (i, partial_derivative_of_root_at_parameter_i) in
-            partial_derivative_of_root_at_parameter
-                .iter()
-                .copied()
-                .enumerate()
+        for (param, partial_derivative_of_root_at_parameter_i) in parameters
+            .iter_mut()
+            .zip(partial_derivative_of_root_at_parameter.iter().copied())
         {
-            let regularization = self.computation.regularization(parameters[i]);
-            parameters[i] -=
-                step_size * (partial_derivative_of_root_at_parameter_i + regularization);
+            let regularization = self.computation.regularization(*param);
+            *param -= step_size * (partial_derivative_of_root_at_parameter_i + regularization);
         }
-        self.buf.put(partial_derivative_of_root_at_parameter);
+        cx.buf().put(partial_derivative_of_root_at_parameter);
         // Clear batch cache
-        while let Some(cache) = self.batch_cache.pop() {
-            cache.put_buf(&mut self.buf);
-        }
+        self.batch_cache.take().unwrap().put_buf(cx);
         self.check_rep();
     }
 
@@ -229,8 +263,8 @@ impl Node {
         addend: f64,
         batch_index: usize,
     ) {
-        let cache = self.batch_cache.get_mut(batch_index).unwrap();
-        cache.backpropagate_mut().add_up(addend);
+        let cache = self.batch_cache.as_mut().unwrap();
+        cache.backpropagate_mut().add_up(addend, batch_index);
         self.check_rep();
     }
 
@@ -244,14 +278,16 @@ impl Node {
         &self,
         batch_index: usize,
         parameters: &[f64],
-        buf: Vec<f64>,
+        cx: &mut NodeContext,
     ) -> Result<Vec<f64>, GradientOfThisAtOperandError> {
         let operand_outputs = self
             .operand_outputs(batch_index)
             .ok_or(GradientOfThisAtOperandError::NoEvaluationOutputCaches)?;
-        Ok(self
-            .computation
-            .compute_gradient_of_this_at_operand(parameters, operand_outputs, buf))
+        let buf = cx.buf().take();
+        let x =
+            self.computation
+                .compute_gradient_of_this_at_operand(parameters, operand_outputs, buf);
+        Ok(x)
     }
 
     /// ```math
@@ -264,7 +300,7 @@ impl Node {
         &self,
         batch_index: usize,
     ) -> Result<f64, GradientOfRootAtThisError> {
-        let Some(cache) = self.batch_cache.get(batch_index) else {
+        let Some(cache) = &self.batch_cache else {
             return Err(
                 GradientOfRootAtThisError::NotReceivingEnoughAddendsOfGradientFromSuccessors,
             );
@@ -275,12 +311,13 @@ impl Node {
                 .backpropagate()
                 .gradient_of_root_at_this(self.num_successors)
             {
-                Some(x) => x,
-                None => {
+                GradRootThis::Some(x) => x[batch_index],
+                GradRootThis::NoEnoughAddends => {
                     return Err(
                     GradientOfRootAtThisError::NotReceivingEnoughAddendsOfGradientFromSuccessors,
-                );
+                    );
                 }
+                GradRootThis::AllOnes => 1.,
             },
         )
     }
@@ -295,16 +332,18 @@ impl Node {
         &self,
         batch_index: usize,
         parameters: &[f64],
-        buf: Vec<f64>,
+        cx: &mut NodeContext,
     ) -> Result<Vec<f64>, GradientOfThisAtParameterError> {
         let operand_outputs = self
             .operand_outputs(batch_index)
             .ok_or(GradientOfThisAtParameterError::NoEvaluationOutputCaches)?;
-        Ok(self.computation.compute_gradient_of_this_at_parameter(
+        let buf = cx.buf().take();
+        let x = self.computation.compute_gradient_of_this_at_parameter(
             parameters,
             operand_outputs.as_ref(),
             buf,
-        ))
+        );
+        Ok(x)
     }
 
     /// ```math
@@ -316,10 +355,10 @@ impl Node {
         &self,
         batch_index: usize,
         parameters: &[f64],
-        buf: Vec<f64>,
+        cx: &mut NodeContext,
     ) -> Result<Vec<f64>, GradientOfRootAtParameterError> {
         let gradient_of_this_at_parameter = self
-            .gradient_of_this_at_parameter(batch_index, parameters, buf)
+            .gradient_of_this_at_parameter(batch_index, parameters, cx)
             .map_err(GradientOfRootAtParameterError::GradientOfThisAtParameter)?;
         let partial_derivative_of_root_at_this = self
             .partial_derivative_of_root_at_this(batch_index)
@@ -334,13 +373,13 @@ impl Node {
     }
 
     pub fn operand_outputs(&self, batch_index: usize) -> Option<&Vec<f64>> {
-        self.batch_cache
-            .get(batch_index)
-            .map(|x| &x.eval().operand_outputs)
+        let cache = self.batch_cache.as_ref()?;
+        Some(&cache.eval().operand_outputs[batch_index])
     }
 
-    pub fn output(&self, batch_index: usize) -> Option<f64> {
-        self.batch_cache.get(batch_index).map(|x| x.eval().output)
+    pub fn output(&self) -> Option<&Vec<f64>> {
+        let cache = self.batch_cache.as_ref()?;
+        Some(&cache.eval().output)
     }
 
     pub fn parameters(&self) -> &SharedParams {
@@ -360,17 +399,21 @@ pub fn clone_node_batch(nodes: &[SharedNode]) -> Vec<SharedNode> {
 
 pub fn graph_delete_caches(root_note: &SharedNode) {
     let f = |n: &mut Node| {
-        if n.batch_cache.is_empty() {
+        if n.batch_cache.is_none() {
             return BfsNextMove::Noop;
         }
-        n.batch_cache.clear();
+        n.batch_cache = None;
         BfsNextMove::VisitChildren
     };
     bfs_operands(root_note, f);
 }
 
-pub fn graph_do_gradient_descent_steps(root_note: &SharedNode, step_size: f64) {
-    let f = |n: &mut Node| match n.do_gradient_descent_step(step_size) {
+pub fn graph_do_gradient_descent_steps(
+    root_note: &SharedNode,
+    step_size: f64,
+    cx: &mut NodeContext,
+) {
+    let f = |n: &mut Node| match n.do_gradient_descent_step(step_size, cx) {
         Ok(_) => BfsNextMove::VisitChildren,
         Err(e) => match e {
             GradientDescentError::NotReceivingEnoughAddendsOfGradientFromSuccessors => {
@@ -383,9 +426,9 @@ pub fn graph_do_gradient_descent_steps(root_note: &SharedNode, step_size: f64) {
     bfs_operands(root_note, f);
 }
 
-fn bfs_operands<V>(root_node: &SharedNode, visit: V)
+fn bfs_operands<V>(root_node: &SharedNode, mut visit: V)
 where
-    V: Fn(&mut Node) -> BfsNextMove,
+    V: FnMut(&mut Node) -> BfsNextMove,
 {
     let mut q = VecDeque::new();
     q.push_back(Arc::clone(root_node));
@@ -462,15 +505,22 @@ struct Cache {
     backpropagate: BackpropagateCache,
 }
 impl Cache {
-    pub fn new(eval: EvaluateCache) -> Self {
+    pub fn new(eval: EvaluateCache, buf: Vec<f64>) -> Self {
+        let batch_size = eval.output.len();
         Self {
             eval,
-            backpropagate: BackpropagateCache::new(),
+            backpropagate: BackpropagateCache::new(batch_size, buf),
         }
     }
 
-    pub fn put_buf(self, buf: &mut ReusedBuffers<f64>) {
-        buf.put(self.eval.operand_outputs);
+    pub fn put_buf(mut self, cx: &mut NodeContext) {
+        cx.buf().put(self.eval.output);
+        while let Some(o) = self.eval.operand_outputs.pop() {
+            cx.buf().put(o);
+        }
+        cx.buf_buf().put(self.eval.operand_outputs);
+        cx.buf()
+            .put(self.backpropagate.sum_gradient_of_root_at_this);
     }
 
     pub fn eval(&self) -> &EvaluateCache {
@@ -482,33 +532,38 @@ impl Cache {
     pub fn backpropagate_mut(&mut self) -> &mut BackpropagateCache {
         &mut self.backpropagate
     }
+    pub fn batch_size(&self) -> usize {
+        self.eval.output.len()
+    }
 }
 
 #[derive(Debug, Clone)]
 struct EvaluateCache {
     /// the output of this node
-    pub output: f64,
-
-    /// the outputs of the operands
-    pub operand_outputs: Vec<f64>,
+    pub output: Vec<f64>,
+    /// the output from operands
+    pub operand_outputs: Vec<Vec<f64>>,
 }
 
 #[derive(Debug, Clone)]
 struct BackpropagateCache {
-    sum_gradient_of_root_at_this: f64,
+    sum_gradient_of_root_at_this: Vec<f64>,
     times: usize,
 }
 impl BackpropagateCache {
-    pub fn new() -> Self {
+    pub fn new(batch_size: usize, mut buf: Vec<f64>) -> Self {
+        buf.extend(core::iter::repeat(0.).take(batch_size));
         Self {
-            sum_gradient_of_root_at_this: 0.,
+            sum_gradient_of_root_at_this: buf,
             times: 0,
         }
     }
 
-    pub fn add_up(&mut self, addend: f64) {
-        self.sum_gradient_of_root_at_this += addend;
-        self.times += 1;
+    pub fn add_up(&mut self, addend: f64, batch_index: usize) {
+        self.sum_gradient_of_root_at_this[batch_index] += addend;
+        if batch_index + 1 == self.sum_gradient_of_root_at_this.len() {
+            self.times += 1;
+        }
     }
 
     /// ```math
@@ -517,15 +572,21 @@ impl BackpropagateCache {
     ///
     /// - $h_i$: the $i$-th immediate successor of this node
     /// - $f$: this node
-    pub fn gradient_of_root_at_this(&self, num_successors: usize) -> Option<f64> {
+    pub fn gradient_of_root_at_this(&self, num_successors: usize) -> GradRootThis<'_> {
         assert!(self.times <= num_successors);
         if num_successors == 0 {
             // this is the root node
-            return Some(1.);
+            return GradRootThis::AllOnes;
         }
         if self.times < num_successors {
-            return None;
+            return GradRootThis::NoEnoughAddends;
         }
-        Some(self.sum_gradient_of_root_at_this)
+        GradRootThis::Some(&self.sum_gradient_of_root_at_this)
     }
+}
+
+enum GradRootThis<'a> {
+    AllOnes,
+    Some(&'a [f64]),
+    NoEnoughAddends,
 }

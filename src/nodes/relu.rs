@@ -67,7 +67,7 @@ fn relu_derivative(x: f64) -> f64 {
 
 #[cfg(test)]
 mod tests {
-    use crate::{mut_cell::MutCell, nodes::input::input_node};
+    use crate::{mut_cell::MutCell, node::NodeContext, nodes::input::input_node};
 
     use super::*;
 
@@ -75,30 +75,33 @@ mod tests {
     fn evaluate_negative() {
         let input_node = input_node(0);
         let mut relu = relu_node(Arc::new(MutCell::new(input_node)));
-        let batch_index = 0;
-        let ret = relu.evaluate_once(&[-2.0], batch_index);
-        assert!(ret >= 0.0);
-        assert!(ret <= 0.0);
+        let mut cx = NodeContext::new();
+        relu.evaluate_once(&[&[-2.0]], &mut cx);
+        let output = relu.output().unwrap()[0];
+        assert!(output >= 0.0);
+        assert!(output <= 0.0);
     }
 
     #[test]
     fn evaluate_positive() {
         let input_node = input_node(0);
         let mut relu = relu_node(Arc::new(MutCell::new(input_node)));
-        let batch_index = 0;
-        let ret = relu.evaluate_once(&[3.0], batch_index);
-        assert!(ret >= 3.0);
-        assert!(ret <= 3.0);
+        let mut cx = NodeContext::new();
+        relu.evaluate_once(&[&[3.0]], &mut cx);
+        let output = relu.output().unwrap()[0];
+        assert!(output >= 3.0);
+        assert!(output <= 3.0);
     }
 
     #[test]
     fn positive_gradient_of_this_at_operand() {
         let input_node = input_node(0);
         let mut relu = relu_node(Arc::new(MutCell::new(input_node)));
+        let mut cx = NodeContext::new();
+        relu.evaluate_once(&[&[3.0]], &mut cx);
         let batch_index = 0;
-        relu.evaluate_once(&[3.0], batch_index);
         let ret = relu
-            .gradient_of_this_at_operand(batch_index, &relu.parameters().borrow(), vec![])
+            .gradient_of_this_at_operand(batch_index, &relu.parameters().borrow(), &mut cx)
             .unwrap();
         assert!(ret[0] >= 1.0);
         assert!(ret[0] <= 1.0);
@@ -108,10 +111,11 @@ mod tests {
     fn negative_gradient_of_this_at_operand() {
         let input_node = input_node(0);
         let mut relu = relu_node(Arc::new(MutCell::new(input_node)));
+        let mut cx = NodeContext::new();
+        relu.evaluate_once(&[&[-3.0]], &mut cx);
         let batch_index = 0;
-        relu.evaluate_once(&[-3.0], batch_index);
         let ret = relu
-            .gradient_of_this_at_operand(batch_index, &relu.parameters().borrow(), vec![])
+            .gradient_of_this_at_operand(batch_index, &relu.parameters().borrow(), &mut cx)
             .unwrap();
         assert!(ret[0] >= 0.0);
         assert!(ret[0] <= 0.0);
@@ -121,10 +125,11 @@ mod tests {
     fn empty_gradient_of_this_at_parameter() {
         let input_node = input_node(0);
         let mut relu = relu_node(Arc::new(MutCell::new(input_node)));
+        let mut cx = NodeContext::new();
+        relu.evaluate_once(&[&[3.0]], &mut cx);
         let batch_index = 0;
-        relu.evaluate_once(&[3.0], batch_index);
         let ret = relu
-            .gradient_of_this_at_parameter(0, &relu.parameters().borrow(), vec![])
+            .gradient_of_this_at_parameter(batch_index, &relu.parameters().borrow(), &mut cx)
             .unwrap();
         assert_eq!(ret.len(), 0);
     }

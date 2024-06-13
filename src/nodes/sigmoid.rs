@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use crate::{
-    node::{Node, NodeComputation, SharedNode},
+    computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
+    mut_cell::MutCell,
+    node::{Node, SharedNode},
     param::empty_shared_params,
 };
 
@@ -10,12 +12,16 @@ use crate::{
 /// ```
 pub fn sigmoid_node(operand: SharedNode) -> Node {
     let computation = SigmoidNodeComputation {};
-    Node::new(vec![operand], Arc::new(computation), empty_shared_params())
+    Node::new(
+        vec![operand],
+        Arc::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+        empty_shared_params(),
+    )
 }
 
 #[derive(Debug)]
 struct SigmoidNodeComputation {}
-impl NodeComputation for SigmoidNodeComputation {
+impl NodeScalarComputation for SigmoidNodeComputation {
     fn compute_output(
         &self,
         parameters: &[f64],
@@ -26,7 +32,8 @@ impl NodeComputation for SigmoidNodeComputation {
         assert_eq!(operand_outputs.len(), 1);
         sigmoid(operand_outputs[0])
     }
-
+}
+impl NodeBackpropagationComputation for SigmoidNodeComputation {
     fn compute_gradient_of_this_at_operand(
         &self,
         parameters: &[f64],

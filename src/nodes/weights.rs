@@ -4,8 +4,9 @@ use rand::Rng;
 use thiserror::Error;
 
 use crate::{
+    computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
-    node::{Node, NodeComputation, SharedNode},
+    node::{Node, SharedNode},
     param::SharedParams,
 };
 
@@ -48,7 +49,11 @@ pub fn weight_node(
         Some(x) => x,
         None => Arc::new(MutCell::new(rnd_weights(operands.len()))),
     };
-    let node = Node::new(operands, Arc::new(computation), weights);
+    let node = Node::new(
+        operands,
+        Arc::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+        weights,
+    );
     Ok(node)
 }
 
@@ -56,7 +61,7 @@ pub fn weight_node(
 struct WeightNodeComputation {
     lambda: f64,
 }
-impl NodeComputation for WeightNodeComputation {
+impl NodeScalarComputation for WeightNodeComputation {
     fn compute_output(
         &self,
         parameters: &[f64],
@@ -66,7 +71,8 @@ impl NodeComputation for WeightNodeComputation {
         assert_eq!(operand_outputs.len(), parameters.len());
         weight(operand_outputs, parameters)
     }
-
+}
+impl NodeBackpropagationComputation for WeightNodeComputation {
     fn compute_gradient_of_this_at_operand(
         &self,
         parameters: &[f64],

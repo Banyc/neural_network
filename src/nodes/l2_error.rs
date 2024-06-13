@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use crate::{
-    node::{Node, NodeComputation, SharedNode},
+    computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
+    mut_cell::MutCell,
+    node::{Node, SharedNode},
     param::empty_shared_params,
 };
 
@@ -12,14 +14,14 @@ pub fn l2_error_node(operand: SharedNode, label: SharedNode) -> Node {
     let computation = L2ErrorNodeComputation {};
     Node::new(
         vec![operand, label],
-        Arc::new(computation),
+        Arc::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
         empty_shared_params(),
     )
 }
 
 #[derive(Debug)]
 struct L2ErrorNodeComputation {}
-impl NodeComputation for L2ErrorNodeComputation {
+impl NodeScalarComputation for L2ErrorNodeComputation {
     fn compute_output(
         &self,
         parameters: &[f64],
@@ -30,7 +32,8 @@ impl NodeComputation for L2ErrorNodeComputation {
         assert_eq!(operand_outputs.len(), 2);
         l2_error(operand_outputs[0], operand_outputs[1])
     }
-
+}
+impl NodeBackpropagationComputation for L2ErrorNodeComputation {
     fn compute_gradient_of_this_at_operand(
         &self,
         parameters: &[f64],

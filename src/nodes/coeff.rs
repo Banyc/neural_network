@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use crate::{
-    node::{Node, NodeComputation, SharedNode},
+    computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
+    mut_cell::MutCell,
+    node::{Node, SharedNode},
     param::empty_shared_params,
 };
 
@@ -9,15 +11,19 @@ use crate::{
 /// f(x) = ax
 /// ```
 pub fn coeff_node(operand: SharedNode, coefficient: f64) -> Node {
-    let computation = Arc::new(CoeffNodeComputation { coefficient });
-    Node::new(vec![operand], computation, empty_shared_params())
+    let computation = CoeffNodeComputation { coefficient };
+    Node::new(
+        vec![operand],
+        Arc::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+        empty_shared_params(),
+    )
 }
 
 #[derive(Debug)]
 struct CoeffNodeComputation {
     coefficient: f64,
 }
-impl NodeComputation for CoeffNodeComputation {
+impl NodeScalarComputation for CoeffNodeComputation {
     fn compute_output(
         &self,
         parameters: &[f64],
@@ -28,7 +34,8 @@ impl NodeComputation for CoeffNodeComputation {
         assert_eq!(operand_outputs.len(), 1);
         self.coefficient * operand_outputs[0]
     }
-
+}
+impl NodeBackpropagationComputation for CoeffNodeComputation {
     fn compute_gradient_of_this_at_operand(
         &self,
         parameters: &[f64],

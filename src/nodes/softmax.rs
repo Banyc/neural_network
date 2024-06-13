@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use crate::{
-    node::{Node, NodeComputation, SharedNode},
+    computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
+    mut_cell::MutCell,
+    node::{Node, SharedNode},
     param::empty_shared_params,
 };
 
@@ -10,14 +12,18 @@ use crate::{
 /// ```
 pub fn softmax_node(operand: SharedNode, operand_index: usize) -> Node {
     let computation = SoftmaxNodeComputation { operand_index };
-    Node::new(vec![operand], Arc::new(computation), empty_shared_params())
+    Node::new(
+        vec![operand],
+        Arc::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+        empty_shared_params(),
+    )
 }
 
 #[derive(Debug)]
 struct SoftmaxNodeComputation {
     operand_index: usize,
 }
-impl NodeComputation for SoftmaxNodeComputation {
+impl NodeScalarComputation for SoftmaxNodeComputation {
     fn compute_output(
         &self,
         parameters: &[f64],
@@ -28,7 +34,8 @@ impl NodeComputation for SoftmaxNodeComputation {
         assert!(!operand_outputs.is_empty());
         softmax(operand_outputs, self.operand_index)
     }
-
+}
+impl NodeBackpropagationComputation for SoftmaxNodeComputation {
     fn compute_gradient_of_this_at_operand(
         &self,
         parameters: &[f64],

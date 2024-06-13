@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use crate::{
+    computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
-    node::{Node, NodeComputation, SharedNode},
+    node::{Node, SharedNode},
     param::empty_shared_params,
 };
 
@@ -11,7 +12,11 @@ use crate::{
 /// ```
 pub fn input_node(input_index: usize) -> Node {
     let computation = InputNodeComputation { input_index };
-    Node::new(Vec::new(), Arc::new(computation), empty_shared_params())
+    Node::new(
+        Vec::new(),
+        Arc::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+        empty_shared_params(),
+    )
 }
 
 #[derive(Debug, Clone)]
@@ -53,7 +58,7 @@ pub fn input_node_batch(params: InputNodeBatchParams) -> Vec<SharedNode> {
 struct InputNodeComputation {
     input_index: usize,
 }
-impl NodeComputation for InputNodeComputation {
+impl NodeScalarComputation for InputNodeComputation {
     fn compute_output(
         &self,
         parameters: &[f64],
@@ -64,7 +69,8 @@ impl NodeComputation for InputNodeComputation {
         assert!(operand_outputs.is_empty());
         graph_inputs[self.input_index]
     }
-
+}
+impl NodeBackpropagationComputation for InputNodeComputation {
     fn compute_gradient_of_this_at_operand(
         &self,
         parameters: &[f64],
@@ -90,9 +96,9 @@ impl NodeComputation for InputNodeComputation {
 
 #[cfg(test)]
 mod tests {
-    use crate::node::NodeContext;
+    use crate::{computation::NodeScalarComputation, node::NodeContext};
 
-    use super::{input_node, InputNodeComputation, NodeComputation};
+    use super::{input_node, InputNodeComputation};
 
     #[test]
     fn node_output1() {

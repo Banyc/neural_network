@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use crate::{
-    node::{Node, NodeComputation, SharedNode},
+    computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
+    mut_cell::MutCell,
+    node::{Node, SharedNode},
     param::empty_shared_params,
 };
 
@@ -10,12 +12,16 @@ use crate::{
 /// ```
 pub fn sum_node(operands: Vec<SharedNode>) -> Node {
     let computation = SumNodeComputation {};
-    Node::new(operands, Arc::new(computation), empty_shared_params())
+    Node::new(
+        operands,
+        Arc::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+        empty_shared_params(),
+    )
 }
 
 #[derive(Debug)]
 struct SumNodeComputation {}
-impl NodeComputation for SumNodeComputation {
+impl NodeScalarComputation for SumNodeComputation {
     fn compute_output(
         &self,
         parameters: &[f64],
@@ -25,7 +31,8 @@ impl NodeComputation for SumNodeComputation {
         assert!(parameters.is_empty());
         sum(operand_outputs)
     }
-
+}
+impl NodeBackpropagationComputation for SumNodeComputation {
     fn compute_gradient_of_this_at_operand(
         &self,
         parameters: &[f64],

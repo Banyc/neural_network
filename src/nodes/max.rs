@@ -3,7 +3,9 @@ use std::sync::Arc;
 use strict_num::FiniteF64;
 
 use crate::{
-    node::{Node, NodeComputation, SharedNode},
+    computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
+    mut_cell::MutCell,
+    node::{Node, SharedNode},
     param::empty_shared_params,
 };
 
@@ -13,12 +15,16 @@ use crate::{
 pub fn max_node(operands: Vec<SharedNode>) -> Node {
     assert!(!operands.is_empty());
     let computation = MaxNodeComputation {};
-    Node::new(operands, Arc::new(computation), empty_shared_params())
+    Node::new(
+        operands,
+        Arc::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+        empty_shared_params(),
+    )
 }
 
 #[derive(Debug)]
 struct MaxNodeComputation {}
-impl NodeComputation for MaxNodeComputation {
+impl NodeScalarComputation for MaxNodeComputation {
     fn compute_output(
         &self,
         parameters: &[f64],
@@ -29,7 +35,8 @@ impl NodeComputation for MaxNodeComputation {
         assert!(!operand_outputs.is_empty());
         max(operand_outputs)
     }
-
+}
+impl NodeBackpropagationComputation for MaxNodeComputation {
     fn compute_gradient_of_this_at_operand(
         &self,
         parameters: &[f64],

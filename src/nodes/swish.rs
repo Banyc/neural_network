@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use crate::{
-    node::{Node, NodeComputation, SharedNode},
+    computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
+    mut_cell::MutCell,
+    node::{Node, SharedNode},
     param::empty_shared_params,
 };
 
@@ -12,12 +14,16 @@ use super::sigmoid::sigmoid;
 /// ```
 pub fn swish_node(operand: SharedNode) -> Node {
     let computation = SwishNodeComputation {};
-    Node::new(vec![operand], Arc::new(computation), empty_shared_params())
+    Node::new(
+        vec![operand],
+        Arc::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+        empty_shared_params(),
+    )
 }
 
 #[derive(Debug)]
 struct SwishNodeComputation {}
-impl NodeComputation for SwishNodeComputation {
+impl NodeScalarComputation for SwishNodeComputation {
     fn compute_output(
         &self,
         parameters: &[f64],
@@ -28,7 +34,8 @@ impl NodeComputation for SwishNodeComputation {
         assert_eq!(operand_outputs.len(), 1);
         swish(operand_outputs[0])
     }
-
+}
+impl NodeBackpropagationComputation for SwishNodeComputation {
     fn compute_gradient_of_this_at_operand(
         &self,
         parameters: &[f64],

@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use crate::{
-    node::{Node, NodeComputation, SharedNode},
+    computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
+    mut_cell::MutCell,
+    node::{Node, SharedNode},
     param::empty_shared_params,
 };
 
@@ -12,12 +14,16 @@ pub fn mse_node(operands: Vec<SharedNode>) -> Node {
     assert!(!operands.is_empty());
     assert!(operands.len() % 2 == 0);
     let computation = MseNodeComputation {};
-    Node::new(operands, Arc::new(computation), empty_shared_params())
+    Node::new(
+        operands,
+        Arc::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+        empty_shared_params(),
+    )
 }
 
 #[derive(Debug)]
 struct MseNodeComputation {}
-impl NodeComputation for MseNodeComputation {
+impl NodeScalarComputation for MseNodeComputation {
     fn compute_output(
         &self,
         parameters: &[f64],
@@ -31,7 +37,8 @@ impl NodeComputation for MseNodeComputation {
         let y_hat = &operand_outputs[n..];
         mse(y, y_hat)
     }
-
+}
+impl NodeBackpropagationComputation for MseNodeComputation {
     fn compute_gradient_of_this_at_operand(
         &self,
         parameters: &[f64],

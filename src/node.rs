@@ -8,61 +8,19 @@
 //! - $E$: the outmost function represented by the root node of the computation graph
 //!   - "root" in code
 
-use std::{collections::VecDeque, sync::Arc};
+use std::{collections::VecDeque, ops::DerefMut, sync::Arc};
 
 use thiserror::Error;
 
 use crate::{
     cache::{GradRootThis, NodeCache, NodeCacheBuilder, OperandOutputs},
+    computation::{NodeBackpropagationComputation, NodeComputation},
     mut_cell::MutCell,
     param::SharedParams,
     reused_buf::ReusedBuffers,
 };
 
 pub type SharedNode = Arc<MutCell<Node>>;
-
-/// The function of this node should be
-/// ```math
-/// f : \mathbb{R}^n \to \mathbb{R}
-/// ```
-pub trait NodeComputation: core::fmt::Debug {
-    fn compute_output(
-        &self,
-        parameters: &[f64],
-        operand_outputs: &[f64],
-        graph_inputs: &[f64],
-    ) -> f64;
-
-    /// ```math
-    /// \frac{\partial f}{\partial z}
-    /// ```
-    ///
-    /// - $z$: the non-tunable operands of this node
-    /// - $f$: this node
-    fn compute_gradient_of_this_at_operand(
-        &self,
-        parameters: &[f64],
-        operand_outputs: &[f64],
-        buf: Vec<f64>,
-    ) -> Vec<f64>;
-
-    /// ```math
-    /// \frac{\partial f}{\partial w}
-    /// ```
-    ///
-    /// - $w$: the tunable parameters of this node
-    /// - $f$: this node
-    fn compute_gradient_of_this_at_parameter(
-        &self,
-        parameters: &[f64],
-        operand_outputs: &[f64],
-        buf: Vec<f64>,
-    ) -> Vec<f64>;
-
-    fn regularization(&self, _parameter: f64) -> f64 {
-        0.0
-    }
-}
 
 #[derive(Debug)]
 pub struct NodeContext {
@@ -95,7 +53,7 @@ pub struct Node {
     operands: Vec<SharedNode>,
     num_successors: usize,
     batch_cache: Option<NodeCache>,
-    computation: Arc<dyn NodeComputation + Sync + Send>,
+    computation: Arc<MutCell<NodeComputation>>,
 
     is_in_bfs_queue: bool,
 }
@@ -107,7 +65,7 @@ impl Node {
 
     pub fn new(
         operands: Vec<SharedNode>,
-        computation: Arc<dyn NodeComputation + Sync + Send>,
+        computation: Arc<MutCell<NodeComputation>>,
         parameters: Arc<MutCell<Vec<f64>>>,
     ) -> Node {
         operands.iter().for_each(|operand| {
@@ -150,17 +108,29 @@ impl Node {
         let operand_outputs_len = eval_buf.len();
 
         // Compute outputs
-        for (batch_index, inputs) in inputs_batch.iter().enumerate() {
-            let operand_outputs = OperandOutputs {
-                slice: &eval_buf[..operand_outputs_len],
-                num_operands: self.operands.len(),
+        let mut computation = self.computation.as_ref().borrow_mut();
+        match computation.deref_mut() {
+            NodeComputation::Scalar(comp) => {
+                for (batch_index, inputs) in inputs_batch.iter().enumerate() {
+                    let operand_outputs = OperandOutputs {
+                        slice: &eval_buf[..operand_outputs_len],
+                        num_operands: self.operands.len(),
+                    }
+                    .get(batch_index);
+                    let parameters = self.parameters.as_ref().borrow();
+                    let o = comp.compute_output(&parameters, operand_outputs, inputs.as_ref());
+                    eval_buf.push(o);
+                }
             }
-            .get(batch_index);
-            let parameters = self.parameters.as_ref().borrow();
-            let o = self
-                .computation
-                .compute_output(&parameters, operand_outputs, inputs.as_ref());
-            eval_buf.push(o);
+            NodeComputation::Batch(bat) => {
+                let buf = cx.buf().take();
+                let parameters = self.parameters.as_ref().borrow();
+                let operand_outputs = &eval_buf;
+                let shape = &[self.operands.len(), inputs_batch.len()];
+                let o = bat.compute_output(&parameters, operand_outputs, shape, buf);
+                eval_buf.extend(o.iter().copied());
+                cx.buf().put(o);
+            }
         }
 
         let cache = NodeCacheBuilder {
@@ -244,7 +214,7 @@ impl Node {
             .iter_mut()
             .zip(partial_derivative_of_root_at_parameter.iter().copied())
         {
-            let regularization = self.computation.regularization(*param);
+            let regularization = self.computation.borrow().regularization(*param);
             *param -= step_size * (der + regularization);
         }
         cx.buf().put(partial_derivative_of_root_at_parameter);
@@ -279,9 +249,10 @@ impl Node {
             .operand_outputs(batch_index)
             .ok_or(GradientOfThisAtOperandError::NoEvaluationOutputCaches)?;
         let buf = cx.buf().take();
-        let x =
-            self.computation
-                .compute_gradient_of_this_at_operand(parameters, operand_outputs, buf);
+        let x = self
+            .computation
+            .borrow()
+            .compute_gradient_of_this_at_operand(parameters, operand_outputs, buf);
         Ok(x)
     }
 
@@ -333,11 +304,10 @@ impl Node {
             .operand_outputs(batch_index)
             .ok_or(GradientOfThisAtParameterError::NoEvaluationOutputCaches)?;
         let buf = cx.buf().take();
-        let x = self.computation.compute_gradient_of_this_at_parameter(
-            parameters,
-            operand_outputs.as_ref(),
-            buf,
-        );
+        let x = self
+            .computation
+            .borrow()
+            .compute_gradient_of_this_at_parameter(parameters, operand_outputs.as_ref(), buf);
         Ok(x)
     }
 

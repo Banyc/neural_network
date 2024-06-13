@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use crate::{
+    computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
-    node::{Node, NodeComputation, SharedNode},
+    node::{Node, SharedNode},
     param::SharedParams,
 };
 
@@ -17,12 +18,16 @@ pub fn bias_node(operand: SharedNode, bias: Option<SharedParams>) -> Node {
     let computation = BiasNodeComputation {};
     let bias = bias.unwrap_or(Arc::new(MutCell::new(vec![default_bias()])));
     assert_eq!(bias.borrow().len(), 1);
-    Node::new(vec![operand], Arc::new(computation), bias)
+    Node::new(
+        vec![operand],
+        Arc::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+        bias,
+    )
 }
 
 #[derive(Debug)]
 struct BiasNodeComputation {}
-impl NodeComputation for BiasNodeComputation {
+impl NodeScalarComputation for BiasNodeComputation {
     fn compute_output(
         &self,
         parameters: &[f64],
@@ -33,7 +38,8 @@ impl NodeComputation for BiasNodeComputation {
         assert_eq!(parameters.len(), 1);
         bias(operand_outputs[0], parameters[0])
     }
-
+}
+impl NodeBackpropagationComputation for BiasNodeComputation {
     fn compute_gradient_of_this_at_operand(
         &self,
         parameters: &[f64],

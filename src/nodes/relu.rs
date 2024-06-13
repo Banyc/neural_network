@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use crate::{
-    node::{Node, NodeComputation, SharedNode},
+    computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
+    mut_cell::MutCell,
+    node::{Node, SharedNode},
     param::empty_shared_params,
 };
 
@@ -13,12 +15,16 @@ use crate::{
 /// ```
 pub fn relu_node(operand: SharedNode) -> Node {
     let computation = ReluNodeComputation {};
-    Node::new(vec![operand], Arc::new(computation), empty_shared_params())
+    Node::new(
+        vec![operand],
+        Arc::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+        empty_shared_params(),
+    )
 }
 
 #[derive(Debug)]
 struct ReluNodeComputation {}
-impl NodeComputation for ReluNodeComputation {
+impl NodeScalarComputation for ReluNodeComputation {
     fn compute_output(
         &self,
         parameters: &[f64],
@@ -29,7 +35,8 @@ impl NodeComputation for ReluNodeComputation {
         assert_eq!(operand_outputs.len(), 1);
         relu(operand_outputs[0])
     }
-
+}
+impl NodeBackpropagationComputation for ReluNodeComputation {
     fn compute_gradient_of_this_at_operand(
         &self,
         parameters: &[f64],

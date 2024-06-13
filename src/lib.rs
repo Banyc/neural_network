@@ -1,6 +1,7 @@
 #![allow(clippy::arc_with_non_send_sync)]
 
 mod cache;
+pub mod computation;
 pub mod layers;
 mod mut_cell;
 pub mod neural_network;

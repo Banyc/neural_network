@@ -134,6 +134,7 @@ mod tests {
     use std::sync::Arc;
 
     use crate::{
+        computation::ComputationMode,
         node::NodeContext,
         nodes::input::{input_node_batch, InputNodeBatchParams},
     };
@@ -146,7 +147,7 @@ mod tests {
         let initial_weights = Arc::new(MutCell::new(initial_weights));
         let mut weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
         let mut cx = NodeContext::new();
-        weight_node.evaluate_once(&[&inputs], &mut cx);
+        weight_node.evaluate_once(&[&inputs], &mut cx, ComputationMode::Inference);
         let output = weight_node.output().unwrap()[0];
         assert_eq!(output, 3.0 * 1.0 + 2.0 * 2.0 + 1.0 * 3.0);
     }
@@ -159,7 +160,7 @@ mod tests {
         let initial_weights = Arc::new(MutCell::new(initial_weights));
         let mut weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
         let mut cx = NodeContext::new();
-        weight_node.evaluate_once(&[&inputs], &mut cx);
+        weight_node.evaluate_once(&[&inputs], &mut cx, ComputationMode::Inference);
         let batch_index = 0;
         let ret = weight_node
             .gradient_of_this_at_operand(batch_index, &weight_node.parameters().borrow(), &mut cx)
@@ -175,7 +176,7 @@ mod tests {
         let initial_weights = Arc::new(MutCell::new(initial_weights));
         let mut weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
         let mut cx = NodeContext::new();
-        weight_node.evaluate_once(&[&inputs], &mut cx);
+        weight_node.evaluate_once(&[&inputs], &mut cx, ComputationMode::Inference);
         let batch_index = 0;
         let ret = weight_node
             .gradient_of_this_at_parameter(batch_index, &weight_node.parameters().borrow(), &mut cx)

@@ -1,3 +1,4 @@
+pub mod batch_norm;
 pub mod bias;
 pub mod coeff;
 pub mod conv;

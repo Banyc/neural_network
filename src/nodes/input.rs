@@ -96,7 +96,10 @@ impl NodeBackpropagationComputation for InputNodeComputation {
 
 #[cfg(test)]
 mod tests {
-    use crate::{computation::NodeScalarComputation, node::NodeContext};
+    use crate::{
+        computation::{ComputationMode, NodeScalarComputation},
+        node::NodeContext,
+    };
 
     use super::{input_node, InputNodeComputation};
 
@@ -104,7 +107,7 @@ mod tests {
     fn node_output1() {
         let mut node = input_node(0);
         let mut cx = NodeContext::new();
-        node.evaluate_once(&[&[3.0]], &mut cx);
+        node.evaluate_once(&[&[3.0]], &mut cx, ComputationMode::Inference);
         let output = node.output().unwrap()[0];
         assert_eq!(output, 3.0);
     }
@@ -113,7 +116,7 @@ mod tests {
     fn node_output2() {
         let mut node = input_node(0);
         let mut cx = NodeContext::new();
-        node.evaluate_once(&[&[-4.0]], &mut cx);
+        node.evaluate_once(&[&[-4.0]], &mut cx, ComputationMode::Inference);
         let output = node.output().unwrap()[0];
         assert_eq!(output, -4.0);
     }

@@ -2,7 +2,10 @@ use std::time::{Duration, Instant};
 
 use rand::Rng;
 
-use crate::node::{graph_delete_caches, NodeContext, SharedNode};
+use crate::{
+    computation::ComputationMode,
+    node::{graph_delete_caches, NodeContext, SharedNode},
+};
 
 use super::node::graph_do_gradient_descent_steps;
 
@@ -34,7 +37,7 @@ impl NeuralNetwork {
     where
         I: AsRef<[f64]>,
     {
-        let err = self.compute_error(samples, EvalOption::KeepCache);
+        let err = self.compute_error(samples, EvalOption::KeepCache, ComputationMode::Training);
         self.cx.buf().put(err);
         graph_do_gradient_descent_steps(&self.error_node, step_size, &mut self.cx);
         self.check_rep();
@@ -51,7 +54,7 @@ impl NeuralNetwork {
 
         for terminal_node in &self.terminal_nodes {
             let mut terminal_node = terminal_node.borrow_mut();
-            terminal_node.evaluate_once(inputs, &mut self.cx);
+            terminal_node.evaluate_once(inputs, &mut self.cx, ComputationMode::Inference);
             let output = terminal_node.output().unwrap();
             outputs.push(output.to_vec());
         }
@@ -70,7 +73,7 @@ impl NeuralNetwork {
         let mut progress_printer = ProgressPrinter::new();
         let mut error = 0.;
         for (i, inputs) in dataset.iter().enumerate() {
-            let err = self.compute_error(&[inputs.as_ref()], option);
+            let err = self.compute_error(&[inputs.as_ref()], option, ComputationMode::Inference);
             error += err[0] / dataset.len() as f64;
             self.cx.buf().put(err);
             progress_printer.print_progress(i, dataset.len());
@@ -78,12 +81,17 @@ impl NeuralNetwork {
         error
     }
 
-    fn compute_error<I>(&mut self, inputs: &[I], option: EvalOption) -> Vec<f64>
+    fn compute_error<I>(
+        &mut self,
+        inputs: &[I],
+        option: EvalOption,
+        mode: ComputationMode,
+    ) -> Vec<f64>
     where
         I: AsRef<[f64]>,
     {
         let mut error_node = self.error_node.borrow_mut();
-        error_node.evaluate_once(inputs, &mut self.cx);
+        error_node.evaluate_once(inputs, &mut self.cx, mode);
         let mut output = self.cx.buf().take();
         output.extend(error_node.output().unwrap());
         drop(error_node);

@@ -14,7 +14,7 @@ use thiserror::Error;
 
 use crate::{
     cache::{GradRootThis, NodeCache, NodeCacheBuilder, OperandOutputs},
-    computation::{NodeBackpropagationComputation, NodeComputation},
+    computation::{ComputationMode, NodeBackpropagationComputation, NodeComputation},
     mut_cell::MutCell,
     param::SharedParams,
     reused_buf::ReusedBuffers,
@@ -84,8 +84,12 @@ impl Node {
         this
     }
 
-    pub fn evaluate_once<I>(&mut self, inputs_batch: &[I], cx: &mut NodeContext)
-    where
+    pub fn evaluate_once<I>(
+        &mut self,
+        inputs_batch: &[I],
+        cx: &mut NodeContext,
+        mode: ComputationMode,
+    ) where
         I: AsRef<[f64]>,
     {
         if self.batch_cache.is_some() {
@@ -94,7 +98,7 @@ impl Node {
 
         for operand in &self.operands {
             let mut operand = operand.borrow_mut();
-            operand.evaluate_once(inputs_batch, cx);
+            operand.evaluate_once(inputs_batch, cx, mode);
         }
 
         // Collect operand outputs
@@ -127,7 +131,7 @@ impl Node {
                 let parameters = self.parameters.as_ref().borrow();
                 let operand_outputs = &eval_buf;
                 let shape = &[self.operands.len(), inputs_batch.len()];
-                let o = bat.compute_output(&parameters, operand_outputs, shape, buf);
+                let o = bat.compute_output(&parameters, operand_outputs, shape, buf, mode);
                 eval_buf.extend(o.iter().copied());
                 cx.buf().put(o);
             }

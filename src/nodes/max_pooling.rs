@@ -25,6 +25,7 @@ mod tests {
     use std::num::NonZeroUsize;
 
     use crate::{
+        computation::ComputationMode,
         node::NodeContext,
         nodes::input::{input_node_batch, InputNodeBatchParams},
         tensor::{OwnedNonZeroShape, OwnedStride},
@@ -71,7 +72,7 @@ mod tests {
         let mut cx = NodeContext::new();
         for output_node in &max_pooling_layer {
             let mut output_node = output_node.borrow_mut();
-            output_node.evaluate_once(&[&image], &mut cx);
+            output_node.evaluate_once(&[&image], &mut cx, ComputationMode::Inference);
             let output = output_node.output().unwrap()[0];
             outputs.push(output);
         }

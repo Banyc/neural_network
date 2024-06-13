@@ -18,8 +18,9 @@ pub trait NodeBatchComputation: core::fmt::Debug + NodeBackpropagationComputatio
         &mut self,
         parameters: &[f64],
         operand_outputs: &[f64],
-        shape: &Shape,
+        operand_outputs_shape: &Shape,
         buf: Vec<f64>,
+        mode: ComputationMode,
     ) -> Vec<f64>;
 }
 
@@ -53,6 +54,12 @@ pub trait NodeBackpropagationComputation: core::fmt::Debug {
     fn regularization(&self, _parameter: f64) -> f64 {
         0.0
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum ComputationMode {
+    Training,
+    Inference,
 }
 
 #[derive(Debug)]

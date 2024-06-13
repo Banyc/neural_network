@@ -29,7 +29,7 @@ impl<T> MutCell<T> {
     #[cfg(not(debug_assertions))]
     pub fn borrow_mut(&self) -> impl DerefMut<Target = T> + '_ {
         let value = unsafe { &mut *self.cell.get() };
-        SafeWrapMut::new(value)
+        ThinWrapMut::new(value)
     }
 
     #[cfg(debug_assertions)]
@@ -39,19 +39,19 @@ impl<T> MutCell<T> {
     #[cfg(not(debug_assertions))]
     pub fn borrow(&self) -> impl Deref<Target = T> + '_ {
         let value = unsafe { &*self.cell.get() };
-        SafeWrap::new(value)
+        ThinWrap::new(value)
     }
 }
 
-struct SafeWrap<'a, T> {
+struct ThinWrap<'a, T> {
     value: &'a T,
 }
-impl<'a, T> SafeWrap<'a, T> {
+impl<'a, T> ThinWrap<'a, T> {
     pub fn new(value: &'a T) -> Self {
         Self { value }
     }
 }
-impl<T> Deref for SafeWrap<'_, T> {
+impl<T> Deref for ThinWrap<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -59,22 +59,22 @@ impl<T> Deref for SafeWrap<'_, T> {
     }
 }
 
-struct SafeWrapMut<'a, T> {
+struct ThinWrapMut<'a, T> {
     value: &'a mut T,
 }
-impl<'a, T> SafeWrapMut<'a, T> {
+impl<'a, T> ThinWrapMut<'a, T> {
     pub fn new(value: &'a mut T) -> Self {
         Self { value }
     }
 }
-impl<T> Deref for SafeWrapMut<'_, T> {
+impl<T> Deref for ThinWrapMut<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
         self.value
     }
 }
-impl<T> DerefMut for SafeWrapMut<'_, T> {
+impl<T> DerefMut for ThinWrapMut<'_, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.value
     }

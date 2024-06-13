@@ -209,20 +209,18 @@ impl Node {
             let gradient_of_this_at_operand = self
                 .gradient_of_this_at_operand(batch_index, &parameters, cx)
                 .unwrap();
-            let partial_derivative_of_root_at_this = self
+            let d_root_at_this = self
                 .partial_derivative_of_root_at_this(batch_index)
                 .unwrap();
-            for (i, operand) in self.operands.iter().enumerate() {
+            for (d_this_at_operand, operand) in
+                gradient_of_this_at_operand.iter().zip(self.operands.iter())
+            {
                 // ```math
                 // \frac{\partial E}{\partial f} \cdot \frac{\partial f}{\partial z}
                 // ```
-                let addend_of_partial_derivative_of_root_at_operand =
-                    partial_derivative_of_root_at_this * gradient_of_this_at_operand[i];
+                let addend = d_root_at_this * d_this_at_operand;
                 let mut operand = operand.borrow_mut();
-                operand.add_addend_of_partial_derivative_of_root_at_this(
-                    addend_of_partial_derivative_of_root_at_operand,
-                    batch_index,
-                );
+                operand.add_addend_of_partial_derivative_of_root_at_this(addend, batch_index);
             }
             cx.buf().put(gradient_of_this_at_operand);
         }
@@ -242,12 +240,12 @@ impl Node {
             }
             cx.buf().put(gradient_of_root_at_parameter);
         }
-        for (param, partial_derivative_of_root_at_parameter_i) in parameters
+        for (param, der) in parameters
             .iter_mut()
             .zip(partial_derivative_of_root_at_parameter.iter().copied())
         {
             let regularization = self.computation.regularization(*param);
-            *param -= step_size * (partial_derivative_of_root_at_parameter_i + regularization);
+            *param -= step_size * (der + regularization);
         }
         cx.buf().put(partial_derivative_of_root_at_parameter);
         // Clear batch cache
@@ -357,16 +355,16 @@ impl Node {
         let gradient_of_this_at_parameter = self
             .gradient_of_this_at_parameter(batch_index, parameters, cx)
             .map_err(GradientOfRootAtParameterError::GradientOfThisAtParameter)?;
-        let partial_derivative_of_root_at_this = self
+        let d_root_at_this = self
             .partial_derivative_of_root_at_this(batch_index)
             .map_err(GradientOfRootAtParameterError::GradientOfRootAtThis)?;
-        let mut gradient_of_root_at_parameter = gradient_of_this_at_parameter;
-        gradient_of_root_at_parameter.iter_mut().for_each(
-            |partial_derivative_of_this_at_parameter_i| {
-                *partial_derivative_of_this_at_parameter_i *= partial_derivative_of_root_at_this
-            },
-        );
-        Ok(gradient_of_root_at_parameter)
+        let mut x = gradient_of_this_at_parameter;
+        for x in &mut x {
+            let d_this_at_param = *x;
+            let d_root_at_param = d_root_at_this * d_this_at_param;
+            *x = d_root_at_param;
+        }
+        Ok(x)
     }
 
     pub fn operand_outputs(&self, batch_index: usize) -> Option<&[f64]> {

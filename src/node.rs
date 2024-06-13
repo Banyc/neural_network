@@ -13,7 +13,7 @@ use std::{collections::VecDeque, sync::Arc};
 use thiserror::Error;
 
 use crate::{
-    mut_cell::MutCell, param::SharedParams, reused_buf::ReusedBuffers, two_d_vec::TwoDVec,
+    mut_cell::MutCell, param::SharedParams, reused_buf::ReusedBuffers, two_d_slice::TwoDSlice,
 };
 
 pub type SharedNode = Arc<MutCell<Node>>;
@@ -104,7 +104,7 @@ impl Node {
         }
         if let Some(cache) = &self.batch_cache {
             assert_eq!(
-                cache.eval().output.len(),
+                cache.eval().batch_size,
                 cache.backpropagate().sum_gradient_of_root_at_this.len()
             );
         }
@@ -144,32 +144,30 @@ impl Node {
             operand.evaluate_once(inputs_batch, cx);
         }
 
-        let mut operand_outputs = cx.buf().take();
+        let mut buf = cx.buf().take();
         for batch_index in 0..inputs_batch.len() {
             for operand in &self.operands {
                 let operand = operand.as_ref().borrow();
-                operand_outputs.push(operand.output().unwrap()[batch_index])
+                buf.push(operand.output().unwrap()[batch_index])
             }
         }
-        let operand_outputs = TwoDVec::new(operand_outputs, self.operands.len());
+        let mut eval_cache = EvaluateCacheBuilder {
+            batch_size: inputs_batch.len(),
+            num_operands: self.operands.len(),
+            buf,
+        }
+        .build();
 
-        let mut output = cx.buf().take();
         for (batch_index, inputs) in inputs_batch.iter().enumerate() {
-            let operand_outputs = operand_outputs.slice(batch_index);
+            let operand_outputs = eval_cache.operand_outputs(batch_index);
             let parameters = self.parameters.as_ref().borrow();
             let o = self
                 .computation
                 .compute_output(&parameters, operand_outputs, inputs.as_ref());
-            output.push(o)
+            eval_cache.push_output(o);
         }
 
-        self.batch_cache = Some(Cache::new(
-            EvaluateCache {
-                output,
-                operand_outputs,
-            },
-            cx.buf().take(),
-        ));
+        self.batch_cache = Some(Cache::new(eval_cache, cx.buf().take()));
         self.check_rep();
     }
 
@@ -374,9 +372,9 @@ impl Node {
         Some(cache.eval().operand_outputs(batch_index))
     }
 
-    pub fn output(&self) -> Option<&Vec<f64>> {
+    pub fn output(&self) -> Option<&[f64]> {
         let cache = self.batch_cache.as_ref()?;
-        Some(&cache.eval().output)
+        Some(cache.eval().output())
     }
 
     pub fn parameters(&self) -> &SharedParams {
@@ -503,7 +501,7 @@ struct Cache {
 }
 impl Cache {
     pub fn new(eval: EvaluateCache, buf: Vec<f64>) -> Self {
-        let batch_size = eval.output.len();
+        let batch_size = eval.batch_size;
         Self {
             eval,
             backpropagate: BackpropagateCache::new(batch_size, buf),
@@ -511,8 +509,7 @@ impl Cache {
     }
 
     pub fn put_buf(self, cx: &mut NodeContext) {
-        cx.buf().put(self.eval.output);
-        cx.buf().put(self.eval.operand_outputs.into_vec());
+        cx.buf().put(self.eval.buf);
         cx.buf()
             .put(self.backpropagate.sum_gradient_of_root_at_this);
     }
@@ -527,22 +524,45 @@ impl Cache {
         &mut self.backpropagate
     }
     pub fn batch_size(&self) -> usize {
-        self.eval.output.len()
+        self.eval.batch_size
     }
 }
 
+struct EvaluateCacheBuilder {
+    pub batch_size: usize,
+    pub num_operands: usize,
+    /// shape: (operands.len(), batch_size) : batch_size
+    pub buf: Vec<f64>,
+}
+impl EvaluateCacheBuilder {
+    pub fn build(self) -> EvaluateCache {
+        assert_eq!(self.batch_size * self.num_operands, self.buf.len());
+        EvaluateCache {
+            batch_size: self.batch_size,
+            num_operands: self.num_operands,
+            buf: self.buf,
+        }
+    }
+}
 #[derive(Debug, Clone)]
 struct EvaluateCache {
-    /// the output of this node
-    pub output: Vec<f64>,
-    /// the output from operands
-    ///
-    /// shape: (operands.len(), batch_size)
-    pub operand_outputs: TwoDVec<f64>,
+    batch_size: usize,
+    num_operands: usize,
+    /// shape: (operands.len(), batch_size) : batch_size
+    buf: Vec<f64>,
 }
 impl EvaluateCache {
+    pub fn push_output(&mut self, output: f64) {
+        self.buf.push(output);
+    }
+    pub fn output(&self) -> &[f64] {
+        let start = self.num_operands * self.batch_size;
+        &self.buf[start..]
+    }
     pub fn operand_outputs(&self, batch_index: usize) -> &[f64] {
-        self.operand_outputs.slice(batch_index)
+        let end = self.num_operands * self.batch_size;
+        let two_d = TwoDSlice::new(&self.buf[..end], self.num_operands);
+        two_d.slice(batch_index)
     }
 }
 

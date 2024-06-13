@@ -53,7 +53,7 @@ impl NeuralNetwork {
             let mut terminal_node = terminal_node.borrow_mut();
             terminal_node.evaluate_once(inputs, &mut self.cx);
             let output = terminal_node.output().unwrap();
-            outputs.push(output.clone());
+            outputs.push(output.to_vec());
         }
         for terminal_node in &self.terminal_nodes {
             graph_delete_caches(terminal_node);

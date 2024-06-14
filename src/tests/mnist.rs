@@ -3,17 +3,19 @@ use std::{io::Read, num::NonZeroUsize, path::Path, sync::Arc};
 use strict_num::FiniteF64;
 
 use crate::{
-    layers::{conv_max_pooling_layer, dense_layer, Activation},
+    layers::{
+        activation::Activation,
+        conv_max_pooling::{
+            conv::{ConvLayerConfig, DeepConvLayerConfig},
+            conv_max_pooling_layer,
+        },
+        dense::dense_layer,
+        kernel::KernelLayerConfig,
+    },
     mut_cell::MutCell,
     neural_network::{AccurateFnParams, NeuralNetwork, TrainOption},
     node::SharedNode,
-    nodes::{
-        conv::{ConvLayerConfig, DeepConvLayerConfig},
-        input::InputNodeGen,
-        kernel::KernelLayerConfig,
-        linear::LinearLayerConfig,
-        mse::mse_node,
-    },
+    nodes::{input::InputNodeGen, linear::LinearLayerConfig, mse::mse_node},
     param::{
         tests::{param_injector, save_params},
         ParamInjection,

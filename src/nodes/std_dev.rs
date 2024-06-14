@@ -65,6 +65,7 @@ fn std_dev(mean: f64, x: &[f64]) -> f64 {
     x.iter()
         .copied()
         .map(|x| (x - mean).powi(2) / n as f64)
+        .map(|x| x.sqrt())
         .sum::<f64>()
 }
 

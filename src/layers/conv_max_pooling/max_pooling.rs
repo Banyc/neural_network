@@ -1,14 +1,11 @@
 use std::sync::Arc;
 
 use crate::{
+    layers::kernel::{kernel_layer, KernelLayerConfig, KernelParams},
     mut_cell::MutCell,
     node::SharedNode,
+    nodes::max::max_node,
     tensor::{OwnedShape, Tensor},
-};
-
-use super::{
-    kernel::{kernel_layer, KernelLayerConfig, KernelParams},
-    max::max_node,
 };
 
 pub fn max_pooling_layer(

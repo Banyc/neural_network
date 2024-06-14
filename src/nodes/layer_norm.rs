@@ -78,10 +78,16 @@ impl NodeBackpropagationComputation for LayerNormNodeComputation {
 }
 
 fn norm(mean: f64, std_dev: f64, x: f64) -> f64 {
+    if std_dev == 0. {
+        panic!();
+    }
     (x - mean) / std_dev
 }
 
 fn norm_derivative(mean: f64, std_dev: f64, x: f64, mut buf: Vec<f64>) -> Vec<f64> {
+    if std_dev == 0. {
+        panic!();
+    }
     let mean_der = -1. / std_dev;
     let std_dev_der = -(x - mean) / std_dev.powi(2);
     let x_der = 1. / std_dev;

@@ -1,16 +1,13 @@
 pub mod batch_norm;
 pub mod bias;
 pub mod coeff;
-pub mod conv;
 pub mod exp;
 pub mod input;
-pub mod kernel;
 pub mod l2_error;
 pub mod layer_norm;
 pub mod linear;
 pub mod log;
 pub mod max;
-pub mod max_pooling;
 pub mod mean;
 pub mod mse;
 pub mod power;

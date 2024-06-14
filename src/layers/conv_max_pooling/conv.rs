@@ -1,17 +1,12 @@
 use std::{num::NonZeroUsize, sync::Arc};
 
 use crate::{
+    layers::kernel::{kernel_layer, KernelLayerConfig, KernelParams},
     mut_cell::MutCell,
     node::SharedNode,
+    nodes::{bias::default_bias, linear::linear_node, weights::rnd_weights},
     param::{ParamInjection, SharedParams},
     tensor::{append_tensors, non_zero_to_shape, OwnedShape, Shape, Tensor},
-};
-
-use super::{
-    bias::default_bias,
-    kernel::{kernel_layer, KernelLayerConfig, KernelParams},
-    linear::linear_node,
-    weights::rnd_weights,
 };
 
 #[derive(Clone)]

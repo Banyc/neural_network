@@ -8,7 +8,7 @@ use crate::{
 };
 
 /// ```math
-/// f(x) = 1 + e^x
+/// f(x) = \frac{e^x}{1 + e^x}
 /// ```
 pub fn sigmoid_node(operand: SharedNode) -> Node {
     let computation = SigmoidNodeComputation {};
@@ -59,11 +59,28 @@ impl NodeBackpropagationComputation for SigmoidNodeComputation {
 }
 
 pub fn sigmoid(x: f64) -> f64 {
-    let exp = x.exp();
-    exp / (exp + 1.0)
+    // Prevent floating point underflow
+    let x = x.clamp(-250.0, 250.0);
+    1.0 / (1.0 + f64::exp(-x))
 }
 
 pub fn sigmoid_derivative(x: f64) -> f64 {
     let sigmoid = sigmoid(x);
     (1.0 - sigmoid) * sigmoid
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_underflow() {
+        let x = f64::MIN;
+        let exp = f64::exp(-x);
+        assert!(exp.is_infinite());
+
+        let s = sigmoid(x);
+        assert!(s.is_finite());
+        assert!(s < 0.001);
+    }
 }

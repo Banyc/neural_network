@@ -1,7 +1,7 @@
 use std::num::NonZeroUsize;
 
 use conv::{deep_conv_layer, DeepConvLayerConfig};
-use max_pooling::max_pooling_layer;
+use pooling::max_pooling_layer;
 
 use crate::{
     layers::residual::residual_layer,
@@ -13,7 +13,7 @@ use crate::{
 use super::{activation::Activation, kernel::KernelLayerConfig};
 
 pub mod conv;
-pub mod max_pooling;
+pub mod pooling;
 
 pub fn conv_max_pooling_layer(
     inputs: Tensor<'_, SharedNode>,

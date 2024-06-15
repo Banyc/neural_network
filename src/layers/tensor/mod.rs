@@ -10,7 +10,7 @@ use crate::{
     tensor::{OwnedShape, Shape, Tensor},
 };
 
-use super::{activation::Activation, kernel::KernelLayerConfig};
+use super::{activation::Activation, kernel::KernelLayerConfig, norm::Normalization};
 
 pub mod conv;
 pub mod pooling;
@@ -32,13 +32,15 @@ pub fn conv_max_pooling_layer(
 
 #[derive(Clone)]
 pub struct ResidualConvConfig<'a> {
-    pub conv: DeepConvLayerConfig<'a>,
+    pub first_conv: DeepConvLayerConfig<'a>,
+    pub following_conv: DeepConvLayerConfig<'a>,
     pub num_conv_layers: NonZeroUsize,
 }
 pub fn residual_conv_layers(
     inputs: Vec<SharedNode>,
     inputs_shape: &Shape,
     activation: &Activation,
+    normalization: Normalization<'_>,
     config: ResidualConvConfig<'_>,
     mut param_injection: Option<ParamInjection<'_>>,
 ) -> (Vec<SharedNode>, OwnedShape) {
@@ -46,17 +48,29 @@ pub fn residual_conv_layers(
 
     for i in 0..config.num_conv_layers.get() {
         let imm_inputs = match &prev_layer {
-            Some((layer, shape)) => Tensor::new(layer, shape).unwrap(),
-            None => Tensor::new(&inputs, inputs_shape).unwrap(),
+            Some((layer, shape)) => {
+                assert!(i != 0);
+                Tensor::new(layer, shape).unwrap()
+            }
+            None => {
+                assert!(i == 0);
+                Tensor::new(&inputs, inputs_shape).unwrap()
+            }
         };
 
         let is_end = i + 1 == config.num_conv_layers.get();
 
-        let conv_param_injection = param_injection
-            .as_mut()
-            .map(|x| x.name_append(&format!(":conv.{i}")));
-        let (conv_layer, shape) =
-            deep_conv_layer(imm_inputs, config.conv.clone(), conv_param_injection);
+        let (conv_layer, shape) = {
+            let param_injection = param_injection
+                .as_mut()
+                .map(|x| x.name_append(&format!(":conv.{i}")));
+            let config = if i == 0 {
+                &config.first_conv
+            } else {
+                &config.following_conv
+            };
+            deep_conv_layer(imm_inputs, config.clone(), param_injection)
+        };
         let res_layer = if is_end {
             let param_injection = param_injection
                 .as_mut()
@@ -65,7 +79,13 @@ pub fn residual_conv_layers(
         } else {
             conv_layer
         };
-        let layer = activation.activate(&res_layer);
+        let act_layer = activation.activate(&res_layer);
+        let layer = {
+            let param_injection = param_injection
+                .as_mut()
+                .map(|x| x.name_append(&format!(":norm.{i}")));
+            normalization.clone().normalize(act_layer, param_injection)
+        };
         prev_layer = Some((layer, shape));
     }
 

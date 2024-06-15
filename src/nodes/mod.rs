@@ -12,6 +12,7 @@ pub mod mean;
 pub mod mse;
 pub mod power;
 pub mod product;
+pub mod recurrent;
 pub mod relu;
 pub mod sigmoid;
 pub mod softmax;

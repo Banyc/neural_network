@@ -47,6 +47,7 @@ pub fn batch_norm_node(
     )
 }
 
+#[derive(Clone)]
 pub struct BatchNormLayerConfig<'a> {
     pub initial_saved: Option<&'a dyn Fn() -> SharedParams>,
     pub initial_trainable: Option<&'a dyn Fn() -> SharedParams>,

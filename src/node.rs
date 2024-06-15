@@ -123,6 +123,14 @@ impl Node {
                     .get(batch_index);
                     let parameters = self.parameters.as_ref().borrow();
                     let o = comp.compute_output(&parameters, operand_outputs, inputs.as_ref());
+                    if !o.is_finite() {
+                        let e = format!(
+                            "{self:?}; {comp:?}; output: {o}; params: {:?}; operands: {operand_outputs:?}; inputs: {:?}",
+                            *parameters,
+                            inputs.as_ref(),
+                        );
+                        panic!("{e}");
+                    }
                     eval_buf.push(o);
                 }
             }

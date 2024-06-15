@@ -63,6 +63,7 @@ fn mean(x: &[f64]) -> f64 {
 }
 
 fn mean_derivative(x: &[f64], mut buf: Vec<f64>) -> Vec<f64> {
-    buf.extend(core::iter::repeat(1. / x.len() as f64).take(x.len()));
+    let n = x.len();
+    buf.extend(core::iter::repeat(1. / n as f64).take(n));
     buf
 }

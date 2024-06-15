@@ -5,12 +5,12 @@ use strict_num::FiniteF64;
 use crate::{
     layers::{
         activation::Activation,
-        conv_max_pooling::{
+        dense::dense_layer,
+        kernel::KernelLayerConfig,
+        tensor::{
             conv::{ConvLayerConfig, DeepConvLayerConfig},
             conv_max_pooling_layer,
         },
-        dense::dense_layer,
-        kernel::KernelLayerConfig,
     },
     mut_cell::MutCell,
     neural_network::{AccurateFnParams, NeuralNetwork, TrainOption},

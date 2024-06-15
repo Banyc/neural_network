@@ -122,7 +122,14 @@ fn neural_network(mut param_injection: Option<ParamInjection<'_>>) -> NeuralNetw
             assert_output_shape: Some(&[12, 12, 6]),
         };
         let param_injection = param_injection.as_mut().map(|x| x.name_append(":conv.0"));
-        conv_max_pooling_layer(inputs, conv, max_pooling, &activation, param_injection)
+        conv_max_pooling_layer(
+            inputs,
+            conv,
+            max_pooling,
+            &activation,
+            None,
+            param_injection,
+        )
     };
     let (layer, _shape) = {
         let inputs = Tensor::new(&layer, &shape).unwrap();
@@ -146,7 +153,14 @@ fn neural_network(mut param_injection: Option<ParamInjection<'_>>) -> NeuralNetw
             assert_output_shape: Some(&[4, 4, 16]),
         };
         let param_injection = param_injection.as_mut().map(|x| x.name_append(":conv.1"));
-        conv_max_pooling_layer(inputs, conv, max_pooling, &activation, param_injection)
+        conv_max_pooling_layer(
+            inputs,
+            conv,
+            max_pooling,
+            &activation,
+            None,
+            param_injection,
+        )
     };
     let layer = {
         let config = LinearLayerConfig {

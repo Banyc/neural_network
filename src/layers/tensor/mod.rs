@@ -20,12 +20,22 @@ pub fn conv_max_pooling_layer(
     conv: DeepConvLayerConfig<'_>,
     max_pooling: KernelLayerConfig<'_>,
     activation: &Activation,
-    param_injection: Option<ParamInjection<'_>>,
+    normalization: Option<Normalization<'_>>,
+    mut param_injection: Option<ParamInjection<'_>>,
 ) -> (Vec<SharedNode>, OwnedShape) {
-    let (conv_layer, shape) = deep_conv_layer(inputs, conv, param_injection);
+    let (conv_layer, shape) = {
+        let param_injection = param_injection.as_mut().map(|x| x.name_append(":conv"));
+        deep_conv_layer(inputs, conv, param_injection)
+    };
     let activation_layer = activation.activate(&conv_layer);
+    let normalization_layer = if let Some(norm) = normalization {
+        let param_injection = param_injection.as_mut().map(|x| x.name_append(":norm"));
+        norm.normalize(activation_layer, param_injection)
+    } else {
+        activation_layer
+    };
     {
-        let inputs = Tensor::new(&activation_layer, &shape).unwrap();
+        let inputs = Tensor::new(&normalization_layer, &shape).unwrap();
         max_pooling_layer(inputs, max_pooling)
     }
 }

@@ -8,27 +8,27 @@ use crate::{
         bias::bias_node,
         input::{input_node, input_node_batch, InputNodeBatchParams},
         l2_error::l2_error_node,
-        linear::linear_node,
+        linear::{linear_node, linear_node_manual},
         relu::relu_node,
         sigmoid::sigmoid_node,
         weights::weight_node,
     },
-    param::SharedParams,
+    param::{ParamInjection, ParamInjector, SharedParams},
 };
 
 fn single_linear_relu(
     input_nodes: Vec<SharedNode>,
-    initial_weights: Option<SharedParams>,
-    initial_bias: Option<SharedParams>,
+    initial_weights: SharedParams,
+    initial_bias: SharedParams,
 ) -> Node {
-    let linear_node = linear_node(input_nodes, initial_weights, initial_bias, None, None).unwrap();
+    let linear_node = linear_node_manual(input_nodes, None, initial_weights, initial_bias).unwrap();
     relu_node(linear_node)
 }
 
 fn single_linear_relu_network(
     node_count: usize,
-    initial_weights: Option<SharedParams>,
-    initial_bias: Option<SharedParams>,
+    initial_weights: SharedParams,
+    initial_bias: SharedParams,
 ) -> NeuralNetwork {
     let input_nodes = input_node_batch(InputNodeBatchParams {
         start: 0,
@@ -47,7 +47,7 @@ fn evaluate() {
     let initial_weights = Arc::new(MutCell::new(initial_weights));
     let initial_bias = -20.0;
     let initial_bias = Arc::new(MutCell::new(vec![initial_bias]));
-    let mut network = single_linear_relu_network(3, Some(initial_weights), Some(initial_bias));
+    let mut network = single_linear_relu_network(3, initial_weights, initial_bias);
     let ret = network.evaluate(&[&[1.0, 2.0, 3.0]]);
     assert_eq!(ret[0][0], 0.0);
 }
@@ -74,7 +74,7 @@ fn cache_reset() {
     let initial_weights = Arc::new(MutCell::new(initial_weights));
     let initial_bias = 3.0;
     let initial_bias = Arc::new(MutCell::new(vec![initial_bias]));
-    let mut network = single_linear_relu_network(2, Some(initial_weights), Some(initial_bias));
+    let mut network = single_linear_relu_network(2, initial_weights, initial_bias);
     let ret = network.evaluate(&[&[2.0, -2.0]]);
     assert_eq!(ret[0][0], 5.0);
     let ret = network.evaluate(&[&[6.0, -2.0]]);
@@ -87,7 +87,7 @@ fn errors_on_dataset() {
     let initial_weights = Arc::new(MutCell::new(initial_weights));
     let initial_bias = 3.0;
     let initial_bias = Arc::new(MutCell::new(vec![initial_bias]));
-    let mut network = single_linear_relu_network(2, Some(initial_weights), Some(initial_bias));
+    let mut network = single_linear_relu_network(2, initial_weights, initial_bias);
     let dataset = vec![vec![2.0, -2.0, 5.0], vec![6.0, -2.0, 5.0]];
     let ret = network.accuracy(&dataset, binary_accurate);
     assert!(ret > 0.499);
@@ -103,11 +103,11 @@ fn gradients() {
     });
     let initial_weights = vec![2.0, 1.0];
     let initial_weights = Arc::new(MutCell::new(initial_weights));
-    let weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
+    let weight_node = weight_node(input_nodes, initial_weights, None).unwrap();
     let weight_node = Arc::new(MutCell::new(weight_node));
     let initial_bias = 3.0;
     let initial_bias = Arc::new(MutCell::new(vec![initial_bias]));
-    let bias_node = bias_node(Arc::clone(&weight_node), Some(initial_bias));
+    let bias_node = bias_node(Arc::clone(&weight_node), initial_bias);
     let bias_node = Arc::new(MutCell::new(bias_node));
     let relu_node = relu_node(Arc::clone(&bias_node));
     let relu_node = Arc::new(MutCell::new(relu_node));
@@ -134,11 +134,11 @@ fn backpropagation_step() {
     });
     let initial_weights = vec![2.0, 1.0];
     let initial_weights = Arc::new(MutCell::new(initial_weights));
-    let weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
+    let weight_node = weight_node(input_nodes, initial_weights, None).unwrap();
     let weight_node = Arc::new(MutCell::new(weight_node));
     let initial_bias = 3.0;
     let initial_bias = Arc::new(MutCell::new(vec![initial_bias]));
-    let bias_node = bias_node(Arc::clone(&weight_node), Some(initial_bias));
+    let bias_node = bias_node(Arc::clone(&weight_node), initial_bias);
     let bias_node = Arc::new(MutCell::new(bias_node));
     let relu_node = relu_node(Arc::clone(&bias_node));
     let relu_node = Arc::new(MutCell::new(relu_node));
@@ -172,16 +172,12 @@ fn backpropagation_step2() {
     });
     let initial_weights1 = vec![2.0];
     let initial_weights1 = Arc::new(MutCell::new(initial_weights1));
-    let weight_node1 = weight_node(input_nodes, Some(initial_weights1), None).unwrap();
+    let weight_node1 = weight_node(input_nodes, initial_weights1, None).unwrap();
     let weight_node1 = Arc::new(MutCell::new(weight_node1));
     let initial_weights2 = vec![3.0];
     let initial_weights2 = Arc::new(MutCell::new(initial_weights2));
-    let weight_node2 = weight_node(
-        vec![Arc::clone(&weight_node1)],
-        Some(initial_weights2),
-        None,
-    )
-    .unwrap();
+    let weight_node2 =
+        weight_node(vec![Arc::clone(&weight_node1)], initial_weights2, None).unwrap();
     let weight_node2 = Arc::new(MutCell::new(weight_node2));
     let label_node = input_node(label_index);
     let label_node = Arc::new(MutCell::new(label_node));
@@ -206,17 +202,29 @@ fn backpropagation_step2() {
 
 #[test]
 fn learn_xor_sigmoid() {
+    let mut param_injector = ParamInjector::empty();
+    let mut param_injection = ParamInjection {
+        injector: &mut param_injector,
+        name: "".to_string(),
+    };
+
     let label_index = 2;
     let input_nodes = input_node_batch(InputNodeBatchParams {
         start: 0,
         len: label_index,
     });
-    let linear_node_1 =
-        linear_node(clone_node_batch(&input_nodes), None, None, None, None).unwrap();
-    let linear_node_2 =
-        linear_node(clone_node_batch(&input_nodes), None, None, None, None).unwrap();
-    let linear_node_3 =
-        linear_node(clone_node_batch(&input_nodes), None, None, None, None).unwrap();
+    let linear_node_1 = {
+        let param_injection = param_injection.name_append(":linear.0");
+        linear_node(clone_node_batch(&input_nodes), None, param_injection).unwrap()
+    };
+    let linear_node_2 = {
+        let param_injection = param_injection.name_append(":linear.1");
+        linear_node(clone_node_batch(&input_nodes), None, param_injection).unwrap()
+    };
+    let linear_node_3 = {
+        let param_injection = param_injection.name_append(":linear.2");
+        linear_node(clone_node_batch(&input_nodes), None, param_injection).unwrap()
+    };
     let sigmoid_node_1 = sigmoid_node(linear_node_1);
     let sigmoid_node_2 = sigmoid_node(linear_node_2);
     let sigmoid_node_3 = sigmoid_node(linear_node_3);
@@ -225,7 +233,10 @@ fn learn_xor_sigmoid() {
         Arc::new(MutCell::new(sigmoid_node_2)),
         Arc::new(MutCell::new(sigmoid_node_3)),
     ];
-    let linear_output = linear_node(sigmoid_nodes, None, None, None, None).unwrap();
+    let linear_output = {
+        let param_injection = param_injection.name_append(":linear.output");
+        linear_node(sigmoid_nodes, None, param_injection).unwrap()
+    };
     let output = sigmoid_node(linear_output);
     let output = Arc::new(MutCell::new(output));
     let label_node = input_node(label_index);
@@ -257,36 +268,45 @@ fn learn_xor_sigmoid() {
 
 #[test]
 fn learn_xor_regularized_sigmoid() {
+    let mut param_injector = ParamInjector::empty();
+    let mut param_injection = ParamInjection {
+        injector: &mut param_injector,
+        name: "".to_string(),
+    };
+
     let label_index = 2;
     let lambda = 0.0001;
     let input_nodes = input_node_batch(InputNodeBatchParams {
         start: 0,
         len: label_index,
     });
-    let linear_node_1 = linear_node(
-        clone_node_batch(&input_nodes),
-        None,
-        None,
-        Some(lambda),
-        None,
-    )
-    .unwrap();
-    let linear_node_2 = linear_node(
-        clone_node_batch(&input_nodes),
-        None,
-        None,
-        Some(lambda),
-        None,
-    )
-    .unwrap();
-    let linear_node_3 = linear_node(
-        clone_node_batch(&input_nodes),
-        None,
-        None,
-        Some(lambda),
-        None,
-    )
-    .unwrap();
+    let linear_node_1 = {
+        let param_injection = param_injection.name_append(":linear.0");
+        linear_node(
+            clone_node_batch(&input_nodes),
+            Some(lambda),
+            param_injection,
+        )
+        .unwrap()
+    };
+    let linear_node_2 = {
+        let param_injection = param_injection.name_append(":linear.1");
+        linear_node(
+            clone_node_batch(&input_nodes),
+            Some(lambda),
+            param_injection,
+        )
+        .unwrap()
+    };
+    let linear_node_3 = {
+        let param_injection = param_injection.name_append(":linear.2");
+        linear_node(
+            clone_node_batch(&input_nodes),
+            Some(lambda),
+            param_injection,
+        )
+        .unwrap()
+    };
     let sigmoid_node_1 = sigmoid_node(linear_node_1);
     let sigmoid_node_2 = sigmoid_node(linear_node_2);
     let sigmoid_node_3 = sigmoid_node(linear_node_3);
@@ -295,7 +315,10 @@ fn learn_xor_regularized_sigmoid() {
         Arc::new(MutCell::new(sigmoid_node_2)),
         Arc::new(MutCell::new(sigmoid_node_3)),
     ];
-    let linear_output = linear_node(sigmoid_nodes, None, None, Some(lambda), None).unwrap();
+    let linear_output = {
+        let param_injection = param_injection.name_append(":linear.output");
+        linear_node(sigmoid_nodes, Some(lambda), param_injection).unwrap()
+    };
     let output = sigmoid_node(linear_output);
     let output = Arc::new(MutCell::new(output));
     let label_node = input_node(label_index);
@@ -327,6 +350,12 @@ fn learn_xor_regularized_sigmoid() {
 
 #[test]
 fn learn_xor_relu() {
+    let mut param_injector = ParamInjector::empty();
+    let mut param_injection = ParamInjection {
+        injector: &mut param_injector,
+        name: "".to_string(),
+    };
+
     let label_index = 2;
     let input_nodes = input_node_batch(InputNodeBatchParams {
         start: 0,
@@ -334,9 +363,11 @@ fn learn_xor_relu() {
     });
     let first_layer = {
         let mut layer = Vec::new();
-        for _ in 0..10 {
+        let mut param_injection = param_injection.name_append(":layer.0");
+        for i in 0..10 {
+            let param_injection = param_injection.name_append(&format!(":linear.{i}"));
             let linear_node =
-                linear_node(clone_node_batch(&input_nodes), None, None, None, None).unwrap();
+                linear_node(clone_node_batch(&input_nodes), None, param_injection).unwrap();
             layer.push(linear_node);
         }
         layer
@@ -351,9 +382,11 @@ fn learn_xor_relu() {
     };
     let second_layer = {
         let mut layer = Vec::new();
-        for _ in 0..10 {
+        let mut param_injection = param_injection.name_append(":layer.1");
+        for i in 0..10 {
+            let param_injection = param_injection.name_append(&format!(":linear.{i}"));
             let linear_node =
-                linear_node(clone_node_batch(&first_layer_relu), None, None, None, None).unwrap();
+                linear_node(clone_node_batch(&first_layer_relu), None, param_injection).unwrap();
             layer.push(linear_node);
         }
         layer
@@ -366,7 +399,10 @@ fn learn_xor_relu() {
         }
         layer
     };
-    let linear_output = linear_node(second_layer_relu, None, None, None, None).unwrap();
+    let linear_output = {
+        let param_injection = param_injection.name_append(":linear.output");
+        linear_node(second_layer_relu, None, param_injection).unwrap()
+    };
     let output = sigmoid_node(linear_output);
     let output = Arc::new(MutCell::new(output));
     let label_node = input_node(label_index);

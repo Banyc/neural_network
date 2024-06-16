@@ -21,15 +21,13 @@ use crate::{
 pub fn residual_layer(
     outputs: Vec<SharedNode>,
     inputs: Vec<SharedNode>,
-    param_injection: Option<ParamInjection<'_>>,
+    param_injection: ParamInjection<'_>,
 ) -> Vec<SharedNode> {
     assert!(!outputs.is_empty());
     assert!(!inputs.is_empty());
     let inputs = if outputs.len() != inputs.len() {
         let config = LinearLayerConfig {
             depth: NonZeroUsize::new(outputs.len()).unwrap(),
-            initial_weights: None,
-            initial_bias: None,
             lambda: None,
         };
         linear_layer(inputs, config, param_injection).unwrap()

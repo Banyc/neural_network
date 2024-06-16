@@ -17,7 +17,7 @@ pub fn rnn(
     inputs: Vec<SharedNode>,
     depth: NonZeroUsize,
     activation: &Activation,
-    mut param_injection: Option<ParamInjection>,
+    mut param_injection: ParamInjection,
 ) -> Vec<SharedNode> {
     let mut rec_readers = vec![];
     let mut rec_values = vec![];
@@ -27,21 +27,17 @@ pub fn rnn(
         rec_values.push(value);
     }
     let x = {
-        let param_injection = param_injection.as_mut().map(|x| x.name_append(":input"));
+        let param_injection = param_injection.name_append(":input");
         let config = LinearLayerConfig {
             depth,
-            initial_weights: None,
-            initial_bias: None,
             lambda: None,
         };
         linear_layer(inputs, config, param_injection).unwrap()
     };
     let rec = {
-        let param_injection = param_injection.as_mut().map(|x| x.name_append(":rec"));
+        let param_injection = param_injection.name_append(":rec");
         let config = LinearLayerConfig {
             depth,
-            initial_weights: None,
-            initial_bias: None,
             lambda: None,
         };
         linear_layer(rec_readers, config, param_injection).unwrap()

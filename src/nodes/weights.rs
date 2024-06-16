@@ -34,20 +34,14 @@ pub fn rnd_weights(op_len: usize) -> Vec<f64> {
 /// - `lambda`: for regularization
 pub fn weight_node(
     operands: Vec<SharedNode>,
-    mut weights: Option<SharedParams>,
+    weights: SharedParams,
     lambda: Option<f64>,
 ) -> Result<Node, WeightNodeError> {
-    if let Some(weights) = &weights {
-        if operands.len() != weights.borrow().len() {
-            return Err(WeightNodeError::ParameterSizeNotMatched);
-        }
+    if operands.len() != weights.borrow().len() {
+        return Err(WeightNodeError::ParameterSizeNotMatched);
     }
     let computation = WeightNodeComputation {
         lambda: lambda.unwrap_or(0.),
-    };
-    let weights = match weights.take() {
-        Some(x) => x,
-        None => Arc::new(MutCell::new(rnd_weights(operands.len()))),
     };
     let node = Node::new(
         operands,
@@ -145,7 +139,7 @@ mod tests {
         let inputs = vec![1.0, 2.0, 3.0];
         let initial_weights = vec![3.0, 2.0, 1.0];
         let initial_weights = Arc::new(MutCell::new(initial_weights));
-        let mut weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
+        let mut weight_node = weight_node(input_nodes, initial_weights, None).unwrap();
         let mut cx = NodeContext::new();
         weight_node.evaluate_once(&[&inputs], &mut cx, ComputationMode::Inference);
         let output = weight_node.output().unwrap()[0];
@@ -158,7 +152,7 @@ mod tests {
         let inputs = vec![1.0, 2.0, 3.0];
         let initial_weights = vec![3.0, 2.0, 1.0];
         let initial_weights = Arc::new(MutCell::new(initial_weights));
-        let mut weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
+        let mut weight_node = weight_node(input_nodes, initial_weights, None).unwrap();
         let mut cx = NodeContext::new();
         weight_node.evaluate_once(&[&inputs], &mut cx, ComputationMode::Inference);
         let batch_index = 0;
@@ -174,7 +168,7 @@ mod tests {
         let inputs = vec![1.0, 2.0, 3.0];
         let initial_weights = vec![3.0, 2.0, 1.0];
         let initial_weights = Arc::new(MutCell::new(initial_weights));
-        let mut weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
+        let mut weight_node = weight_node(input_nodes, initial_weights, None).unwrap();
         let mut cx = NodeContext::new();
         weight_node.evaluate_once(&[&inputs], &mut cx, ComputationMode::Inference);
         let batch_index = 0;

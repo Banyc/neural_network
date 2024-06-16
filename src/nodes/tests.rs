@@ -15,8 +15,8 @@ fn linear_evaluate() {
     let initial_weights = Arc::new(MutCell::new(initial_weights));
     let initial_bias = 4.0;
     let initial_bias = Arc::new(MutCell::new(vec![initial_bias]));
-    let weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
-    let mut bias_node = bias_node(Arc::new(MutCell::new(weight_node)), Some(initial_bias));
+    let weight_node = weight_node(input_nodes, initial_weights, None).unwrap();
+    let mut bias_node = bias_node(Arc::new(MutCell::new(weight_node)), initial_bias);
     let mut cx = NodeContext::new();
     bias_node.evaluate_once(&[&inputs], &mut cx, ComputationMode::Inference);
     let output = bias_node.output().unwrap()[0];
@@ -31,8 +31,8 @@ fn linear_gradient_of_this_at_operand() {
     let initial_weights = Arc::new(MutCell::new(initial_weights));
     let initial_bias = 4.0;
     let initial_bias = Arc::new(MutCell::new(vec![initial_bias]));
-    let weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
-    let mut bias_node = bias_node(Arc::new(MutCell::new(weight_node)), Some(initial_bias));
+    let weight_node = weight_node(input_nodes, initial_weights, None).unwrap();
+    let mut bias_node = bias_node(Arc::new(MutCell::new(weight_node)), initial_bias);
     let mut cx = NodeContext::new();
     bias_node.evaluate_once(&[&inputs], &mut cx, ComputationMode::Inference);
     let batch_index = 0;
@@ -50,8 +50,8 @@ fn linear_gradient_of_this_at_parameter() {
     let initial_weights = Arc::new(MutCell::new(initial_weights));
     let initial_bias = 4.0;
     let initial_bias = Arc::new(MutCell::new(vec![initial_bias]));
-    let weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
-    let mut bias_node = bias_node(Arc::new(MutCell::new(weight_node)), Some(initial_bias));
+    let weight_node = weight_node(input_nodes, initial_weights, None).unwrap();
+    let mut bias_node = bias_node(Arc::new(MutCell::new(weight_node)), initial_bias);
     let mut cx = NodeContext::new();
     bias_node.evaluate_once(&[&inputs], &mut cx, ComputationMode::Inference);
     let batch_index = 0;
@@ -69,8 +69,8 @@ fn linear_with_relu_evaluate() {
     let initial_weights = Arc::new(MutCell::new(initial_weights));
     let initial_bias = -20.0;
     let initial_bias = Arc::new(MutCell::new(vec![initial_bias]));
-    let weight_node = weight_node(input_nodes, Some(initial_weights), None).unwrap();
-    let bias_node = bias_node(Arc::new(MutCell::new(weight_node)), Some(initial_bias));
+    let weight_node = weight_node(input_nodes, initial_weights, None).unwrap();
+    let bias_node = bias_node(Arc::new(MutCell::new(weight_node)), initial_bias);
     let bias_node = Arc::new(MutCell::new(bias_node));
     let mut relu_node = relu_node(Arc::clone(&bias_node));
     let mut cx = NodeContext::new();

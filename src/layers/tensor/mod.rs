@@ -20,16 +20,16 @@ pub fn conv_max_pooling_layer(
     conv: DeepConvLayerConfig<'_>,
     max_pooling: KernelLayerConfig<'_>,
     activation: &Activation,
-    normalization: Option<Normalization<'_>>,
-    mut param_injection: Option<ParamInjection<'_>>,
+    normalization: Option<Normalization>,
+    mut param_injection: ParamInjection<'_>,
 ) -> (Vec<SharedNode>, OwnedShape) {
     let (conv_layer, shape) = {
-        let param_injection = param_injection.as_mut().map(|x| x.name_append(":conv"));
+        let param_injection = param_injection.name_append(":conv");
         deep_conv_layer(inputs, conv, param_injection)
     };
     let activation_layer = activation.activate(&conv_layer);
     let normalization_layer = if let Some(norm) = normalization {
-        let param_injection = param_injection.as_mut().map(|x| x.name_append(":norm"));
+        let param_injection = param_injection.name_append(":norm");
         norm.normalize(activation_layer, param_injection)
     } else {
         activation_layer
@@ -50,9 +50,9 @@ pub fn residual_conv_layers(
     inputs: Vec<SharedNode>,
     inputs_shape: &Shape,
     activation: &Activation,
-    normalization: Normalization<'_>,
+    normalization: Normalization,
     config: ResidualConvConfig<'_>,
-    mut param_injection: Option<ParamInjection<'_>>,
+    mut param_injection: ParamInjection<'_>,
 ) -> (Vec<SharedNode>, OwnedShape) {
     let mut prev_layer: Option<(Vec<SharedNode>, OwnedShape)> = None;
 
@@ -71,9 +71,7 @@ pub fn residual_conv_layers(
         let is_end = i + 1 == config.num_conv_layers.get();
 
         let (conv_layer, shape) = {
-            let param_injection = param_injection
-                .as_mut()
-                .map(|x| x.name_append(&format!(":conv.{i}")));
+            let param_injection = param_injection.name_append(&format!(":conv.{i}"));
             let config = if i == 0 {
                 &config.first_conv
             } else {
@@ -82,18 +80,14 @@ pub fn residual_conv_layers(
             deep_conv_layer(imm_inputs, config.clone(), param_injection)
         };
         let res_layer = if is_end {
-            let param_injection = param_injection
-                .as_mut()
-                .map(|x| x.name_append(&format!(":res.{i}")));
+            let param_injection = param_injection.name_append(&format!(":res.{i}"));
             residual_layer(conv_layer, inputs.clone(), param_injection)
         } else {
             conv_layer
         };
         let act_layer = activation.activate(&res_layer);
         let layer = {
-            let param_injection = param_injection
-                .as_mut()
-                .map(|x| x.name_append(&format!(":norm.{i}")));
+            let param_injection = param_injection.name_append(&format!(":norm.{i}"));
             normalization.clone().normalize(act_layer, param_injection)
         };
         prev_layer = Some((layer, shape));

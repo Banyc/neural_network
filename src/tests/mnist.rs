@@ -18,7 +18,7 @@ use crate::{
     nodes::{input::InputNodeGen, linear::LinearLayerConfig, mse::mse_node},
     param::{
         tests::{param_injector, save_params},
-        ParamInjection,
+        ParamInjection, ParamInjector,
     },
     tensor::{primitive_to_stride, shape_to_non_zero, Tensor},
 };
@@ -35,7 +35,12 @@ const PARAMS_TXT: &str = "local/mnist/params.ron";
 fn converge() {
     let train_dataset = read_mnist(TRAIN_IMAGE, TRAIN_LABEL).unwrap();
     println!("inputs: {:?}", train_dataset[0]);
-    let mut nn = neural_network(None);
+    let mut param_injector = ParamInjector::empty();
+    let param_injection = ParamInjection {
+        injector: &mut param_injector,
+        name: "".to_string(),
+    };
+    let mut nn = neural_network(param_injection);
     let loss = nn.error(&train_dataset[0..1]);
     println!("loss: {loss}");
     let mut step_size = loss;
@@ -55,7 +60,12 @@ fn converge() {
         let loss = nn.error(&train_dataset[0..1]);
         println!("loss: {loss}");
         if (prev_loss - loss).abs() < 0.001 {
-            nn = neural_network(None);
+            param_injector = ParamInjector::empty();
+            let param_injection = ParamInjection {
+                injector: &mut param_injector,
+                name: "".to_string(),
+            };
+            nn = neural_network(param_injection);
             continue;
         }
         prev_loss = loss;
@@ -74,7 +84,7 @@ fn train() {
         injector: &mut param_injector,
         name: "".into(),
     };
-    let mut nn = neural_network(Some(param_injection));
+    let mut nn = neural_network(param_injection);
     let loss = nn.error(&train_dataset[0..1]);
     println!("loss: {loss}");
     let mut step_size = loss;
@@ -93,7 +103,7 @@ fn train() {
 }
 
 /// a LeNet variant
-fn neural_network(mut param_injection: Option<ParamInjection<'_>>) -> NeuralNetwork {
+fn neural_network(mut param_injection: ParamInjection<'_>) -> NeuralNetwork {
     let activation = Activation::Swish;
     let width = 28;
     let height = 28;
@@ -110,8 +120,6 @@ fn neural_network(mut param_injection: Option<ParamInjection<'_>>) -> NeuralNetw
                     kernel_shape: &shape_to_non_zero(&[5, 5]).unwrap(),
                     assert_output_shape: None,
                 },
-                initial_weights: None,
-                initial_bias: None,
                 lambda: None,
             },
             assert_output_shape: Some(&[24, 24, 6]),
@@ -121,7 +129,7 @@ fn neural_network(mut param_injection: Option<ParamInjection<'_>>) -> NeuralNetw
             kernel_shape: &shape_to_non_zero(&[2, 2, 1]).unwrap(),
             assert_output_shape: Some(&[12, 12, 6]),
         };
-        let param_injection = param_injection.as_mut().map(|x| x.name_append(":conv.0"));
+        let param_injection = param_injection.name_append(":conv.0");
         conv_max_pooling_layer(
             inputs,
             conv,
@@ -141,8 +149,6 @@ fn neural_network(mut param_injection: Option<ParamInjection<'_>>) -> NeuralNetw
                     kernel_shape: &shape_to_non_zero(&[5, 5, 6]).unwrap(),
                     assert_output_shape: None,
                 },
-                initial_weights: None,
-                initial_bias: None,
                 lambda: None,
             },
             assert_output_shape: Some(&[8, 8, 16]),
@@ -152,7 +158,7 @@ fn neural_network(mut param_injection: Option<ParamInjection<'_>>) -> NeuralNetw
             kernel_shape: &shape_to_non_zero(&[2, 2, 1]).unwrap(),
             assert_output_shape: Some(&[4, 4, 16]),
         };
-        let param_injection = param_injection.as_mut().map(|x| x.name_append(":conv.1"));
+        let param_injection = param_injection.name_append(":conv.1");
         conv_max_pooling_layer(
             inputs,
             conv,
@@ -165,31 +171,25 @@ fn neural_network(mut param_injection: Option<ParamInjection<'_>>) -> NeuralNetw
     let layer = {
         let config = LinearLayerConfig {
             depth: NonZeroUsize::new(120).unwrap(),
-            initial_weights: None,
-            initial_bias: None,
             lambda: None,
         };
-        let param_injection = param_injection.as_mut().map(|x| x.name_append(":dense.0"));
+        let param_injection = param_injection.name_append(":dense.0");
         dense_layer(layer, config, &activation, param_injection)
     };
     let layer = {
         let config = LinearLayerConfig {
             depth: NonZeroUsize::new(84).unwrap(),
-            initial_weights: None,
-            initial_bias: None,
             lambda: None,
         };
-        let param_injection = param_injection.as_mut().map(|x| x.name_append(":dense.1"));
+        let param_injection = param_injection.name_append(":dense.1");
         dense_layer(layer, config, &activation, param_injection)
     };
     let outputs = {
         let config = LinearLayerConfig {
             depth: NonZeroUsize::new(CLASSES).unwrap(),
-            initial_weights: None,
-            initial_bias: None,
             lambda: None,
         };
-        let param_injection = param_injection.as_mut().map(|x| x.name_append(":dense.2"));
+        let param_injection = param_injection.name_append(":dense.2");
         dense_layer(layer, config, &activation, param_injection)
     };
     let label_nodes = input_node_gen.gen(CLASSES);

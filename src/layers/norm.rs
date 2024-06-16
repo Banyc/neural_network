@@ -8,15 +8,15 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub enum Normalization<'a> {
-    BatchNorm { config: BatchNormLayerConfig<'a> },
+pub enum Normalization {
+    BatchNorm { config: BatchNormLayerConfig },
     LayerNorm,
 }
-impl Normalization<'_> {
+impl Normalization {
     pub fn normalize(
         self,
         inputs: Vec<SharedNode>,
-        param_injection: Option<ParamInjection<'_>>,
+        param_injection: ParamInjection<'_>,
     ) -> Vec<SharedNode> {
         match self {
             Normalization::BatchNorm { config } => {

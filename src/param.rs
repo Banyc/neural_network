@@ -22,8 +22,8 @@ impl<'a> ParamInjection<'a> {
         }
     }
 
-    pub fn insert_params(self, params: SharedParams) {
-        self.injector.insert_params(self.name, params);
+    pub fn get_or_create_params(self, create: impl Fn() -> SharedParams) -> SharedParams {
+        self.injector.get_or_create_params(self.name, create)
     }
 }
 
@@ -46,12 +46,20 @@ impl ParamInjector {
         }
     }
 
-    pub fn insert_params(&mut self, name: String, params: SharedParams) {
-        assert!(!self.params.contains_key(&name));
+    pub fn get_or_create_params(
+        &mut self,
+        name: String,
+        create: impl Fn() -> SharedParams,
+    ) -> SharedParams {
+        if let Some(params) = self.params.get(&name) {
+            return Arc::clone(params);
+        }
+        let params = create();
         if let Some(p) = self.prev_params.get(&name) {
             *params.borrow_mut() = p.clone();
         }
-        self.params.insert(name, params);
+        self.params.insert(name, Arc::clone(&params));
+        params
     }
 
     pub fn collect_parameters(&self) -> HashMap<String, Vec<f64>> {

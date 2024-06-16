@@ -28,14 +28,10 @@ pub fn default_saved_params() -> Vec<f64> {
 /// ```
 pub fn batch_norm_node(
     operand: SharedNode,
-    saved_params: Option<SharedParams>,
-    trainable_params: Option<SharedParams>,
+    saved_params: SharedParams,
+    trainable_params: SharedParams,
     alpha: f64,
 ) -> Node {
-    let saved_params =
-        saved_params.unwrap_or_else(|| Arc::new(MutCell::new(default_saved_params())));
-    let trainable_params =
-        trainable_params.unwrap_or_else(|| Arc::new(MutCell::new(default_trainable_params())));
     let computation = BatchNormComputation {
         saved_params,
         alpha,
@@ -48,43 +44,25 @@ pub fn batch_norm_node(
 }
 
 #[derive(Clone)]
-pub struct BatchNormLayerConfig<'a> {
-    pub initial_saved: Option<&'a dyn Fn() -> SharedParams>,
-    pub initial_trainable: Option<&'a dyn Fn() -> SharedParams>,
+pub struct BatchNormLayerConfig {
     pub alpha: f64,
 }
 pub fn batch_norm_layer(
     input_nodes: Vec<SharedNode>,
     config: BatchNormLayerConfig,
-    mut param_injection: Option<ParamInjection<'_>>,
+    mut param_injection: ParamInjection<'_>,
 ) -> Vec<SharedNode> {
     let mut layer = Vec::with_capacity(input_nodes.len());
     for (i, input_node) in input_nodes.into_iter().enumerate() {
-        let mut param_injection = param_injection
-            .as_mut()
-            .map(|x| x.name_append(&format!(":bn.{i}")));
-        let saved_params = config
-            .initial_saved
-            .map(|f| f())
-            .unwrap_or_else(|| Arc::new(MutCell::new(default_saved_params())));
-        let trainable_params = config
-            .initial_trainable
-            .map(|f| f())
-            .unwrap_or_else(|| Arc::new(MutCell::new(default_trainable_params())));
-        if let Some(param_injection) = param_injection.as_mut() {
-            param_injection
-                .name_append(":saved")
-                .insert_params(Arc::clone(&saved_params));
-            param_injection
-                .name_append(":trainable")
-                .insert_params(Arc::clone(&trainable_params));
-        }
-        let batch_norm_node = batch_norm_node(
-            input_node,
-            Some(saved_params),
-            Some(trainable_params),
-            config.alpha,
-        );
+        let mut param_injection = param_injection.name_append(&format!(":bn.{i}"));
+        let saved_params = param_injection
+            .name_append(":saved")
+            .get_or_create_params(|| Arc::new(MutCell::new(default_saved_params())));
+        let trainable_params = param_injection
+            .name_append(":trainable")
+            .get_or_create_params(|| Arc::new(MutCell::new(default_trainable_params())));
+        let batch_norm_node =
+            batch_norm_node(input_node, saved_params, trainable_params, config.alpha);
         layer.push(Arc::new(MutCell::new(batch_norm_node)));
     }
     layer

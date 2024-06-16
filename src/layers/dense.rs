@@ -10,7 +10,7 @@ pub fn dense_layer(
     inputs: Vec<SharedNode>,
     config: LinearLayerConfig,
     activation: &Activation,
-    param_injection: Option<ParamInjection<'_>>,
+    param_injection: ParamInjection<'_>,
 ) -> Vec<SharedNode> {
     let depth = config.depth;
     let linear_layer = linear_layer(inputs, config, param_injection).unwrap();

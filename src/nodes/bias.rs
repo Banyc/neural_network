@@ -14,9 +14,8 @@ pub fn default_bias() -> f64 {
 /// ```math
 /// f_b (x) = x + b
 /// ```
-pub fn bias_node(operand: SharedNode, bias: Option<SharedParams>) -> Node {
+pub fn bias_node(operand: SharedNode, bias: SharedParams) -> Node {
     let computation = BiasNodeComputation {};
-    let bias = bias.unwrap_or(Arc::new(MutCell::new(vec![default_bias()])));
     assert_eq!(bias.borrow().len(), 1);
     Node::new(
         vec![operand],

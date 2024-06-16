@@ -6,7 +6,6 @@ use crate::{
     node::SharedNode,
     nodes::{
         linear::{linear_layer, LinearLayerConfig},
-        recurrent::{recurrent_reader_node, recurrent_writer_node},
         sum::sum_node,
     },
     param::ParamInjection,
@@ -14,24 +13,18 @@ use crate::{
 
 /// gradient computation algorithm: BPTT
 pub fn rnn(
+    init_hidden_states: Vec<SharedNode>,
     inputs_seq: Vec<Vec<SharedNode>>,
-    depth: NonZeroUsize,
     activation: &Activation,
     mut param_injection: ParamInjection<'_>,
 ) -> Vec<Vec<SharedNode>> {
     assert!(!inputs_seq.is_empty());
 
-    let mut rec_readers = vec![];
-    let mut rec_values = vec![];
-    for _ in 0..depth.get() {
-        let (reader, value) = recurrent_reader_node();
-        rec_readers.push(Arc::new(MutCell::new(reader)));
-        rec_values.push(value);
-    }
+    let depth = NonZeroUsize::new(init_hidden_states.len()).unwrap();
+    let mut init_hidden_states = Some(init_hidden_states);
+    let mut rnn_unit_seq: Vec<Vec<SharedNode>> = vec![];
 
-    let mut rnn_unit_seq = vec![rec_readers];
-
-    let mut param_injection = param_injection.name_append(":rnn");
+    let mut param_injection = param_injection.name_append(":unit");
     for inputs in inputs_seq.into_iter() {
         let x = {
             let param_injection = param_injection.name_append(":input");
@@ -41,18 +34,17 @@ pub fn rnn(
             };
             linear_layer(inputs, config, param_injection).unwrap()
         };
+        let hidden_states = match init_hidden_states.take() {
+            Some(x) => x,
+            None => rnn_unit_seq.last().unwrap().clone(),
+        };
         let rec = {
             let param_injection = param_injection.name_append(":rec");
             let config = LinearLayerConfig {
                 depth,
                 lambda: None,
             };
-            linear_layer(
-                rnn_unit_seq.last().unwrap().clone(),
-                config,
-                param_injection,
-            )
-            .unwrap()
+            linear_layer(hidden_states, config, param_injection).unwrap()
         };
         let mut sum_layer = vec![];
         for (x, rec) in x.into_iter().zip(rec.into_iter()) {
@@ -60,21 +52,9 @@ pub fn rnn(
             sum_layer.push(Arc::new(MutCell::new(node)));
         }
         let act_layer = activation.activate(&sum_layer);
-        assert_eq!(act_layer.len(), rec_values.len());
+        assert_eq!(act_layer.len(), depth.get());
         rnn_unit_seq.push(act_layer);
     }
-
-    let mut rec_writers = vec![];
-    for (input, value) in rnn_unit_seq
-        .pop()
-        .unwrap()
-        .into_iter()
-        .zip(rec_values.into_iter())
-    {
-        let writer = recurrent_writer_node(input, value);
-        rec_writers.push(Arc::new(MutCell::new(writer)));
-    }
-    rnn_unit_seq.push(rec_writers);
 
     rnn_unit_seq
 }

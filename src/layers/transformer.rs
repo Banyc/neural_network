@@ -16,6 +16,49 @@ use crate::{
     param::ParamInjection,
 };
 
+pub fn codec_transformer(
+    encoding_inputs_seq: Vec<Vec<SharedNode>>,
+    encoding_seq: SeqDef,
+    decoding_inputs_seq: Vec<Vec<SharedNode>>,
+    decoding_seq: SeqDef,
+    depth: NonZeroUsize,
+    heads: NonZeroUsize,
+    mut param_injection: ParamInjection<'_>,
+) -> Vec<Vec<Vec<SharedNode>>> {
+    let encoder = {
+        let param_injection = param_injection.name_append(":encoder");
+        transformer(
+            encoding_inputs_seq,
+            encoding_seq,
+            depth,
+            heads,
+            param_injection,
+        )
+    };
+    let decoder = {
+        let param_injection = param_injection.name_append(":decoder");
+        transformer(
+            decoding_inputs_seq,
+            decoding_seq,
+            depth,
+            heads,
+            param_injection,
+        )
+    };
+    let mut seqs = vec![];
+    for (i, (encoder_seq, decoder_seq)) in encoder.into_iter().zip(decoder.into_iter()).enumerate()
+    {
+        let reference = AttentionReference {
+            referee_seq: encoder_seq,
+            referrer_seq: decoder_seq,
+        };
+        let param_injection = param_injection.name_append(&format!(":codec_attention.{i}"));
+        let seq = residual_attention_seq(reference, depth, param_injection);
+        seqs.push(seq);
+    }
+    seqs
+}
+
 /// output shape: (word embedding depth, sequence length, heads)
 pub fn transformer(
     inputs_seq: Vec<Vec<SharedNode>>,
@@ -34,47 +77,56 @@ pub fn transformer(
     }
     let mut residual_connection_seqs = vec![];
     for i in 0..heads.get() {
+        let reference = AttentionReference {
+            referee_seq: layer_seq.clone(),
+            referrer_seq: layer_seq.clone(),
+        };
         let param_injection = param_injection.name_append(&format!(":self_attention.{i}"));
-        let residual_connection_seq =
-            residual_self_attention_seq(layer_seq.clone(), depth, param_injection);
+        let residual_connection_seq = residual_attention_seq(reference, depth, param_injection);
         residual_connection_seqs.push(residual_connection_seq);
     }
     residual_connection_seqs
 }
 
-pub fn residual_self_attention_seq(
-    inputs_seq: Vec<Vec<SharedNode>>,
+pub fn residual_attention_seq(
+    reference: AttentionReference,
     depth: NonZeroUsize,
     param_injection: ParamInjection<'_>,
 ) -> Vec<Vec<SharedNode>> {
-    let self_attention_seq = self_attention_seq(inputs_seq.clone(), depth, param_injection);
+    let referrer_seq = reference.referrer_seq.clone();
+    let attention_value_seq = attention_seq(reference, depth, param_injection);
     let mut residual_connection_seq = vec![];
-    for (self_attention, x) in self_attention_seq.into_iter().zip(inputs_seq.iter()) {
-        let residual_connection = same_size_residual_layer(self_attention, x.clone());
+    for (attention_value, x) in attention_value_seq.into_iter().zip(referrer_seq.iter()) {
+        let residual_connection = same_size_residual_layer(attention_value, x.clone());
         residual_connection_seq.push(residual_connection);
     }
     residual_connection_seq
 }
 
-pub fn self_attention_seq(
-    inputs_seq: Vec<Vec<SharedNode>>,
+#[derive(Debug)]
+pub struct AttentionReference {
+    pub referee_seq: Vec<Vec<SharedNode>>,
+    pub referrer_seq: Vec<Vec<SharedNode>>,
+}
+pub fn attention_seq(
+    reference: AttentionReference,
     depth: NonZeroUsize,
     mut param_injection: ParamInjection<'_>,
 ) -> Vec<Vec<SharedNode>> {
     let value_seq = {
         let param_injection = param_injection.name_append(":value");
-        linear_layer_seq(inputs_seq.clone(), depth, param_injection)
+        linear_layer_seq(reference.referee_seq.clone(), depth, param_injection)
     };
     let key_seq = {
         let param_injection = param_injection.name_append(":key");
-        linear_layer_seq(inputs_seq.clone(), depth, param_injection)
+        linear_layer_seq(reference.referee_seq.clone(), depth, param_injection)
     };
     let query_seq = {
         let param_injection = param_injection.name_append(":query");
-        linear_layer_seq(inputs_seq.clone(), depth, param_injection)
+        linear_layer_seq(reference.referrer_seq, depth, param_injection)
     };
 
-    let mut self_attention_seq = vec![];
+    let mut attention_seq = vec![];
     for query in query_seq {
         let mut similarity_scores = vec![];
         for key in &key_seq {
@@ -103,9 +155,9 @@ pub fn self_attention_seq(
             let sum = Arc::new(MutCell::new(sum_node(sum)));
             self_attention_value.push(sum);
         }
-        self_attention_seq.push(self_attention_value);
+        attention_seq.push(self_attention_value);
     }
-    self_attention_seq
+    attention_seq
 }
 
 pub fn dot_product(a: &[SharedNode], b: &[SharedNode]) -> SharedNode {
@@ -121,6 +173,7 @@ pub fn dot_product(a: &[SharedNode], b: &[SharedNode]) -> SharedNode {
     Arc::new(MutCell::new(sum_node(products)))
 }
 
+#[derive(Debug, Clone)]
 pub struct SeqDef {
     pub start_pos: SharedNode,
     pub len: SharedNode,

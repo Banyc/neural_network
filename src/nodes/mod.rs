@@ -19,6 +19,7 @@ pub mod softmax;
 pub mod std_dev;
 pub mod sum;
 pub mod swish;
+pub mod tanh;
 #[cfg(test)]
 mod tests;
 pub mod weights;

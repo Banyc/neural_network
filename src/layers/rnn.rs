@@ -20,25 +20,22 @@ pub fn rnn(
 ) -> Vec<Vec<SharedNode>> {
     assert!(!inputs_seq.is_empty());
 
-    let mut init_hidden_states = Some(init_hidden_states);
-    let mut rnn_unit_seq: Vec<Vec<SharedNode>> = vec![];
+    let mut hidden_states = init_hidden_states;
+    let mut outputs_seq: Vec<Vec<SharedNode>> = vec![];
 
     for inputs in inputs_seq.into_iter() {
-        let prev_hidden_states = match init_hidden_states.take() {
-            Some(x) => x,
-            None => rnn_unit_seq.last().unwrap().clone(),
-        };
         let param_injection = param_injection.name_append(":unit");
-        let depth = prev_hidden_states.len();
-        let unit = rnn_unit(prev_hidden_states, inputs, activation, param_injection);
-        assert_eq!(unit.len(), depth);
-        rnn_unit_seq.push(unit);
+        let depth = hidden_states.len();
+        let outputs = rnn_unit(hidden_states, inputs, activation, param_injection);
+        hidden_states = outputs.clone();
+        assert_eq!(outputs.len(), depth);
+        outputs_seq.push(outputs);
     }
 
-    rnn_unit_seq
+    outputs_seq
 }
 
-fn rnn_unit(
+pub fn rnn_unit(
     prev_hidden_states: Vec<SharedNode>,
     inputs: Vec<SharedNode>,
     activation: &Activation,

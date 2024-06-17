@@ -1,6 +1,7 @@
 use std::{num::NonZeroUsize, sync::Arc};
 
 use crate::{
+    layers::residual::same_size_residual_layer,
     mut_cell::MutCell,
     node::SharedNode,
     nodes::{
@@ -15,13 +16,14 @@ use crate::{
     param::ParamInjection,
 };
 
+/// output shape: (word embedding depth, sequence length, heads)
 pub fn transformer(
     inputs_seq: Vec<Vec<SharedNode>>,
     seq: SeqDef,
     depth: NonZeroUsize,
     heads: NonZeroUsize,
     mut param_injection: ParamInjection<'_>,
-) {
+) -> Vec<Vec<Vec<SharedNode>>> {
     let word_embedding_seq = {
         let param_injection = param_injection.name_append(":word_embedding");
         linear_layer_seq(inputs_seq, depth, param_injection)
@@ -36,7 +38,16 @@ pub fn transformer(
         let seq = self_attention_seq(layer_seq.clone(), depth, param_injection);
         self_attention_seqs.push(seq);
     }
-    todo!()
+    let mut residual_connection_seqs = vec![];
+    for self_attention_seq in self_attention_seqs {
+        let mut residual_connection_seq = vec![];
+        for (self_attention, x) in self_attention_seq.into_iter().zip(layer_seq.iter()) {
+            let residual_connection = same_size_residual_layer(self_attention, x.clone());
+            residual_connection_seq.push(residual_connection);
+        }
+        residual_connection_seqs.push(residual_connection_seq);
+    }
+    residual_connection_seqs
 }
 
 pub fn self_attention_seq(

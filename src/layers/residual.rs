@@ -34,6 +34,18 @@ pub fn residual_layer(
     } else {
         inputs
     };
+    same_size_residual_layer(outputs, inputs)
+}
+
+/// ```math
+/// f(o, i) = o + i
+/// ```
+pub fn same_size_residual_layer(
+    outputs: Vec<SharedNode>,
+    inputs: Vec<SharedNode>,
+) -> Vec<SharedNode> {
+    assert!(!outputs.is_empty());
+    assert!(!inputs.is_empty());
     assert_eq!(outputs.len(), inputs.len());
     let mut layer = vec![];
     for (o, i) in outputs.into_iter().zip(inputs.into_iter()) {

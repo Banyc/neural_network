@@ -16,6 +16,19 @@ use crate::{
     param::ParamInjection,
 };
 
+pub fn attention_value_to_one_hot_word(
+    attention_value: Vec<SharedNode>,
+    word_depth: NonZeroUsize,
+    param_injection: ParamInjection<'_>,
+) -> Vec<SharedNode> {
+    let config = LinearLayerConfig {
+        depth: word_depth,
+        lambda: None,
+    };
+    let scores = linear_layer(attention_value, config, param_injection).unwrap();
+    softmax_layer(scores)
+}
+
 pub fn codec_transformer(
     encoding_inputs_seq: Vec<Vec<SharedNode>>,
     encoding_seq: SeqDef,

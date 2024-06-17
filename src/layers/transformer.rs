@@ -32,22 +32,28 @@ pub fn transformer(
     for layer in &layer_seq {
         assert_eq!(layer.len(), depth.get());
     }
-    let mut self_attention_seqs = vec![];
+    let mut residual_connection_seqs = vec![];
     for i in 0..heads.get() {
         let param_injection = param_injection.name_append(&format!(":self_attention.{i}"));
-        let seq = self_attention_seq(layer_seq.clone(), depth, param_injection);
-        self_attention_seqs.push(seq);
-    }
-    let mut residual_connection_seqs = vec![];
-    for self_attention_seq in self_attention_seqs {
-        let mut residual_connection_seq = vec![];
-        for (self_attention, x) in self_attention_seq.into_iter().zip(layer_seq.iter()) {
-            let residual_connection = same_size_residual_layer(self_attention, x.clone());
-            residual_connection_seq.push(residual_connection);
-        }
+        let residual_connection_seq =
+            residual_self_attention_seq(layer_seq.clone(), depth, param_injection);
         residual_connection_seqs.push(residual_connection_seq);
     }
     residual_connection_seqs
+}
+
+pub fn residual_self_attention_seq(
+    inputs_seq: Vec<Vec<SharedNode>>,
+    depth: NonZeroUsize,
+    param_injection: ParamInjection<'_>,
+) -> Vec<Vec<SharedNode>> {
+    let self_attention_seq = self_attention_seq(inputs_seq.clone(), depth, param_injection);
+    let mut residual_connection_seq = vec![];
+    for (self_attention, x) in self_attention_seq.into_iter().zip(inputs_seq.iter()) {
+        let residual_connection = same_size_residual_layer(self_attention, x.clone());
+        residual_connection_seq.push(residual_connection);
+    }
+    residual_connection_seq
 }
 
 pub fn self_attention_seq(

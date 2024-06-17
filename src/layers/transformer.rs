@@ -16,6 +16,8 @@ use crate::{
     param::ParamInjection,
 };
 
+use super::norm::Normalization;
+
 pub fn attention_value_to_one_hot_word(
     attention_value: Vec<SharedNode>,
     word_depth: NonZeroUsize,
@@ -35,6 +37,7 @@ pub fn codec_transformer(
     decoding_inputs_seq: Vec<Vec<SharedNode>>,
     decoding_seq: SeqDef,
     depth: NonZeroUsize,
+    normalization: Normalization,
     mut param_injection: ParamInjection<'_>,
 ) -> Vec<Vec<SharedNode>> {
     let mut decoding_word_len = None;
@@ -48,11 +51,23 @@ pub fn codec_transformer(
 
     let encoder_seq = {
         let param_injection = param_injection.name_append(":encoder");
-        transformer(encoding_inputs_seq, encoding_seq, depth, param_injection)
+        transformer(
+            encoding_inputs_seq,
+            encoding_seq,
+            depth,
+            normalization.clone(),
+            param_injection,
+        )
     };
     let decoder_seq = {
         let param_injection = param_injection.name_append(":decoder");
-        transformer(decoding_inputs_seq, decoding_seq, depth, param_injection)
+        transformer(
+            decoding_inputs_seq,
+            decoding_seq,
+            depth,
+            normalization.clone(),
+            param_injection,
+        )
     };
     let mut one_hot_words = vec![];
     for decoder in decoder_seq {
@@ -62,7 +77,7 @@ pub fn codec_transformer(
         };
         let attention_value = {
             let param_injection = param_injection.name_append(":codec_attention");
-            residual_attention_seq(reference, depth, param_injection)
+            residual_attention_seq(reference, depth, normalization.clone(), param_injection)
                 .pop()
                 .unwrap()
         };
@@ -80,6 +95,7 @@ pub fn transformer(
     inputs_seq: Vec<Vec<SharedNode>>,
     seq: SeqDef,
     depth: NonZeroUsize,
+    normalization: Normalization,
     mut param_injection: ParamInjection<'_>,
 ) -> Vec<Vec<SharedNode>> {
     let word_embedding_seq = {
@@ -90,21 +106,35 @@ pub fn transformer(
     for layer in &layer_seq {
         assert_eq!(layer.len(), depth.get());
     }
+    let layer_seq = {
+        let param_injection = param_injection.name_append(":norm");
+        normalize_seq(layer_seq, normalization.clone(), param_injection)
+    };
     let reference = AttentionReference {
         referee_seq: layer_seq.clone(),
         referrer_seq: layer_seq.clone(),
     };
-    let param_injection = param_injection.name_append(":self_attention");
-    residual_attention_seq(reference, depth, param_injection)
+    {
+        let param_injection = param_injection.name_append(":self_attention");
+        residual_attention_seq(reference, depth, normalization, param_injection)
+    }
 }
 
 pub fn residual_attention_seq(
     reference: AttentionReference,
     depth: NonZeroUsize,
-    param_injection: ParamInjection<'_>,
+    normalization: Normalization,
+    mut param_injection: ParamInjection<'_>,
 ) -> Vec<Vec<SharedNode>> {
     let referrer_seq = reference.referrer_seq.clone();
-    let attention_value_seq = attention_seq(reference, depth, param_injection);
+    let attention_value_seq = {
+        let param_injection = param_injection.name_append(":attention");
+        attention_seq(reference, depth, param_injection)
+    };
+    let attention_value_seq = {
+        let param_injection = param_injection.name_append(":norm");
+        normalize_seq(attention_value_seq, normalization, param_injection)
+    };
     let mut residual_connection_seq = vec![];
     for (attention_value, x) in attention_value_seq.into_iter().zip(referrer_seq.iter()) {
         let residual_connection = same_size_residual_layer(attention_value, x.clone());
@@ -241,4 +271,18 @@ pub fn linear_layer_seq(
         outputs_seq.push(outputs);
     }
     outputs_seq
+}
+
+pub fn normalize_seq(
+    inputs_seq: Vec<Vec<SharedNode>>,
+    normalization: Normalization,
+    mut param_injection: ParamInjection<'_>,
+) -> Vec<Vec<SharedNode>> {
+    let mut normalized_seq = vec![];
+    for layer in inputs_seq {
+        let param_injection = param_injection.name_append(":norm_unit");
+        let layer = normalization.clone().normalize(layer, param_injection);
+        normalized_seq.push(layer);
+    }
+    normalized_seq
 }

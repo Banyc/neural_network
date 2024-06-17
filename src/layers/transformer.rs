@@ -22,51 +22,31 @@ pub fn codec_transformer(
     decoding_inputs_seq: Vec<Vec<SharedNode>>,
     decoding_seq: SeqDef,
     depth: NonZeroUsize,
-    heads: NonZeroUsize,
     mut param_injection: ParamInjection<'_>,
-) -> Vec<Vec<Vec<SharedNode>>> {
-    let encoder = {
+) -> Vec<Vec<SharedNode>> {
+    let encoder_seq = {
         let param_injection = param_injection.name_append(":encoder");
-        transformer(
-            encoding_inputs_seq,
-            encoding_seq,
-            depth,
-            heads,
-            param_injection,
-        )
+        transformer(encoding_inputs_seq, encoding_seq, depth, param_injection)
     };
-    let decoder = {
+    let decoder_seq = {
         let param_injection = param_injection.name_append(":decoder");
-        transformer(
-            decoding_inputs_seq,
-            decoding_seq,
-            depth,
-            heads,
-            param_injection,
-        )
+        transformer(decoding_inputs_seq, decoding_seq, depth, param_injection)
     };
-    let mut seqs = vec![];
-    for (i, (encoder_seq, decoder_seq)) in encoder.into_iter().zip(decoder.into_iter()).enumerate()
-    {
-        let reference = AttentionReference {
-            referee_seq: encoder_seq,
-            referrer_seq: decoder_seq,
-        };
-        let param_injection = param_injection.name_append(&format!(":codec_attention.{i}"));
-        let seq = residual_attention_seq(reference, depth, param_injection);
-        seqs.push(seq);
-    }
-    seqs
+    let reference = AttentionReference {
+        referee_seq: encoder_seq,
+        referrer_seq: decoder_seq,
+    };
+    let param_injection = param_injection.name_append(":codec_attention");
+    residual_attention_seq(reference, depth, param_injection)
 }
 
-/// output shape: (word embedding depth, sequence length, heads)
+/// output shape: (word embedding depth, sequence length)
 pub fn transformer(
     inputs_seq: Vec<Vec<SharedNode>>,
     seq: SeqDef,
     depth: NonZeroUsize,
-    heads: NonZeroUsize,
     mut param_injection: ParamInjection<'_>,
-) -> Vec<Vec<Vec<SharedNode>>> {
+) -> Vec<Vec<SharedNode>> {
     let word_embedding_seq = {
         let param_injection = param_injection.name_append(":word_embedding");
         linear_layer_seq(inputs_seq, depth, param_injection)
@@ -75,17 +55,12 @@ pub fn transformer(
     for layer in &layer_seq {
         assert_eq!(layer.len(), depth.get());
     }
-    let mut residual_connection_seqs = vec![];
-    for i in 0..heads.get() {
-        let reference = AttentionReference {
-            referee_seq: layer_seq.clone(),
-            referrer_seq: layer_seq.clone(),
-        };
-        let param_injection = param_injection.name_append(&format!(":self_attention.{i}"));
-        let residual_connection_seq = residual_attention_seq(reference, depth, param_injection);
-        residual_connection_seqs.push(residual_connection_seq);
-    }
-    residual_connection_seqs
+    let reference = AttentionReference {
+        referee_seq: layer_seq.clone(),
+        referrer_seq: layer_seq.clone(),
+    };
+    let param_injection = param_injection.name_append(":self_attention");
+    residual_attention_seq(reference, depth, param_injection)
 }
 
 pub fn residual_attention_seq(

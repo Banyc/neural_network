@@ -9,6 +9,7 @@ use crate::{
         power::power_node,
         product::product_node,
         sin::sin_node,
+        softmax::softmax_layer,
         sum::sum_node,
     },
     param::ParamInjection,
@@ -18,14 +19,89 @@ pub fn transformer(
     inputs_seq: Vec<Vec<SharedNode>>,
     seq: SeqDef,
     depth: NonZeroUsize,
+    heads: NonZeroUsize,
     mut param_injection: ParamInjection<'_>,
 ) {
-    let layer = {
-        let param_injection = param_injection.name_append(":we");
-        word_embedding(inputs_seq, depth, param_injection)
+    let word_embedding_seq = {
+        let param_injection = param_injection.name_append(":word_embedding");
+        linear_layer_seq(inputs_seq, depth, param_injection)
     };
-    let layer = positional_encoding(layer, seq);
+    let layer_seq = positional_encoding(word_embedding_seq, seq);
+    for layer in &layer_seq {
+        assert_eq!(layer.len(), depth.get());
+    }
+    let mut self_attention_seqs = vec![];
+    for i in 0..heads.get() {
+        let param_injection = param_injection.name_append(&format!(":self_attention.{i}"));
+        let seq = self_attention_seq(layer_seq.clone(), depth, param_injection);
+        self_attention_seqs.push(seq);
+    }
     todo!()
+}
+
+pub fn self_attention_seq(
+    inputs_seq: Vec<Vec<SharedNode>>,
+    depth: NonZeroUsize,
+    mut param_injection: ParamInjection<'_>,
+) -> Vec<Vec<SharedNode>> {
+    let value_seq = {
+        let param_injection = param_injection.name_append(":value");
+        linear_layer_seq(inputs_seq.clone(), depth, param_injection)
+    };
+    let key_seq = {
+        let param_injection = param_injection.name_append(":key");
+        linear_layer_seq(inputs_seq.clone(), depth, param_injection)
+    };
+    let query_seq = {
+        let param_injection = param_injection.name_append(":query");
+        linear_layer_seq(inputs_seq.clone(), depth, param_injection)
+    };
+
+    let mut self_attention_seq = vec![];
+    for query in query_seq {
+        let mut similarity_scores = vec![];
+        for key in &key_seq {
+            let similarity_score = dot_product(&query, key);
+            similarity_scores.push(similarity_score);
+        }
+        let similarity_prob = softmax_layer(similarity_scores);
+        let mut scaled_value_seq = vec![];
+        assert_eq!(value_seq.len(), similarity_prob.len());
+        for (value, prob) in value_seq.iter().zip(similarity_prob.iter()) {
+            let mut scaled_value = vec![];
+            for value in value {
+                scaled_value.push(Arc::new(MutCell::new(product_node(vec![
+                    Arc::clone(value),
+                    Arc::clone(prob),
+                ]))));
+            }
+            scaled_value_seq.push(scaled_value);
+        }
+        let mut self_attention_value = vec![];
+        for depth_pos in 0..depth.get() {
+            let mut sum = vec![];
+            for scaled_value in &scaled_value_seq {
+                sum.push(Arc::clone(&scaled_value[depth_pos]));
+            }
+            let sum = Arc::new(MutCell::new(sum_node(sum)));
+            self_attention_value.push(sum);
+        }
+        self_attention_seq.push(self_attention_value);
+    }
+    self_attention_seq
+}
+
+pub fn dot_product(a: &[SharedNode], b: &[SharedNode]) -> SharedNode {
+    assert_eq!(a.len(), b.len());
+    let mut products = vec![];
+    for (a, b) in a.iter().zip(b.iter()) {
+        let prod = Arc::new(MutCell::new(product_node(vec![
+            Arc::clone(a),
+            Arc::clone(b),
+        ])));
+        products.push(prod);
+    }
+    Arc::new(MutCell::new(sum_node(products)))
 }
 
 pub struct SeqDef {
@@ -69,18 +145,18 @@ pub fn embedding_position(pos: SeqDepthPosition) -> SharedNode {
     Arc::new(MutCell::new(sin_node(prod)))
 }
 
-pub fn word_embedding(
+pub fn linear_layer_seq(
     inputs_seq: Vec<Vec<SharedNode>>,
     depth: NonZeroUsize,
     mut param_injection: ParamInjection<'_>,
 ) -> Vec<Vec<SharedNode>> {
     let mut outputs_seq = vec![];
     for inputs in inputs_seq {
-        let param_injection = param_injection.name_append(":token");
         let config = LinearLayerConfig {
             depth,
             lambda: None,
         };
+        let param_injection = param_injection.name_append(":seq_unit");
         let outputs = linear_layer(inputs, config, param_injection).unwrap();
         outputs_seq.push(outputs);
     }

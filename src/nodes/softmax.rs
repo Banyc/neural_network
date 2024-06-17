@@ -7,13 +7,22 @@ use crate::{
     param::empty_shared_params,
 };
 
+pub fn softmax_layer(operands: Vec<SharedNode>) -> Vec<SharedNode> {
+    let mut layer = vec![];
+    for i in 0..operands.len() {
+        let node = Arc::new(MutCell::new(softmax_node(operands.clone(), i)));
+        layer.push(node);
+    }
+    layer
+}
+
 /// ```math
 /// f(x) = \frac{e^{x_i}}{\sum e^x}
 /// ```
-pub fn softmax_node(operand: SharedNode, operand_index: usize) -> Node {
+pub fn softmax_node(operands: Vec<SharedNode>, operand_index: usize) -> Node {
     let computation = SoftmaxNodeComputation { operand_index };
     Node::new(
-        vec![operand],
+        operands,
         Arc::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
         empty_shared_params(),
     )

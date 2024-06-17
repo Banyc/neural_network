@@ -1,6 +1,7 @@
 pub mod batch_norm;
 pub mod bias;
 pub mod coeff;
+pub mod constant;
 pub mod exp;
 pub mod input;
 pub mod l2_error;
@@ -15,6 +16,7 @@ pub mod product;
 pub mod recurrent;
 pub mod relu;
 pub mod sigmoid;
+pub mod sin;
 pub mod softmax;
 pub mod std_dev;
 pub mod sum;

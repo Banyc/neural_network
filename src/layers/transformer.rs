@@ -37,6 +37,15 @@ pub fn codec_transformer(
     depth: NonZeroUsize,
     mut param_injection: ParamInjection<'_>,
 ) -> Vec<Vec<SharedNode>> {
+    let mut decoding_word_len = None;
+    for inputs in &decoding_inputs_seq {
+        if let Some(len) = decoding_word_len {
+            assert_eq!(len, inputs.len());
+        }
+        decoding_word_len = Some(inputs.len());
+    }
+    let decoding_word_len = NonZeroUsize::new(decoding_word_len.unwrap()).unwrap();
+
     let encoder_seq = {
         let param_injection = param_injection.name_append(":encoder");
         transformer(encoding_inputs_seq, encoding_seq, depth, param_injection)
@@ -45,12 +54,25 @@ pub fn codec_transformer(
         let param_injection = param_injection.name_append(":decoder");
         transformer(decoding_inputs_seq, decoding_seq, depth, param_injection)
     };
-    let reference = AttentionReference {
-        referee_seq: encoder_seq,
-        referrer_seq: decoder_seq,
-    };
-    let param_injection = param_injection.name_append(":codec_attention");
-    residual_attention_seq(reference, depth, param_injection)
+    let mut one_hot_words = vec![];
+    for decoder in decoder_seq {
+        let reference = AttentionReference {
+            referee_seq: encoder_seq.clone(),
+            referrer_seq: vec![decoder],
+        };
+        let attention_value = {
+            let param_injection = param_injection.name_append(":codec_attention");
+            residual_attention_seq(reference, depth, param_injection)
+                .pop()
+                .unwrap()
+        };
+        let word = {
+            let param_injection = param_injection.name_append(":fc");
+            attention_value_to_one_hot_word(attention_value, decoding_word_len, param_injection)
+        };
+        one_hot_words.push(word);
+    }
+    one_hot_words
 }
 
 /// output shape: (word embedding depth, sequence length)

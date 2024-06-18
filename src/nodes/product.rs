@@ -29,6 +29,7 @@ impl NodeScalarComputation for ProductNodeComputation {
         _graph_inputs: &[f64],
     ) -> f64 {
         assert!(parameters.is_empty());
+        assert!(!operand_outputs.is_empty());
         product(operand_outputs)
     }
 }
@@ -40,6 +41,7 @@ impl NodeBackpropagationComputation for ProductNodeComputation {
         buf: Vec<f64>,
     ) -> Vec<f64> {
         assert!(parameters.is_empty());
+        assert!(!operand_outputs.is_empty());
         product_derivative(operand_outputs, buf)
     }
 
@@ -50,7 +52,7 @@ impl NodeBackpropagationComputation for ProductNodeComputation {
         buf: Vec<f64>,
     ) -> Vec<f64> {
         assert!(parameters.is_empty());
-        assert_eq!(operand_outputs.len(), 1);
+        assert!(!operand_outputs.is_empty());
         buf
     }
 }

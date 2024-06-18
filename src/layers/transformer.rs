@@ -287,3 +287,93 @@ pub fn normalize_seq(
     }
     normalized_seq
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        neural_network::{NeuralNetwork, TrainOption},
+        nodes::{input::InputNodeGen, mse::mse_node},
+        param::ParamInjector,
+    };
+
+    use super::*;
+
+    #[test]
+    fn test_converge() {
+        let mut param_injector = ParamInjector::empty();
+        let param_injection = ParamInjection {
+            injector: &mut param_injector,
+            name: "".to_string(),
+        };
+
+        let hello = [1, 0, 0].iter().map(|&x| x as f64);
+        let world = [0, 1, 0].iter().map(|&x| x as f64);
+        let eos = [0, 0, 1].iter().map(|&x| x as f64);
+
+        let mut input_gen = InputNodeGen::new();
+        // hello, world, EOS
+        let encoding_inputs_seq = vec![input_gen.gen(3), input_gen.gen(3), input_gen.gen(3)];
+        let encoding_seq = SeqDef {
+            start_pos: Arc::new(MutCell::new(constant_node(0.))),
+            len: Arc::new(MutCell::new(constant_node(3.))),
+        };
+        // EOS, hello, world
+        let decoding_inputs_seq = vec![input_gen.gen(3), input_gen.gen(3), input_gen.gen(3)];
+        let decoding_seq = SeqDef {
+            start_pos: Arc::new(MutCell::new(constant_node(0.))),
+            len: Arc::new(MutCell::new(constant_node(3.))),
+        };
+        let depth = NonZeroUsize::new(2).unwrap();
+        let normalization = Normalization::LayerNorm;
+
+        let output_word_seq = codec_transformer(
+            encoding_inputs_seq,
+            encoding_seq,
+            decoding_inputs_seq,
+            decoding_seq,
+            depth,
+            normalization,
+            param_injection,
+        );
+        let terminal_nodes = output_word_seq
+            .iter()
+            .flat_map(|x| x.iter())
+            .map(Arc::clone)
+            .collect::<Vec<SharedNode>>();
+
+        // hello, world, EOS
+        let label_seq = vec![input_gen.gen(3), input_gen.gen(3), input_gen.gen(3)];
+
+        let mut error_inputs = vec![];
+        error_inputs.extend(label_seq.into_iter().flat_map(|x| x.into_iter()));
+        error_inputs.extend(output_word_seq.into_iter().flat_map(|x| x.into_iter()));
+        let error_node = Arc::new(MutCell::new(mse_node(error_inputs)));
+
+        let mut nn = NeuralNetwork::new(terminal_nodes, error_node);
+        let mut sample = vec![];
+
+        // encoding
+        sample.extend(hello.clone());
+        sample.extend(world.clone());
+        sample.extend(eos.clone());
+        // decoding
+        sample.extend(eos.clone());
+        sample.extend(hello.clone());
+        sample.extend(world.clone());
+        // label
+        sample.extend(hello.clone());
+        sample.extend(world.clone());
+        sample.extend(eos.clone());
+
+        let dataset = [sample];
+
+        let eval = nn.evaluate(&dataset);
+        println!("{eval:?}");
+
+        let option = TrainOption::StochasticGradientDescent;
+        nn.train(&dataset, 0.1, 1024, option);
+
+        let eval = nn.evaluate(&dataset);
+        println!("{eval:?}");
+    }
+}

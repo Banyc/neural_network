@@ -1,7 +1,5 @@
 use std::{io::Read, num::NonZeroUsize, path::Path, sync::Arc};
 
-use strict_num::FiniteF64;
-
 use crate::{
     layers::{
         activation::Activation,
@@ -13,7 +11,7 @@ use crate::{
         },
     },
     mut_cell::MutCell,
-    neural_network::{AccurateFnParams, NeuralNetwork, TrainOption},
+    neural_network::{NeuralNetwork, TrainOption},
     node::SharedNode,
     nodes::{input::InputNodeGen, linear::LinearLayerConfig, mse::mse_node},
     param::{
@@ -21,6 +19,7 @@ use crate::{
         ParamInjection, ParamInjector,
     },
     tensor::{primitive_to_stride, shape_to_non_zero, Tensor},
+    tests::multi_class_accurate,
 };
 
 const CLASSES: usize = 10;
@@ -53,7 +52,7 @@ fn converge() {
         let eval = nn.evaluate(&train_dataset[0..1]);
         let eval = eval.iter().map(|x| x[0]).collect::<Vec<f64>>();
         println!("eval: {eval:?}");
-        let acc = nn.accuracy(&train_dataset[0..1], accurate);
+        let acc = nn.accuracy(&train_dataset[0..1], |x| multi_class_accurate(x, CLASSES));
         if acc == 1. {
             break;
         }
@@ -93,7 +92,7 @@ fn train() {
         let max_steps = 2 << 10;
         let option = TrainOption::StochasticGradientDescent;
         nn.train(&train_dataset, step_size, max_steps, option);
-        let acc = nn.accuracy(&test_dataset[..128], accurate);
+        let acc = nn.accuracy(&test_dataset[..128], |x| multi_class_accurate(x, CLASSES));
         println!("acc: {acc}");
         let loss = nn.error(&test_dataset[..128]);
         println!("loss: {loss}");
@@ -276,28 +275,4 @@ fn one_hot(i: usize, space_size: usize) -> Vec<f64> {
     let mut vec = vec![0.; space_size];
     vec[i] = 1.;
     vec
-}
-
-fn accurate(params: AccurateFnParams<'_>) -> bool {
-    let eval = params.outputs;
-    let label = &params.inputs[params.inputs.len() - CLASSES..];
-    assert_eq!(eval.len(), label.len());
-    assert!(!eval.is_empty());
-    let eval_max_i = max_i(&eval);
-    let label_max_i = max_i(label);
-    eval_max_i == label_max_i
-}
-
-fn max_i(x: &[f64]) -> usize {
-    assert!(!x.is_empty());
-    let mut max = x[0];
-    let mut max_i = 0;
-    for (i, x) in x.iter().copied().enumerate() {
-        FiniteF64::new(x).unwrap();
-        if max < x {
-            max = x;
-            max_i = i;
-        }
-    }
-    max_i
 }

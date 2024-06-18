@@ -294,6 +294,7 @@ mod tests {
         neural_network::{NeuralNetwork, TrainOption},
         nodes::{input::InputNodeGen, mse::mse_node},
         param::ParamInjector,
+        tests::multi_class_accurate,
     };
 
     use super::*;
@@ -323,7 +324,7 @@ mod tests {
             start_pos: Arc::new(MutCell::new(constant_node(0.))),
             len: Arc::new(MutCell::new(constant_node(3.))),
         };
-        let depth = NonZeroUsize::new(2).unwrap();
+        let depth = NonZeroUsize::new(3).unwrap();
         let normalization = Normalization::LayerNorm;
 
         let output_word_seq = codec_transformer(
@@ -346,7 +347,7 @@ mod tests {
 
         let mut error_inputs = vec![];
         error_inputs.extend(label_seq.into_iter().flat_map(|x| x.into_iter()));
-        error_inputs.extend(output_word_seq.into_iter().flat_map(|x| x.into_iter()));
+        error_inputs.extend(terminal_nodes.clone());
         let error_node = Arc::new(MutCell::new(mse_node(error_inputs)));
 
         let mut nn = NeuralNetwork::new(terminal_nodes, error_node);
@@ -375,5 +376,8 @@ mod tests {
 
         let eval = nn.evaluate(&dataset);
         println!("{eval:?}");
+
+        let acc = nn.accuracy(&dataset, |x| multi_class_accurate(x, 3 * 3));
+        assert_eq!(acc, 1.);
     }
 }

@@ -8,6 +8,7 @@ pub mod l2_error;
 pub mod layer_norm;
 pub mod linear;
 pub mod log;
+pub mod log_loss;
 pub mod max;
 pub mod mean;
 pub mod mse;

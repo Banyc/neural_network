@@ -196,10 +196,9 @@ fn neural_network(mut param_injection: ParamInjection<'_>) -> NeuralNetwork {
         dense_layer(layer, config, &activation, param_injection)
     };
     let label_nodes = input_node_gen.gen(CLASSES);
-    let error_node_inputs = outputs
-        .iter()
-        .cloned()
-        .chain(label_nodes)
+    let error_node_inputs = label_nodes
+        .into_iter()
+        .chain(outputs.iter().cloned())
         .collect::<Vec<SharedNode>>();
     let error_node = Arc::new(MutCell::new(mse_node(error_node_inputs)));
     NeuralNetwork::new(outputs, error_node)

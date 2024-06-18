@@ -292,7 +292,7 @@ pub fn normalize_seq(
 mod tests {
     use crate::{
         neural_network::{AccurateFnParams, NeuralNetwork, TrainOption},
-        nodes::{input::InputNodeGen, mse::mse_node},
+        nodes::{input::InputNodeGen, log_loss::log_loss_node},
         param::ParamInjector,
         tests::max_i,
     };
@@ -349,7 +349,7 @@ mod tests {
         let mut error_inputs = vec![];
         error_inputs.extend(label_seq.into_iter().flat_map(|x| x.into_iter()));
         error_inputs.extend(terminal_nodes.clone());
-        let error_node = Arc::new(MutCell::new(mse_node(error_inputs)));
+        let error_node = Arc::new(MutCell::new(log_loss_node(error_inputs)));
 
         let mut nn = NeuralNetwork::new(terminal_nodes, error_node);
 

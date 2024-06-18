@@ -31,6 +31,7 @@ pub fn attention_value_to_one_hot_word(
     softmax_layer(scores)
 }
 
+/// output shape: (word length, sequence length)
 pub fn codec_transformer(
     encoding_inputs_seq: Vec<Vec<SharedNode>>,
     encoding_seq: SeqDef,
@@ -51,7 +52,7 @@ pub fn codec_transformer(
 
     let encoder_seq = {
         let param_injection = param_injection.name_append(":encoder");
-        transformer(
+        self_transformer(
             encoding_inputs_seq,
             encoding_seq,
             depth,
@@ -61,7 +62,7 @@ pub fn codec_transformer(
     };
     let decoder_seq = {
         let param_injection = param_injection.name_append(":decoder");
-        transformer(
+        self_transformer(
             decoding_inputs_seq,
             decoding_seq,
             depth,
@@ -91,7 +92,7 @@ pub fn codec_transformer(
 }
 
 /// output shape: (word embedding depth, sequence length)
-pub fn transformer(
+pub fn self_transformer(
     inputs_seq: Vec<Vec<SharedNode>>,
     seq: SeqDef,
     depth: NonZeroUsize,

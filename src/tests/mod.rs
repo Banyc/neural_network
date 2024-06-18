@@ -5,7 +5,7 @@ use crate::neural_network::AccurateFnParams;
 mod mnist;
 mod neural_network;
 
-pub fn multi_class_accurate(params: AccurateFnParams<'_>, classes: usize) -> bool {
+pub fn multi_class_one_hot_accurate(params: AccurateFnParams<'_>, classes: usize) -> bool {
     let eval = params.outputs;
     let label = &params.inputs[params.inputs.len() - classes..];
     assert_eq!(eval.len(), label.len());

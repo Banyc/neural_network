@@ -17,3 +17,6 @@ ron = "0.8"
 [profile.profiling]
 inherits = "release"
 debug = true
+
+[profile.test]
+inherits = "release"

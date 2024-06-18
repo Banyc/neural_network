@@ -19,7 +19,7 @@ use crate::{
         ParamInjection, ParamInjector,
     },
     tensor::{primitive_to_stride, shape_to_non_zero, Tensor},
-    tests::multi_class_accurate,
+    tests::multi_class_one_hot_accurate,
 };
 
 const CLASSES: usize = 10;
@@ -52,7 +52,9 @@ fn converge() {
         let eval = nn.evaluate(&train_dataset[0..1]);
         let eval = eval.iter().map(|x| x[0]).collect::<Vec<f64>>();
         println!("eval: {eval:?}");
-        let acc = nn.accuracy(&train_dataset[0..1], |x| multi_class_accurate(x, CLASSES));
+        let acc = nn.accuracy(&train_dataset[0..1], |x| {
+            multi_class_one_hot_accurate(x, CLASSES)
+        });
         if acc == 1. {
             break;
         }
@@ -92,7 +94,9 @@ fn train() {
         let max_steps = 2 << 10;
         let option = TrainOption::StochasticGradientDescent;
         nn.train(&train_dataset, step_size, max_steps, option);
-        let acc = nn.accuracy(&test_dataset[..128], |x| multi_class_accurate(x, CLASSES));
+        let acc = nn.accuracy(&test_dataset[..128], |x| {
+            multi_class_one_hot_accurate(x, CLASSES)
+        });
         println!("acc: {acc}");
         let loss = nn.error(&test_dataset[..128]);
         println!("loss: {loss}");

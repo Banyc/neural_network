@@ -291,10 +291,10 @@ pub fn normalize_seq(
 #[cfg(test)]
 mod tests {
     use crate::{
-        neural_network::{NeuralNetwork, TrainOption},
+        neural_network::{AccurateFnParams, NeuralNetwork, TrainOption},
         nodes::{input::InputNodeGen, mse::mse_node},
         param::ParamInjector,
-        tests::multi_class_accurate,
+        tests::max_i,
     };
 
     use super::*;
@@ -324,7 +324,7 @@ mod tests {
             start_pos: Arc::new(MutCell::new(constant_node(0.))),
             len: Arc::new(MutCell::new(constant_node(3.))),
         };
-        let depth = NonZeroUsize::new(3).unwrap();
+        let depth = NonZeroUsize::new(5).unwrap();
         let normalization = Normalization::LayerNorm;
 
         let output_word_seq = codec_transformer(
@@ -336,6 +336,7 @@ mod tests {
             normalization,
             param_injection,
         );
+        dbg!(&output_word_seq);
         let terminal_nodes = output_word_seq
             .iter()
             .flat_map(|x| x.iter())
@@ -351,33 +352,81 @@ mod tests {
         let error_node = Arc::new(MutCell::new(mse_node(error_inputs)));
 
         let mut nn = NeuralNetwork::new(terminal_nodes, error_node);
-        let mut sample = vec![];
 
-        // encoding
-        sample.extend(hello.clone());
-        sample.extend(world.clone());
-        sample.extend(eos.clone());
-        // decoding
-        sample.extend(eos.clone());
-        sample.extend(hello.clone());
-        sample.extend(world.clone());
-        // label
-        sample.extend(hello.clone());
-        sample.extend(world.clone());
-        sample.extend(eos.clone());
+        let mut dataset = vec![];
 
-        let dataset = [sample];
+        {
+            let mut sample = vec![];
 
-        let eval = nn.evaluate(&dataset);
+            // encoding
+            sample.extend(hello.clone());
+            sample.extend(world.clone());
+            sample.extend(eos.clone());
+            // decoding
+            sample.extend(eos.clone());
+            sample.extend(hello.clone());
+            sample.extend(world.clone());
+            // label
+            sample.extend(hello.clone());
+            sample.extend(world.clone());
+            sample.extend(eos.clone());
+
+            dataset.push(sample);
+        }
+        {
+            let mut sample = vec![];
+
+            // encoding
+            sample.extend(world.clone());
+            sample.extend(hello.clone());
+            sample.extend(eos.clone());
+            // decoding
+            sample.extend(eos.clone());
+            sample.extend(world.clone());
+            sample.extend(hello.clone());
+            // label
+            sample.extend(world.clone());
+            sample.extend(hello.clone());
+            sample.extend(eos.clone());
+
+            dataset.push(sample);
+        }
+
+        let eval = nn.evaluate(&dataset[0..1]);
         println!("{eval:?}");
 
         let option = TrainOption::StochasticGradientDescent;
-        nn.train(&dataset, 0.1, 1024, option);
+        nn.train(&dataset, 0.1, 1024 * 2, option);
 
-        let eval = nn.evaluate(&dataset);
+        let eval = nn.evaluate(&dataset[0..1]);
+        println!("{eval:?}");
+        let eval = nn.evaluate(&dataset[1..2]);
         println!("{eval:?}");
 
-        let acc = nn.accuracy(&dataset, |x| multi_class_accurate(x, 3 * 3));
+        let acc_config = SeqAcc {
+            word_len: 3,
+            words: 3,
+        };
+        let acc = nn.accuracy(&dataset[0..1], |x| accurate(x, &acc_config));
         assert_eq!(acc, 1.);
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct SeqAcc {
+        pub word_len: usize,
+        pub words: usize,
+    }
+    pub fn accurate(params: AccurateFnParams, seq_config: &SeqAcc) -> bool {
+        let eval = params.outputs.chunks(seq_config.word_len);
+        let label = &params.inputs[params.inputs.len() - seq_config.word_len * seq_config.words..];
+        let label = label.chunks(seq_config.word_len);
+        for (eval, label) in eval.zip(label) {
+            assert_eq!(eval.len(), label.len());
+            let is_acc = max_i(eval) == max_i(label);
+            if !is_acc {
+                return false;
+            }
+        }
+        true
     }
 }

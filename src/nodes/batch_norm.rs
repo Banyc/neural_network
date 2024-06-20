@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::{
     computation::{
         ComputationMode, NodeBackpropagationComputation, NodeBatchComputation, NodeComputation,
@@ -7,6 +5,7 @@ use crate::{
     mut_cell::MutCell,
     node::{Node, SharedNode},
     param::{ParamInjection, SharedParams},
+    ref_ctr::RefCtr,
     tensor::Shape,
 };
 
@@ -38,7 +37,7 @@ pub fn batch_norm_node(
     };
     Node::new(
         vec![operand],
-        Arc::new(MutCell::new(NodeComputation::Batch(Box::new(computation)))),
+        RefCtr::new(MutCell::new(NodeComputation::Batch(Box::new(computation)))),
         trainable_params,
     )
 }
@@ -57,13 +56,13 @@ pub fn batch_norm_layer(
         let mut param_injection = param_injection.name_append(&format!(":bn.{i}"));
         let saved_params = param_injection
             .name_append(":saved")
-            .get_or_create_params(|| Arc::new(MutCell::new(default_saved_params())));
+            .get_or_create_params(|| RefCtr::new(MutCell::new(default_saved_params())));
         let trainable_params = param_injection
             .name_append(":trainable")
-            .get_or_create_params(|| Arc::new(MutCell::new(default_trainable_params())));
+            .get_or_create_params(|| RefCtr::new(MutCell::new(default_trainable_params())));
         let batch_norm_node =
             batch_norm_node(input_node, saved_params, trainable_params, config.alpha);
-        layer.push(Arc::new(MutCell::new(batch_norm_node)));
+        layer.push(RefCtr::new(MutCell::new(batch_norm_node)));
     }
     layer
 }

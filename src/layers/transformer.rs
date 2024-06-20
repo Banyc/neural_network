@@ -1,4 +1,4 @@
-use std::{num::NonZeroUsize, sync::Arc};
+use std::num::NonZeroUsize;
 
 use crate::{
     layers::residual::same_size_residual_layer,
@@ -14,6 +14,7 @@ use crate::{
         sum::sum_node,
     },
     param::ParamInjection,
+    ref_ctr::RefCtr,
 };
 
 use super::norm::Normalization;
@@ -180,9 +181,9 @@ pub fn attention_seq(
         for (value, prob) in value_seq.iter().zip(similarity_prob.iter()) {
             let mut scaled_value = vec![];
             for value in value {
-                scaled_value.push(Arc::new(MutCell::new(product_node(vec![
-                    Arc::clone(value),
-                    Arc::clone(prob),
+                scaled_value.push(RefCtr::new(MutCell::new(product_node(vec![
+                    RefCtr::clone(value),
+                    RefCtr::clone(prob),
                 ]))));
             }
             scaled_value_seq.push(scaled_value);
@@ -191,9 +192,9 @@ pub fn attention_seq(
         for depth_pos in 0..depth.get() {
             let mut sum = vec![];
             for scaled_value in &scaled_value_seq {
-                sum.push(Arc::clone(&scaled_value[depth_pos]));
+                sum.push(RefCtr::clone(&scaled_value[depth_pos]));
             }
-            let sum = Arc::new(MutCell::new(sum_node(sum)));
+            let sum = RefCtr::new(MutCell::new(sum_node(sum)));
             self_attention_value.push(sum);
         }
         attention_seq.push(self_attention_value);
@@ -205,13 +206,13 @@ pub fn dot_product(a: &[SharedNode], b: &[SharedNode]) -> SharedNode {
     assert_eq!(a.len(), b.len());
     let mut products = vec![];
     for (a, b) in a.iter().zip(b.iter()) {
-        let prod = Arc::new(MutCell::new(product_node(vec![
-            Arc::clone(a),
-            Arc::clone(b),
+        let prod = RefCtr::new(MutCell::new(product_node(vec![
+            RefCtr::clone(a),
+            RefCtr::clone(b),
         ])));
         products.push(prod);
     }
-    Arc::new(MutCell::new(sum_node(products)))
+    RefCtr::new(MutCell::new(sum_node(products)))
 }
 
 #[derive(Debug, Clone)]
@@ -225,8 +226,8 @@ pub fn positional_encoding(inputs_seq: Vec<Vec<SharedNode>>, seq: SeqDef) -> Vec
         let mut unit = vec![];
         let depth_len = NonZeroUsize::new(inputs.len()).unwrap();
         for (depth_pos, node) in inputs.into_iter().enumerate() {
-            let seq_off = Arc::new(MutCell::new(constant_node(seq_off as f64)));
-            let seq_pos = Arc::new(MutCell::new(sum_node(vec![seq.start_pos.clone(), seq_off])));
+            let seq_off = RefCtr::new(MutCell::new(constant_node(seq_off as f64)));
+            let seq_pos = RefCtr::new(MutCell::new(sum_node(vec![seq.start_pos.clone(), seq_off])));
             let pos = SeqDepthPosition {
                 seq_pos,
                 seq_len: seq.len.clone(),
@@ -234,7 +235,7 @@ pub fn positional_encoding(inputs_seq: Vec<Vec<SharedNode>>, seq: SeqDef) -> Vec
                 depth_len,
             };
             let pos = embedding_position(pos);
-            let node = Arc::new(MutCell::new(sum_node(vec![node, pos])));
+            let node = RefCtr::new(MutCell::new(sum_node(vec![node, pos])));
             unit.push(node);
         }
         outputs_seq.push(unit);
@@ -251,9 +252,9 @@ pub struct SeqDepthPosition {
 }
 pub fn embedding_position(pos: SeqDepthPosition) -> SharedNode {
     let pow = -((2 * pos.depth_pos) as f64 / pos.depth_len.get() as f64);
-    let pow = Arc::new(MutCell::new(power_node(pos.seq_len, pow)));
-    let prod = Arc::new(MutCell::new(product_node(vec![pos.seq_pos, pow])));
-    Arc::new(MutCell::new(sin_node(prod)))
+    let pow = RefCtr::new(MutCell::new(power_node(pos.seq_len, pow)));
+    let prod = RefCtr::new(MutCell::new(product_node(vec![pos.seq_pos, pow])));
+    RefCtr::new(MutCell::new(sin_node(prod)))
 }
 
 pub fn linear_layer_seq(
@@ -315,14 +316,14 @@ mod tests {
         // hello, world, EOS
         let encoding_inputs_seq = vec![input_gen.gen(3), input_gen.gen(3), input_gen.gen(3)];
         let encoding_seq = SeqDef {
-            start_pos: Arc::new(MutCell::new(constant_node(0.))),
-            len: Arc::new(MutCell::new(constant_node(3.))),
+            start_pos: RefCtr::new(MutCell::new(constant_node(0.))),
+            len: RefCtr::new(MutCell::new(constant_node(3.))),
         };
         // EOS, hello, world
         let decoding_inputs_seq = vec![input_gen.gen(3), input_gen.gen(3), input_gen.gen(3)];
         let decoding_seq = SeqDef {
-            start_pos: Arc::new(MutCell::new(constant_node(0.))),
-            len: Arc::new(MutCell::new(constant_node(3.))),
+            start_pos: RefCtr::new(MutCell::new(constant_node(0.))),
+            len: RefCtr::new(MutCell::new(constant_node(3.))),
         };
         let depth = NonZeroUsize::new(5).unwrap();
         let normalization = Normalization::LayerNorm;
@@ -340,7 +341,7 @@ mod tests {
         let terminal_nodes = output_word_seq
             .iter()
             .flat_map(|x| x.iter())
-            .map(Arc::clone)
+            .map(RefCtr::clone)
             .collect::<Vec<SharedNode>>();
 
         // hello, world, EOS
@@ -349,7 +350,7 @@ mod tests {
         let mut error_inputs = vec![];
         error_inputs.extend(label_seq.into_iter().flat_map(|x| x.into_iter()));
         error_inputs.extend(terminal_nodes.clone());
-        let error_node = Arc::new(MutCell::new(log_loss_node(error_inputs)));
+        let error_node = RefCtr::new(MutCell::new(log_loss_node(error_inputs)));
 
         let mut nn = NeuralNetwork::new(terminal_nodes, error_node);
 

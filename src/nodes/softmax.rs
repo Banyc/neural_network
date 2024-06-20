@@ -1,16 +1,15 @@
-use std::sync::Arc;
-
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
     node::{Node, SharedNode},
     param::empty_shared_params,
+    ref_ctr::RefCtr,
 };
 
 pub fn softmax_layer(operands: Vec<SharedNode>) -> Vec<SharedNode> {
     let mut layer = vec![];
     for i in 0..operands.len() {
-        let node = Arc::new(MutCell::new(softmax_node(operands.clone(), i)));
+        let node = RefCtr::new(MutCell::new(softmax_node(operands.clone(), i)));
         layer.push(node);
     }
     layer
@@ -23,7 +22,7 @@ pub fn softmax_node(operands: Vec<SharedNode>, operand_index: usize) -> Node {
     let computation = SoftmaxNodeComputation { operand_index };
     Node::new(
         operands,
-        Arc::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+        RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
         empty_shared_params(),
     )
 }

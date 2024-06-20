@@ -1,10 +1,9 @@
-use std::sync::Arc;
-
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
     node::{Node, SharedNode},
     param::empty_shared_params,
+    ref_ctr::RefCtr,
 };
 
 use super::sigmoid::sigmoid;
@@ -16,7 +15,7 @@ pub fn swish_node(operand: SharedNode) -> Node {
     let computation = SwishNodeComputation {};
     Node::new(
         vec![operand],
-        Arc::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+        RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
         empty_shared_params(),
     )
 }

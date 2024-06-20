@@ -1,10 +1,9 @@
-use std::sync::Arc;
-
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
     node::{Node, SharedNode},
     param::empty_shared_params,
+    ref_ctr::RefCtr,
 };
 
 /// ```math
@@ -14,7 +13,7 @@ pub fn log_node(operand: SharedNode, base: f64) -> Node {
     let computation = LogNodeComputation { base };
     Node::new(
         vec![operand],
-        Arc::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+        RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
         empty_shared_params(),
     )
 }

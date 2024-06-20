@@ -1,4 +1,4 @@
-use std::{num::NonZeroUsize, sync::Arc};
+use std::num::NonZeroUsize;
 
 use crate::{
     layers::activation::Activation,
@@ -9,6 +9,7 @@ use crate::{
         sum::sum_node,
     },
     param::ParamInjection,
+    ref_ctr::RefCtr,
 };
 
 /// gradient computation algorithm: BPTT
@@ -61,7 +62,7 @@ pub fn rnn_unit(
     let mut sum_layer = vec![];
     for (x, rec) in x.into_iter().zip(rec.into_iter()) {
         let node = sum_node(vec![x, rec]);
-        sum_layer.push(Arc::new(MutCell::new(node)));
+        sum_layer.push(RefCtr::new(MutCell::new(node)));
     }
     let act_layer = activation.activate(&sum_layer);
     assert_eq!(act_layer.len(), depth.get());

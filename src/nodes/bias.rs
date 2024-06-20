@@ -1,10 +1,9 @@
-use std::sync::Arc;
-
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
     node::{Node, SharedNode},
     param::SharedParams,
+    ref_ctr::RefCtr,
 };
 
 pub fn default_bias() -> f64 {
@@ -19,7 +18,7 @@ pub fn bias_node(operand: SharedNode, bias: SharedParams) -> Node {
     assert_eq!(bias.borrow().len(), 1);
     Node::new(
         vec![operand],
-        Arc::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+        RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
         bias,
     )
 }

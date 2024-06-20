@@ -1,10 +1,9 @@
-use std::sync::Arc;
-
 use crate::{
     layers::kernel::{kernel_layer, KernelLayerConfig, KernelParams},
     mut_cell::MutCell,
     node::SharedNode,
     nodes::{max::max_node, mean::mean_node},
+    ref_ctr::RefCtr,
     tensor::{OwnedShape, Tensor},
 };
 
@@ -13,7 +12,7 @@ pub fn max_pooling_layer(
     config: KernelLayerConfig<'_>,
 ) -> (Vec<SharedNode>, OwnedShape) {
     let create_filter =
-        |params: KernelParams| -> SharedNode { Arc::new(MutCell::new(max_node(params.inputs))) };
+        |params: KernelParams| -> SharedNode { RefCtr::new(MutCell::new(max_node(params.inputs))) };
     kernel_layer(inputs, config, create_filter)
 }
 
@@ -21,8 +20,9 @@ pub fn avg_pooling_layer(
     inputs: Tensor<'_, SharedNode>,
     config: KernelLayerConfig<'_>,
 ) -> (Vec<SharedNode>, OwnedShape) {
-    let create_filter =
-        |params: KernelParams| -> SharedNode { Arc::new(MutCell::new(mean_node(params.inputs))) };
+    let create_filter = |params: KernelParams| -> SharedNode {
+        RefCtr::new(MutCell::new(mean_node(params.inputs)))
+    };
     kernel_layer(inputs, config, create_filter)
 }
 

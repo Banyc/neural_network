@@ -1,10 +1,9 @@
-use std::sync::Arc;
-
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
     node::{Node, SharedNode},
     param::empty_shared_params,
+    ref_ctr::RefCtr,
 };
 
 /// ```math
@@ -14,7 +13,7 @@ pub fn input_node(input_index: usize) -> Node {
     let computation = InputNodeComputation { input_index };
     Node::new(
         Vec::new(),
-        Arc::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+        RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
         empty_shared_params(),
     )
 }
@@ -49,7 +48,7 @@ pub fn input_node_batch(params: InputNodeBatchParams) -> Vec<SharedNode> {
     (0..params.len)
         .map(|i| {
             let node = input_node(params.start + i);
-            Arc::new(MutCell::new(node))
+            RefCtr::new(MutCell::new(node))
         })
         .collect()
 }

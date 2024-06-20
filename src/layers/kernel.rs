@@ -1,7 +1,8 @@
-use std::{num::NonZeroUsize, sync::Arc};
+use std::num::NonZeroUsize;
 
 use crate::{
     node::SharedNode,
+    ref_ctr::RefCtr,
     tensor::{IndexIter, NonZeroShape, OwnedShape, OwnedStride, Shape, Stride, Tensor},
 };
 
@@ -38,7 +39,7 @@ pub fn kernel_layer(
         let mut kernel_inputs = vec![];
         while let Some(kernel_input_index) = kernel_input_indices.next_index() {
             let node = inputs.get(kernel_input_index).unwrap();
-            kernel_inputs.push(Arc::clone(node));
+            kernel_inputs.push(RefCtr::clone(node));
         }
         let params = KernelParams {
             i: kernels.len(),

@@ -1,10 +1,9 @@
-use std::sync::Arc;
-
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
     node::{Node, SharedNode},
     param::empty_shared_params,
+    ref_ctr::RefCtr,
 };
 
 /// ```math
@@ -17,7 +16,7 @@ pub fn relu_node(operand: SharedNode) -> Node {
     let computation = ReluNodeComputation {};
     Node::new(
         vec![operand],
-        Arc::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+        RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
         empty_shared_params(),
     )
 }
@@ -84,7 +83,7 @@ mod tests {
     #[test]
     fn evaluate_negative() {
         let input_node = input_node(0);
-        let mut relu = relu_node(Arc::new(MutCell::new(input_node)));
+        let mut relu = relu_node(RefCtr::new(MutCell::new(input_node)));
         let mut cx = NodeContext::new();
         relu.evaluate_once(&[&[-2.0]], &mut cx, ComputationMode::Inference);
         let output = relu.output().unwrap()[0];
@@ -95,7 +94,7 @@ mod tests {
     #[test]
     fn evaluate_positive() {
         let input_node = input_node(0);
-        let mut relu = relu_node(Arc::new(MutCell::new(input_node)));
+        let mut relu = relu_node(RefCtr::new(MutCell::new(input_node)));
         let mut cx = NodeContext::new();
         relu.evaluate_once(&[&[3.0]], &mut cx, ComputationMode::Inference);
         let output = relu.output().unwrap()[0];
@@ -106,7 +105,7 @@ mod tests {
     #[test]
     fn positive_gradient_of_this_at_operand() {
         let input_node = input_node(0);
-        let mut relu = relu_node(Arc::new(MutCell::new(input_node)));
+        let mut relu = relu_node(RefCtr::new(MutCell::new(input_node)));
         let mut cx = NodeContext::new();
         relu.evaluate_once(&[&[3.0]], &mut cx, ComputationMode::Inference);
         let batch_index = 0;
@@ -120,7 +119,7 @@ mod tests {
     #[test]
     fn negative_gradient_of_this_at_operand() {
         let input_node = input_node(0);
-        let mut relu = relu_node(Arc::new(MutCell::new(input_node)));
+        let mut relu = relu_node(RefCtr::new(MutCell::new(input_node)));
         let mut cx = NodeContext::new();
         relu.evaluate_once(&[&[-3.0]], &mut cx, ComputationMode::Inference);
         let batch_index = 0;
@@ -134,7 +133,7 @@ mod tests {
     #[test]
     fn empty_gradient_of_this_at_parameter() {
         let input_node = input_node(0);
-        let mut relu = relu_node(Arc::new(MutCell::new(input_node)));
+        let mut relu = relu_node(RefCtr::new(MutCell::new(input_node)));
         let mut cx = NodeContext::new();
         relu.evaluate_once(&[&[3.0]], &mut cx, ComputationMode::Inference);
         let batch_index = 0;

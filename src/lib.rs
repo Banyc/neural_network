@@ -8,6 +8,7 @@ pub mod neural_network;
 pub mod node;
 pub mod nodes;
 pub mod param;
+mod ref_ctr;
 mod reused_buf;
 pub mod tensor;
 #[cfg(test)]

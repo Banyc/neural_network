@@ -1,11 +1,10 @@
-use std::sync::Arc;
-
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
     node::{Node, SharedNode},
     nodes::{mean::mean_node, std_dev::std_dev_node},
     param::empty_shared_params,
+    ref_ctr::RefCtr,
 };
 
 /// ```math
@@ -13,22 +12,22 @@ use crate::{
 /// ```
 pub fn layer_norm_layer(operands: Vec<SharedNode>) -> Vec<SharedNode> {
     let mean = mean_node(operands.clone());
-    let mean = Arc::new(MutCell::new(mean));
+    let mean = RefCtr::new(MutCell::new(mean));
     let mut std_dev_inputs = vec![];
-    std_dev_inputs.push(Arc::clone(&mean));
+    std_dev_inputs.push(RefCtr::clone(&mean));
     std_dev_inputs.extend(operands.iter().cloned());
     let std_dev = std_dev_node(std_dev_inputs);
-    let std_dev = Arc::new(MutCell::new(std_dev));
+    let std_dev = RefCtr::new(MutCell::new(std_dev));
     let mut layer_norm_nodes = vec![];
     for operand in operands {
         let computation = LayerNormNodeComputation {};
-        let operands = vec![Arc::clone(&mean), Arc::clone(&std_dev), operand];
+        let operands = vec![RefCtr::clone(&mean), RefCtr::clone(&std_dev), operand];
         let node = Node::new(
             operands,
-            Arc::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+            RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
             empty_shared_params(),
         );
-        layer_norm_nodes.push(Arc::new(MutCell::new(node)));
+        layer_norm_nodes.push(RefCtr::new(MutCell::new(node)));
     }
     layer_norm_nodes
 }

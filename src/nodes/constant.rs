@@ -1,17 +1,16 @@
-use std::sync::Arc;
-
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
     node::Node,
     param::empty_shared_params,
+    ref_ctr::RefCtr,
 };
 
 pub fn constant_node(value: f64) -> Node {
     let computation = ConstantNodeComputation { value };
     Node::new(
         vec![],
-        Arc::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+        RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
         empty_shared_params(),
     )
 }

@@ -1,9 +1,10 @@
-use std::{num::NonZeroUsize, sync::Arc};
+use std::num::NonZeroUsize;
 
 use crate::{
     mut_cell::MutCell,
     node::SharedNode,
     param::{ParamInjection, SharedParams},
+    ref_ctr::RefCtr,
 };
 
 use super::{
@@ -23,10 +24,10 @@ pub fn linear_node(
 ) -> Result<SharedNode, WeightNodeError> {
     let weights = param_injection
         .name_append(":weights")
-        .get_or_create_params(|| Arc::new(MutCell::new(rnd_weights(input_nodes.len()))));
+        .get_or_create_params(|| RefCtr::new(MutCell::new(rnd_weights(input_nodes.len()))));
     let bias = param_injection
         .name_append(":bias")
-        .get_or_create_params(|| Arc::new(MutCell::new(vec![default_bias()])));
+        .get_or_create_params(|| RefCtr::new(MutCell::new(vec![default_bias()])));
     linear_node_manual(input_nodes, lambda, weights, bias)
 }
 pub fn linear_node_manual(
@@ -36,9 +37,9 @@ pub fn linear_node_manual(
     bias: SharedParams,
 ) -> Result<SharedNode, WeightNodeError> {
     let weight_node = weight_node(input_nodes, weights, lambda)?;
-    let weight_node = Arc::new(MutCell::new(weight_node));
-    let bias_node = bias_node(Arc::clone(&weight_node), bias);
-    let bias_node = Arc::new(MutCell::new(bias_node));
+    let weight_node = RefCtr::new(MutCell::new(weight_node));
+    let bias_node = bias_node(RefCtr::clone(&weight_node), bias);
+    let bias_node = RefCtr::new(MutCell::new(bias_node));
     Ok(bias_node)
 }
 

@@ -1,4 +1,4 @@
-use std::{num::NonZeroUsize, sync::Arc};
+use std::num::NonZeroUsize;
 
 use crate::{
     mut_cell::MutCell,
@@ -8,6 +8,7 @@ use crate::{
         sum::sum_node,
     },
     param::ParamInjection,
+    ref_ctr::RefCtr,
 };
 
 /// ```math
@@ -50,7 +51,7 @@ pub fn same_size_residual_layer(
     let mut layer = vec![];
     for (o, i) in outputs.into_iter().zip(inputs.into_iter()) {
         let node = sum_node(vec![o, i]);
-        layer.push(Arc::new(MutCell::new(node)));
+        layer.push(RefCtr::new(MutCell::new(node)));
     }
     layer
 }

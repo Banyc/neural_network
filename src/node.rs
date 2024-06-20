@@ -8,7 +8,7 @@
 //! - $E$: the outmost function represented by the root node of the computation graph
 //!   - "root" in code
 
-use std::{collections::VecDeque, ops::DerefMut, sync::Arc};
+use std::{collections::VecDeque, ops::DerefMut};
 
 use thiserror::Error;
 
@@ -17,10 +17,11 @@ use crate::{
     computation::{ComputationMode, NodeBackpropagationComputation, NodeComputation},
     mut_cell::MutCell,
     param::SharedParams,
+    ref_ctr::RefCtr,
     reused_buf::ReusedBuffers,
 };
 
-pub type SharedNode = Arc<MutCell<Node>>;
+pub type SharedNode = RefCtr<MutCell<Node>>;
 
 #[derive(Debug)]
 pub struct NodeContext {
@@ -53,7 +54,7 @@ pub struct Node {
     operands: Vec<SharedNode>,
     num_successors: usize,
     batch_cache: Option<NodeCache>,
-    computation: Arc<MutCell<NodeComputation>>,
+    computation: RefCtr<MutCell<NodeComputation>>,
 
     is_in_bfs_queue: bool,
 }
@@ -65,8 +66,8 @@ impl Node {
 
     pub fn new(
         operands: Vec<SharedNode>,
-        computation: Arc<MutCell<NodeComputation>>,
-        parameters: Arc<MutCell<Vec<f64>>>,
+        computation: RefCtr<MutCell<NodeComputation>>,
+        parameters: RefCtr<MutCell<Vec<f64>>>,
     ) -> Node {
         operands.iter().for_each(|operand| {
             let mut operand = operand.borrow_mut();
@@ -371,7 +372,7 @@ impl Node {
 }
 
 pub fn clone_node_batch(nodes: &[SharedNode]) -> Vec<SharedNode> {
-    nodes.iter().map(Arc::clone).collect()
+    nodes.iter().map(RefCtr::clone).collect()
 }
 
 pub fn graph_delete_caches(root_note: &SharedNode) {
@@ -408,7 +409,7 @@ where
     V: FnMut(&mut Node) -> BfsNextMove,
 {
     let mut q = VecDeque::new();
-    q.push_back(Arc::clone(root_node));
+    q.push_back(RefCtr::clone(root_node));
 
     while let Some(node) = q.pop_front() {
         let mut n = node.borrow_mut();
@@ -431,7 +432,7 @@ where
                 }
                 op.set_is_in_bfs_queue(true);
             }
-            q.push_back(Arc::clone(op));
+            q.push_back(RefCtr::clone(op));
         }
     }
 }

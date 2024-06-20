@@ -1,11 +1,10 @@
-use std::sync::Arc;
-
 use crate::{
     layers::{activation::Activation, rnn::rnn_unit},
     mut_cell::MutCell,
     node::SharedNode,
     nodes::{product::product_node, sum::sum_node},
     param::ParamInjection,
+    ref_ctr::RefCtr,
 };
 
 pub fn lstm(
@@ -60,7 +59,7 @@ fn lstm_unit(
         .into_iter()
         .zip(long_term_remember_rate.into_iter())
     {
-        let x = Arc::new(MutCell::new(product_node(vec![x, r])));
+        let x = RefCtr::new(MutCell::new(product_node(vec![x, r])));
         remembered_long_term_memory.push(x);
     }
 
@@ -90,7 +89,7 @@ fn lstm_unit(
         .into_iter()
         .zip(potential_long_term_memory_to_remember_rate.into_iter())
     {
-        let x = Arc::new(MutCell::new(product_node(vec![x, r])));
+        let x = RefCtr::new(MutCell::new(product_node(vec![x, r])));
         long_term_memory_adjustment.push(x);
     }
     let mut new_long_term_memory = vec![];
@@ -98,7 +97,7 @@ fn lstm_unit(
         .into_iter()
         .zip(long_term_memory_adjustment.into_iter())
     {
-        let x = Arc::new(MutCell::new(sum_node(vec![x, a])));
+        let x = RefCtr::new(MutCell::new(sum_node(vec![x, a])));
         new_long_term_memory.push(x);
     }
 
@@ -122,7 +121,7 @@ fn lstm_unit(
         .into_iter()
         .zip(potential_short_term_memory_to_remember_rate.into_iter())
     {
-        let x = Arc::new(MutCell::new(product_node(vec![x, r])));
+        let x = RefCtr::new(MutCell::new(product_node(vec![x, r])));
         new_short_term_memory.push(x);
     }
 

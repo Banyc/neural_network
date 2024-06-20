@@ -1,4 +1,4 @@
-use std::{io::Read, num::NonZeroUsize, path::Path, sync::Arc};
+use std::{io::Read, num::NonZeroUsize, path::Path};
 
 use crate::{
     layers::{
@@ -18,6 +18,7 @@ use crate::{
         tests::{param_injector, save_params},
         ParamInjection, ParamInjector,
     },
+    ref_ctr::RefCtr,
     tensor::{primitive_to_stride, shape_to_non_zero, Tensor},
     tests::multi_class_one_hot_accurate,
 };
@@ -200,7 +201,7 @@ fn neural_network(mut param_injection: ParamInjection<'_>) -> NeuralNetwork {
         .into_iter()
         .chain(outputs.iter().cloned())
         .collect::<Vec<SharedNode>>();
-    let error_node = Arc::new(MutCell::new(mse_node(error_node_inputs)));
+    let error_node = RefCtr::new(MutCell::new(mse_node(error_node_inputs)));
     NeuralNetwork::new(outputs, error_node)
 }
 

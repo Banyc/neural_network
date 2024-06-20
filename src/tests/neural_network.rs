@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::{
     mut_cell::MutCell,
     neural_network::{AccurateFnParams, NeuralNetwork, TrainOption},
@@ -14,6 +12,7 @@ use crate::{
         weights::weight_node,
     },
     param::{ParamInjection, ParamInjector, SharedParams},
+    ref_ctr::RefCtr,
 };
 
 fn single_linear_relu(
@@ -35,18 +34,21 @@ fn single_linear_relu_network(
         len: node_count,
     });
     let relu_node = single_linear_relu(input_nodes, initial_weights, initial_bias);
-    let relu_node = Arc::new(MutCell::new(relu_node));
+    let relu_node = RefCtr::new(MutCell::new(relu_node));
     let label_node = input_node(node_count);
-    let error_node = l2_error_node(Arc::clone(&relu_node), Arc::new(MutCell::new(label_node)));
-    NeuralNetwork::new(vec![relu_node], Arc::new(MutCell::new(error_node)))
+    let error_node = l2_error_node(
+        RefCtr::clone(&relu_node),
+        RefCtr::new(MutCell::new(label_node)),
+    );
+    NeuralNetwork::new(vec![relu_node], RefCtr::new(MutCell::new(error_node)))
 }
 
 #[test]
 fn evaluate() {
     let initial_weights = vec![3.0, 2.0, 1.0];
-    let initial_weights = Arc::new(MutCell::new(initial_weights));
+    let initial_weights = RefCtr::new(MutCell::new(initial_weights));
     let initial_bias = -20.0;
-    let initial_bias = Arc::new(MutCell::new(vec![initial_bias]));
+    let initial_bias = RefCtr::new(MutCell::new(vec![initial_bias]));
     let mut network = single_linear_relu_network(3, initial_weights, initial_bias);
     let ret = network.evaluate(&[&[1.0, 2.0, 3.0]]);
     assert_eq!(ret[0][0], 0.0);
@@ -55,11 +57,11 @@ fn evaluate() {
 #[test]
 fn error() {
     let input = input_node(0);
-    let relu = relu_node(Arc::new(MutCell::new(input)));
-    let relu = Arc::new(MutCell::new(relu));
+    let relu = relu_node(RefCtr::new(MutCell::new(input)));
+    let relu = RefCtr::new(MutCell::new(relu));
     let label = input_node(1);
-    let error = l2_error_node(Arc::clone(&relu), Arc::new(MutCell::new(label)));
-    let error = Arc::new(MutCell::new(error));
+    let error = l2_error_node(RefCtr::clone(&relu), RefCtr::new(MutCell::new(label)));
+    let error = RefCtr::new(MutCell::new(error));
     let mut network = NeuralNetwork::new(vec![relu], error);
     let inputs = vec![-2.0, 1.0];
     let ret = network.evaluate(&[&inputs]);
@@ -71,9 +73,9 @@ fn error() {
 #[test]
 fn cache_reset() {
     let initial_weights = vec![2.0, 1.0];
-    let initial_weights = Arc::new(MutCell::new(initial_weights));
+    let initial_weights = RefCtr::new(MutCell::new(initial_weights));
     let initial_bias = 3.0;
-    let initial_bias = Arc::new(MutCell::new(vec![initial_bias]));
+    let initial_bias = RefCtr::new(MutCell::new(vec![initial_bias]));
     let mut network = single_linear_relu_network(2, initial_weights, initial_bias);
     let ret = network.evaluate(&[&[2.0, -2.0]]);
     assert_eq!(ret[0][0], 5.0);
@@ -84,9 +86,9 @@ fn cache_reset() {
 #[test]
 fn errors_on_dataset() {
     let initial_weights = vec![2.0, 1.0];
-    let initial_weights = Arc::new(MutCell::new(initial_weights));
+    let initial_weights = RefCtr::new(MutCell::new(initial_weights));
     let initial_bias = 3.0;
-    let initial_bias = Arc::new(MutCell::new(vec![initial_bias]));
+    let initial_bias = RefCtr::new(MutCell::new(vec![initial_bias]));
     let mut network = single_linear_relu_network(2, initial_weights, initial_bias);
     let dataset = vec![vec![2.0, -2.0, 5.0], vec![6.0, -2.0, 5.0]];
     let ret = network.accuracy(&dataset, binary_accurate);
@@ -102,20 +104,21 @@ fn gradients() {
         len: label_index,
     });
     let initial_weights = vec![2.0, 1.0];
-    let initial_weights = Arc::new(MutCell::new(initial_weights));
+    let initial_weights = RefCtr::new(MutCell::new(initial_weights));
     let weight_node = weight_node(input_nodes, initial_weights, None).unwrap();
-    let weight_node = Arc::new(MutCell::new(weight_node));
+    let weight_node = RefCtr::new(MutCell::new(weight_node));
     let initial_bias = 3.0;
-    let initial_bias = Arc::new(MutCell::new(vec![initial_bias]));
-    let bias_node = bias_node(Arc::clone(&weight_node), initial_bias);
-    let bias_node = Arc::new(MutCell::new(bias_node));
-    let relu_node = relu_node(Arc::clone(&bias_node));
-    let relu_node = Arc::new(MutCell::new(relu_node));
+    let initial_bias = RefCtr::new(MutCell::new(vec![initial_bias]));
+    let bias_node = bias_node(RefCtr::clone(&weight_node), initial_bias);
+    let bias_node = RefCtr::new(MutCell::new(bias_node));
+    let relu_node = relu_node(RefCtr::clone(&bias_node));
+    let relu_node = RefCtr::new(MutCell::new(relu_node));
     let label_node = input_node(label_index);
-    let label_node = Arc::new(MutCell::new(label_node));
-    let error_node = l2_error_node(Arc::clone(&relu_node), label_node);
-    let error_node = Arc::new(MutCell::new(error_node));
-    let mut network = NeuralNetwork::new(vec![Arc::clone(&relu_node)], Arc::clone(&error_node));
+    let label_node = RefCtr::new(MutCell::new(label_node));
+    let error_node = l2_error_node(RefCtr::clone(&relu_node), label_node);
+    let error_node = RefCtr::new(MutCell::new(error_node));
+    let mut network =
+        NeuralNetwork::new(vec![RefCtr::clone(&relu_node)], RefCtr::clone(&error_node));
 
     let inputs = vec![2.0, -2.0, 1.0];
 
@@ -133,21 +136,22 @@ fn backpropagation_step() {
         len: label_index,
     });
     let initial_weights = vec![2.0, 1.0];
-    let initial_weights = Arc::new(MutCell::new(initial_weights));
+    let initial_weights = RefCtr::new(MutCell::new(initial_weights));
     let weight_node = weight_node(input_nodes, initial_weights, None).unwrap();
-    let weight_node = Arc::new(MutCell::new(weight_node));
+    let weight_node = RefCtr::new(MutCell::new(weight_node));
     let initial_bias = 3.0;
-    let initial_bias = Arc::new(MutCell::new(vec![initial_bias]));
-    let bias_node = bias_node(Arc::clone(&weight_node), initial_bias);
-    let bias_node = Arc::new(MutCell::new(bias_node));
-    let relu_node = relu_node(Arc::clone(&bias_node));
-    let relu_node = Arc::new(MutCell::new(relu_node));
+    let initial_bias = RefCtr::new(MutCell::new(vec![initial_bias]));
+    let bias_node = bias_node(RefCtr::clone(&weight_node), initial_bias);
+    let bias_node = RefCtr::new(MutCell::new(bias_node));
+    let relu_node = relu_node(RefCtr::clone(&bias_node));
+    let relu_node = RefCtr::new(MutCell::new(relu_node));
     let label_node = input_node(label_index);
-    let label_node = Arc::new(MutCell::new(label_node));
-    let error_node = l2_error_node(Arc::clone(&relu_node), label_node);
-    let error_node = Arc::new(MutCell::new(error_node));
+    let label_node = RefCtr::new(MutCell::new(label_node));
+    let error_node = l2_error_node(RefCtr::clone(&relu_node), label_node);
+    let error_node = RefCtr::new(MutCell::new(error_node));
     let step_size = 0.5;
-    let mut network = NeuralNetwork::new(vec![Arc::clone(&relu_node)], Arc::clone(&error_node));
+    let mut network =
+        NeuralNetwork::new(vec![RefCtr::clone(&relu_node)], RefCtr::clone(&error_node));
 
     let inputs = vec![2.0, -2.0, 1.0];
     network.backpropagation_step(&[&inputs], step_size);
@@ -171,20 +175,23 @@ fn backpropagation_step2() {
         len: label_index,
     });
     let initial_weights1 = vec![2.0];
-    let initial_weights1 = Arc::new(MutCell::new(initial_weights1));
+    let initial_weights1 = RefCtr::new(MutCell::new(initial_weights1));
     let weight_node1 = weight_node(input_nodes, initial_weights1, None).unwrap();
-    let weight_node1 = Arc::new(MutCell::new(weight_node1));
+    let weight_node1 = RefCtr::new(MutCell::new(weight_node1));
     let initial_weights2 = vec![3.0];
-    let initial_weights2 = Arc::new(MutCell::new(initial_weights2));
+    let initial_weights2 = RefCtr::new(MutCell::new(initial_weights2));
     let weight_node2 =
-        weight_node(vec![Arc::clone(&weight_node1)], initial_weights2, None).unwrap();
-    let weight_node2 = Arc::new(MutCell::new(weight_node2));
+        weight_node(vec![RefCtr::clone(&weight_node1)], initial_weights2, None).unwrap();
+    let weight_node2 = RefCtr::new(MutCell::new(weight_node2));
     let label_node = input_node(label_index);
-    let label_node = Arc::new(MutCell::new(label_node));
-    let error_node = l2_error_node(Arc::clone(&weight_node2), label_node);
-    let error_node = Arc::new(MutCell::new(error_node));
+    let label_node = RefCtr::new(MutCell::new(label_node));
+    let error_node = l2_error_node(RefCtr::clone(&weight_node2), label_node);
+    let error_node = RefCtr::new(MutCell::new(error_node));
     let step_size = 0.5;
-    let mut network = NeuralNetwork::new(vec![Arc::clone(&weight_node2)], Arc::clone(&error_node));
+    let mut network = NeuralNetwork::new(
+        vec![RefCtr::clone(&weight_node2)],
+        RefCtr::clone(&error_node),
+    );
 
     let inputs = vec![2.0, 1.0];
     network.backpropagation_step(&[&inputs], step_size);
@@ -229,20 +236,23 @@ fn learn_xor_sigmoid() {
     let sigmoid_node_2 = sigmoid_node(linear_node_2);
     let sigmoid_node_3 = sigmoid_node(linear_node_3);
     let sigmoid_nodes = vec![
-        Arc::new(MutCell::new(sigmoid_node_1)),
-        Arc::new(MutCell::new(sigmoid_node_2)),
-        Arc::new(MutCell::new(sigmoid_node_3)),
+        RefCtr::new(MutCell::new(sigmoid_node_1)),
+        RefCtr::new(MutCell::new(sigmoid_node_2)),
+        RefCtr::new(MutCell::new(sigmoid_node_3)),
     ];
     let linear_output = {
         let param_injection = param_injection.name_append(":linear.output");
         linear_node(sigmoid_nodes, None, param_injection).unwrap()
     };
     let output = sigmoid_node(linear_output);
-    let output = Arc::new(MutCell::new(output));
+    let output = RefCtr::new(MutCell::new(output));
     let label_node = input_node(label_index);
-    let error_node = l2_error_node(Arc::clone(&output), Arc::new(MutCell::new(label_node)));
+    let error_node = l2_error_node(
+        RefCtr::clone(&output),
+        RefCtr::new(MutCell::new(label_node)),
+    );
     let step_size = 0.5;
-    let mut network = NeuralNetwork::new(vec![output], Arc::new(MutCell::new(error_node)));
+    let mut network = NeuralNetwork::new(vec![output], RefCtr::new(MutCell::new(error_node)));
 
     let dataset = vec![
         vec![0.0, 0.0, 0.0],
@@ -311,20 +321,23 @@ fn learn_xor_regularized_sigmoid() {
     let sigmoid_node_2 = sigmoid_node(linear_node_2);
     let sigmoid_node_3 = sigmoid_node(linear_node_3);
     let sigmoid_nodes = vec![
-        Arc::new(MutCell::new(sigmoid_node_1)),
-        Arc::new(MutCell::new(sigmoid_node_2)),
-        Arc::new(MutCell::new(sigmoid_node_3)),
+        RefCtr::new(MutCell::new(sigmoid_node_1)),
+        RefCtr::new(MutCell::new(sigmoid_node_2)),
+        RefCtr::new(MutCell::new(sigmoid_node_3)),
     ];
     let linear_output = {
         let param_injection = param_injection.name_append(":linear.output");
         linear_node(sigmoid_nodes, Some(lambda), param_injection).unwrap()
     };
     let output = sigmoid_node(linear_output);
-    let output = Arc::new(MutCell::new(output));
+    let output = RefCtr::new(MutCell::new(output));
     let label_node = input_node(label_index);
-    let error_node = l2_error_node(Arc::clone(&output), Arc::new(MutCell::new(label_node)));
+    let error_node = l2_error_node(
+        RefCtr::clone(&output),
+        RefCtr::new(MutCell::new(label_node)),
+    );
     let step_size = 0.5;
-    let mut network = NeuralNetwork::new(vec![output], Arc::new(MutCell::new(error_node)));
+    let mut network = NeuralNetwork::new(vec![output], RefCtr::new(MutCell::new(error_node)));
 
     let dataset = vec![
         vec![-1.0, -1.0, 0.0],
@@ -376,7 +389,7 @@ fn learn_xor_relu() {
         let mut layer = Vec::new();
         for node in first_layer {
             let relu_node = relu_node(node);
-            layer.push(Arc::new(MutCell::new(relu_node)));
+            layer.push(RefCtr::new(MutCell::new(relu_node)));
         }
         layer
     };
@@ -395,7 +408,7 @@ fn learn_xor_relu() {
         let mut layer = Vec::new();
         for node in second_layer {
             let relu_node = relu_node(node);
-            layer.push(Arc::new(MutCell::new(relu_node)));
+            layer.push(RefCtr::new(MutCell::new(relu_node)));
         }
         layer
     };
@@ -404,11 +417,14 @@ fn learn_xor_relu() {
         linear_node(second_layer_relu, None, param_injection).unwrap()
     };
     let output = sigmoid_node(linear_output);
-    let output = Arc::new(MutCell::new(output));
+    let output = RefCtr::new(MutCell::new(output));
     let label_node = input_node(label_index);
-    let error_node = l2_error_node(Arc::clone(&output), Arc::new(MutCell::new(label_node)));
+    let error_node = l2_error_node(
+        RefCtr::clone(&output),
+        RefCtr::new(MutCell::new(label_node)),
+    );
     let step_size = 0.05;
-    let mut network = NeuralNetwork::new(vec![output], Arc::new(MutCell::new(error_node)));
+    let mut network = NeuralNetwork::new(vec![output], RefCtr::new(MutCell::new(error_node)));
 
     let dataset = vec![
         vec![0.0, 0.0, 0.0],

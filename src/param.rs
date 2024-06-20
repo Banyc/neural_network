@@ -1,10 +1,10 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
-use crate::mut_cell::MutCell;
+use crate::{mut_cell::MutCell, ref_ctr::RefCtr};
 
-pub type SharedParams = Arc<MutCell<Vec<f64>>>;
+pub type SharedParams = RefCtr<MutCell<Vec<f64>>>;
 pub fn empty_shared_params() -> SharedParams {
-    Arc::new(MutCell::new(vec![]))
+    RefCtr::new(MutCell::new(vec![]))
 }
 
 #[derive(Debug)]
@@ -52,13 +52,13 @@ impl ParamInjector {
         create: impl Fn() -> SharedParams,
     ) -> SharedParams {
         if let Some(params) = self.params.get(&name) {
-            return Arc::clone(params);
+            return RefCtr::clone(params);
         }
         let params = create();
         if let Some(p) = self.prev_params.get(&name) {
             *params.borrow_mut() = p.clone();
         }
-        self.params.insert(name, Arc::clone(&params));
+        self.params.insert(name, RefCtr::clone(&params));
         params
     }
 

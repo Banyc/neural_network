@@ -417,6 +417,7 @@ where
         let next_move = visit(&mut n);
         match next_move {
             BfsNextMove::Reschedule => {
+                n.set_is_in_bfs_queue(true);
                 drop(n);
                 q.push_back(node);
                 continue;

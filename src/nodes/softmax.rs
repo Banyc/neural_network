@@ -1,15 +1,17 @@
+use graph::NodeIdx;
+
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
-    node::{Node, SharedNode},
+    node::CompNode,
     param::empty_shared_params,
     ref_ctr::RefCtr,
 };
 
-pub fn softmax_layer(operands: Vec<SharedNode>) -> Vec<SharedNode> {
+pub fn softmax_layer(operands: Vec<NodeIdx>) -> Vec<CompNode> {
     let mut layer = vec![];
     for i in 0..operands.len() {
-        let node = RefCtr::new(MutCell::new(softmax_node(operands.clone(), i)));
+        let node = softmax_node(operands.clone(), i);
         layer.push(node);
     }
     layer
@@ -18,9 +20,9 @@ pub fn softmax_layer(operands: Vec<SharedNode>) -> Vec<SharedNode> {
 /// ```math
 /// f(x) = \frac{e^{x_i}}{\sum e^x}
 /// ```
-pub fn softmax_node(operands: Vec<SharedNode>, operand_index: usize) -> Node {
+pub fn softmax_node(operands: Vec<NodeIdx>, operand_index: usize) -> CompNode {
     let computation = SoftmaxNodeComputation { operand_index };
-    Node::new(
+    CompNode::new(
         operands,
         RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
         empty_shared_params(),

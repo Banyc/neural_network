@@ -1,9 +1,10 @@
+use graph::NodeIdx;
 use strict_num::FiniteF64;
 
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
-    node::{Node, SharedNode},
+    node::CompNode,
     param::empty_shared_params,
     ref_ctr::RefCtr,
 };
@@ -11,10 +12,10 @@ use crate::{
 /// ```math
 /// f(x) = \max x
 /// ```
-pub fn max_node(operands: Vec<SharedNode>) -> Node {
+pub fn max_node(operands: Vec<NodeIdx>) -> CompNode {
     assert!(!operands.is_empty());
     let computation = MaxNodeComputation {};
-    Node::new(
+    CompNode::new(
         operands,
         RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
         empty_shared_params(),

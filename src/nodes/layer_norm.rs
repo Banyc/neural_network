@@ -1,7 +1,9 @@
+use graph::NodeIdx;
+
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
-    node::{Node, SharedNode},
+    node::{CompNode, GraphBuilder},
     nodes::{mean::mean_node, std_dev::std_dev_node},
     param::empty_shared_params,
     ref_ctr::RefCtr,
@@ -10,24 +12,22 @@ use crate::{
 /// ```math
 /// f(x) = \frac{x - \mu}{\sigma}
 /// ```
-pub fn layer_norm_layer(operands: Vec<SharedNode>) -> Vec<SharedNode> {
-    let mean = mean_node(operands.clone());
-    let mean = RefCtr::new(MutCell::new(mean));
+pub fn layer_norm_layer(graph: &mut GraphBuilder, operands: Vec<NodeIdx>) -> Vec<CompNode> {
+    let mean = graph.insert_node(mean_node(operands.clone()));
     let mut std_dev_inputs = vec![];
-    std_dev_inputs.push(RefCtr::clone(&mean));
+    std_dev_inputs.push(mean);
     std_dev_inputs.extend(operands.iter().cloned());
-    let std_dev = std_dev_node(std_dev_inputs);
-    let std_dev = RefCtr::new(MutCell::new(std_dev));
+    let std_dev = graph.insert_node(std_dev_node(std_dev_inputs));
     let mut layer_norm_nodes = vec![];
     for operand in operands {
         let computation = LayerNormNodeComputation {};
-        let operands = vec![RefCtr::clone(&mean), RefCtr::clone(&std_dev), operand];
-        let node = Node::new(
+        let operands = vec![mean, std_dev, operand];
+        let node = CompNode::new(
             operands,
             RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
             empty_shared_params(),
         );
-        layer_norm_nodes.push(RefCtr::new(MutCell::new(node)));
+        layer_norm_nodes.push(node);
     }
     layer_norm_nodes
 }

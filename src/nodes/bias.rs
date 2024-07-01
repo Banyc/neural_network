@@ -1,7 +1,9 @@
+use graph::NodeIdx;
+
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
-    node::{Node, SharedNode},
+    node::CompNode,
     param::SharedParams,
     ref_ctr::RefCtr,
 };
@@ -13,10 +15,10 @@ pub fn default_bias() -> f64 {
 /// ```math
 /// f_b (x) = x + b
 /// ```
-pub fn bias_node(operand: SharedNode, bias: SharedParams) -> Node {
+pub fn bias_node(operand: NodeIdx, bias: SharedParams) -> CompNode {
     let computation = BiasNodeComputation {};
     assert_eq!(bias.borrow().len(), 1);
-    Node::new(
+    CompNode::new(
         vec![operand],
         RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
         bias,

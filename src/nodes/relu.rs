@@ -1,7 +1,9 @@
+use graph::NodeIdx;
+
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
-    node::{Node, SharedNode},
+    node::CompNode,
     param::empty_shared_params,
     ref_ctr::RefCtr,
 };
@@ -12,9 +14,9 @@ use crate::{
 ///   0 & x < 0 \\
 /// \end{cases}
 /// ```
-pub fn relu_node(operand: SharedNode) -> Node {
+pub fn relu_node(operand: NodeIdx) -> CompNode {
     let computation = ReluNodeComputation {};
-    Node::new(
+    CompNode::new(
         vec![operand],
         RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
         empty_shared_params(),
@@ -73,73 +75,80 @@ fn relu_derivative(x: f64) -> f64 {
 
 #[cfg(test)]
 mod tests {
+    use graph::dependency_order;
+
     use crate::{
-        computation::ComputationMode, mut_cell::MutCell, node::NodeContext,
+        computation::ComputationMode,
+        node::{evaluate_once, GraphBuilder, NodeContext},
         nodes::input::input_node,
     };
 
     use super::*;
 
+    fn assertion(input: f64, assert_relu: impl Fn(&CompNode, &mut NodeContext)) {
+        let mut graph = GraphBuilder::new();
+        let input_node = graph.insert_node(input_node(0));
+        let relu = graph.insert_node(relu_node(input_node));
+        let mut graph = graph.build();
+        let nodes_forward = dependency_order(&graph, &[relu]);
+        let mut cx = NodeContext::new();
+        evaluate_once(
+            &mut graph,
+            &nodes_forward,
+            &[&[input]],
+            &mut cx,
+            ComputationMode::Inference,
+        );
+        let relu = graph.nodes().get(relu).unwrap();
+        assert_relu(relu, &mut cx);
+    }
+
     #[test]
     fn evaluate_negative() {
-        let input_node = input_node(0);
-        let mut relu = relu_node(RefCtr::new(MutCell::new(input_node)));
-        let mut cx = NodeContext::new();
-        relu.evaluate_once(&[&[-2.0]], &mut cx, ComputationMode::Inference);
-        let output = relu.output().unwrap()[0];
-        assert!(output >= 0.0);
-        assert!(output <= 0.0);
+        assertion(-2.0, |relu, _| {
+            let output = relu.output().unwrap()[0];
+            assert_eq!(output, 0.0);
+        });
     }
 
     #[test]
     fn evaluate_positive() {
-        let input_node = input_node(0);
-        let mut relu = relu_node(RefCtr::new(MutCell::new(input_node)));
-        let mut cx = NodeContext::new();
-        relu.evaluate_once(&[&[3.0]], &mut cx, ComputationMode::Inference);
-        let output = relu.output().unwrap()[0];
-        assert!(output >= 3.0);
-        assert!(output <= 3.0);
+        assertion(3.0, |relu, _| {
+            let output = relu.output().unwrap()[0];
+            assert_eq!(output, 3.0);
+        });
     }
 
     #[test]
     fn positive_gradient_of_this_at_operand() {
-        let input_node = input_node(0);
-        let mut relu = relu_node(RefCtr::new(MutCell::new(input_node)));
-        let mut cx = NodeContext::new();
-        relu.evaluate_once(&[&[3.0]], &mut cx, ComputationMode::Inference);
-        let batch_index = 0;
-        let ret = relu
-            .gradient_of_this_at_operand(batch_index, &relu.parameters().borrow(), &mut cx)
-            .unwrap();
-        assert!(ret[0] >= 1.0);
-        assert!(ret[0] <= 1.0);
+        assertion(3.0, |relu, cx| {
+            let batch_index = 0;
+            let ret = relu
+                .gradient_of_this_at_operand(batch_index, &relu.parameters().borrow(), cx)
+                .unwrap();
+            assert_eq!(ret[0], 1.0);
+        });
     }
 
     #[test]
     fn negative_gradient_of_this_at_operand() {
-        let input_node = input_node(0);
-        let mut relu = relu_node(RefCtr::new(MutCell::new(input_node)));
-        let mut cx = NodeContext::new();
-        relu.evaluate_once(&[&[-3.0]], &mut cx, ComputationMode::Inference);
-        let batch_index = 0;
-        let ret = relu
-            .gradient_of_this_at_operand(batch_index, &relu.parameters().borrow(), &mut cx)
-            .unwrap();
-        assert!(ret[0] >= 0.0);
-        assert!(ret[0] <= 0.0);
+        assertion(-3.0, |relu, cx| {
+            let batch_index = 0;
+            let ret = relu
+                .gradient_of_this_at_operand(batch_index, &relu.parameters().borrow(), cx)
+                .unwrap();
+            assert_eq!(ret[0], 0.0);
+        });
     }
 
     #[test]
     fn empty_gradient_of_this_at_parameter() {
-        let input_node = input_node(0);
-        let mut relu = relu_node(RefCtr::new(MutCell::new(input_node)));
-        let mut cx = NodeContext::new();
-        relu.evaluate_once(&[&[3.0]], &mut cx, ComputationMode::Inference);
-        let batch_index = 0;
-        let ret = relu
-            .gradient_of_this_at_parameter(batch_index, &relu.parameters().borrow(), &mut cx)
-            .unwrap();
-        assert_eq!(ret.len(), 0);
+        assertion(3.0, |relu, cx| {
+            let batch_index = 0;
+            let ret = relu
+                .gradient_of_this_at_parameter(batch_index, &relu.parameters().borrow(), cx)
+                .unwrap();
+            assert_eq!(ret.len(), 0);
+        });
     }
 }

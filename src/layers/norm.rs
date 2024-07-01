@@ -1,5 +1,7 @@
+use graph::NodeIdx;
+
 use crate::{
-    node::SharedNode,
+    node::{CompNode, GraphBuilder},
     nodes::{
         batch_norm::{batch_norm_layer, BatchNormLayerConfig},
         layer_norm::layer_norm_layer,
@@ -15,14 +17,15 @@ pub enum Normalization {
 impl Normalization {
     pub fn normalize(
         self,
-        inputs: Vec<SharedNode>,
+        graph: &mut GraphBuilder,
+        inputs: Vec<NodeIdx>,
         param_injection: ParamInjection<'_>,
-    ) -> Vec<SharedNode> {
+    ) -> Vec<CompNode> {
         match self {
             Normalization::BatchNorm { config } => {
                 batch_norm_layer(inputs, config, param_injection)
             }
-            Normalization::LayerNorm => layer_norm_layer(inputs),
+            Normalization::LayerNorm => layer_norm_layer(graph, inputs),
         }
     }
 }

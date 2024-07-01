@@ -1,14 +1,16 @@
+use graph::NodeIdx;
+
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
-    node::{Node, SharedNode},
+    node::CompNode,
     param::empty_shared_params,
     ref_ctr::RefCtr,
 };
 
-pub fn sin_node(operand: SharedNode) -> Node {
+pub fn sin_node(operand: NodeIdx) -> CompNode {
     let computation = SinNodeComputation {};
-    Node::new(
+    CompNode::new(
         vec![operand],
         RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
         empty_shared_params(),

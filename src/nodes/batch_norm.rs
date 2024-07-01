@@ -1,9 +1,11 @@
+use graph::NodeIdx;
+
 use crate::{
     computation::{
         ComputationMode, NodeBackpropagationComputation, NodeBatchComputation, NodeComputation,
     },
     mut_cell::MutCell,
-    node::{Node, SharedNode},
+    node::CompNode,
     param::{ParamInjection, SharedParams},
     ref_ctr::RefCtr,
     tensor::Shape,
@@ -26,16 +28,16 @@ pub fn default_saved_params() -> Vec<f64> {
 /// f_{\beta, \gamma} (x) = \frac{x - \mu_x}{\sigma_x} \gamma + \beta
 /// ```
 pub fn batch_norm_node(
-    operand: SharedNode,
+    operand: NodeIdx,
     saved_params: SharedParams,
     trainable_params: SharedParams,
     alpha: f64,
-) -> Node {
+) -> CompNode {
     let computation = BatchNormComputation {
         saved_params,
         alpha,
     };
-    Node::new(
+    CompNode::new(
         vec![operand],
         RefCtr::new(MutCell::new(NodeComputation::Batch(Box::new(computation)))),
         trainable_params,
@@ -47,10 +49,10 @@ pub struct BatchNormLayerConfig {
     pub alpha: f64,
 }
 pub fn batch_norm_layer(
-    input_nodes: Vec<SharedNode>,
+    input_nodes: Vec<NodeIdx>,
     config: BatchNormLayerConfig,
     mut param_injection: ParamInjection<'_>,
-) -> Vec<SharedNode> {
+) -> Vec<CompNode> {
     let mut layer = Vec::with_capacity(input_nodes.len());
     for (i, input_node) in input_nodes.into_iter().enumerate() {
         let mut param_injection = param_injection.name_append(&format!(":bn.{i}"));
@@ -62,7 +64,7 @@ pub fn batch_norm_layer(
             .get_or_create_params(|| RefCtr::new(MutCell::new(default_trainable_params())));
         let batch_norm_node =
             batch_norm_node(input_node, saved_params, trainable_params, config.alpha);
-        layer.push(RefCtr::new(MutCell::new(batch_norm_node)));
+        layer.push(batch_norm_node);
     }
     layer
 }

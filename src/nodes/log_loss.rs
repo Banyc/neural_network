@@ -1,7 +1,9 @@
+use graph::NodeIdx;
+
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
-    node::{Node, SharedNode},
+    node::CompNode,
     param::empty_shared_params,
     ref_ctr::RefCtr,
 };
@@ -9,11 +11,11 @@ use crate::{
 /// ```math
 /// f(y, \hat{y}) = -\frac{1}{n} \sum y \log(\hat{y}) + (1 - y) \log(1 - \hat{y})
 /// ```
-pub fn log_loss_node(operands: Vec<SharedNode>) -> Node {
+pub fn log_loss_node(operands: Vec<NodeIdx>) -> CompNode {
     assert!(!operands.is_empty());
     assert!(operands.len() % 2 == 0);
     let computation = MseNodeComputation {};
-    Node::new(
+    CompNode::new(
         operands,
         RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
         empty_shared_params(),

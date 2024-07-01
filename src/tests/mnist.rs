@@ -10,15 +10,13 @@ use crate::{
             conv_max_pooling_layer,
         },
     },
-    mut_cell::MutCell,
     neural_network::{NeuralNetwork, TrainOption},
-    node::SharedNode,
+    node::GraphBuilder,
     nodes::{input::InputNodeGen, linear::LinearLayerConfig, mse::mse_node},
     param::{
         tests::{param_injector, save_params},
         ParamInjection, ParamInjector,
     },
-    ref_ctr::RefCtr,
     tensor::{primitive_to_stride, shape_to_non_zero, Tensor},
     tests::multi_class_one_hot_accurate,
 };
@@ -108,11 +106,12 @@ fn train() {
 
 /// a LeNet variant
 fn neural_network(mut param_injection: ParamInjection<'_>) -> NeuralNetwork {
+    let mut graph = GraphBuilder::new();
     let activation = Activation::Swish;
     let width = 28;
     let height = 28;
     let mut input_node_gen = InputNodeGen::new();
-    let input_nodes = input_node_gen.gen(width * height);
+    let input_nodes = graph.insert_nodes(input_node_gen.gen(width * height));
     let (layer, shape) = {
         let shape = [width, height];
         let inputs = Tensor::new(&input_nodes, &shape).unwrap();
@@ -135,6 +134,7 @@ fn neural_network(mut param_injection: ParamInjection<'_>) -> NeuralNetwork {
         };
         let param_injection = param_injection.name_append(":conv.0");
         conv_max_pooling_layer(
+            &mut graph,
             inputs,
             conv,
             max_pooling,
@@ -164,6 +164,7 @@ fn neural_network(mut param_injection: ParamInjection<'_>) -> NeuralNetwork {
         };
         let param_injection = param_injection.name_append(":conv.1");
         conv_max_pooling_layer(
+            &mut graph,
             inputs,
             conv,
             max_pooling,
@@ -178,7 +179,8 @@ fn neural_network(mut param_injection: ParamInjection<'_>) -> NeuralNetwork {
             lambda: None,
         };
         let param_injection = param_injection.name_append(":dense.0");
-        dense_layer(layer, config, &activation, param_injection)
+        let dense = dense_layer(&mut graph, layer, config, &activation, param_injection);
+        graph.insert_nodes(dense)
     };
     let layer = {
         let config = LinearLayerConfig {
@@ -186,7 +188,8 @@ fn neural_network(mut param_injection: ParamInjection<'_>) -> NeuralNetwork {
             lambda: None,
         };
         let param_injection = param_injection.name_append(":dense.1");
-        dense_layer(layer, config, &activation, param_injection)
+        let dense = dense_layer(&mut graph, layer, config, &activation, param_injection);
+        graph.insert_nodes(dense)
     };
     let outputs = {
         let config = LinearLayerConfig {
@@ -194,15 +197,13 @@ fn neural_network(mut param_injection: ParamInjection<'_>) -> NeuralNetwork {
             lambda: None,
         };
         let param_injection = param_injection.name_append(":dense.2");
-        dense_layer(layer, config, &activation, param_injection)
+        let dense = dense_layer(&mut graph, layer, config, &activation, param_injection);
+        graph.insert_nodes(dense)
     };
-    let label_nodes = input_node_gen.gen(CLASSES);
-    let error_node_inputs = label_nodes
-        .into_iter()
-        .chain(outputs.iter().cloned())
-        .collect::<Vec<SharedNode>>();
-    let error_node = RefCtr::new(MutCell::new(mse_node(error_node_inputs)));
-    NeuralNetwork::new(outputs, error_node)
+    let label_nodes = graph.insert_nodes(input_node_gen.gen(CLASSES));
+    let error_node = graph.insert_node(mse_node(label_nodes, outputs.clone()));
+    let graph = graph.build();
+    NeuralNetwork::new(graph, outputs, error_node)
 }
 
 fn read_mnist(image: impl AsRef<Path>, label: impl AsRef<Path>) -> std::io::Result<Vec<Vec<f64>>> {

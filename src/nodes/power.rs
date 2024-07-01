@@ -1,7 +1,9 @@
+use graph::NodeIdx;
+
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
-    node::{Node, SharedNode},
+    node::CompNode,
     param::empty_shared_params,
     ref_ctr::RefCtr,
 };
@@ -9,9 +11,9 @@ use crate::{
 /// ```math
 /// f(x) = x^a
 /// ```
-pub fn power_node(operand: SharedNode, power: f64) -> Node {
+pub fn power_node(operand: NodeIdx, power: f64) -> CompNode {
     let computation = PowerNodeComputation { power };
-    Node::new(
+    CompNode::new(
         vec![operand],
         RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
         empty_shared_params(),

@@ -1,14 +1,14 @@
 use std::num::NonZeroUsize;
 
+use graph::NodeIdx;
+
 use crate::{
-    mut_cell::MutCell,
-    node::SharedNode,
+    node::{CompNode, GraphBuilder},
     nodes::{
         linear::{linear_layer, LinearLayerConfig},
         sum::sum_node,
     },
     param::ParamInjection,
-    ref_ctr::RefCtr,
 };
 
 /// ```math
@@ -20,10 +20,11 @@ use crate::{
 ///
 /// - $l$: linear layer
 pub fn residual_layer(
-    outputs: Vec<SharedNode>,
-    inputs: Vec<SharedNode>,
+    graph: &mut GraphBuilder,
+    outputs: Vec<NodeIdx>,
+    inputs: Vec<NodeIdx>,
     param_injection: ParamInjection<'_>,
-) -> Vec<SharedNode> {
+) -> Vec<NodeIdx> {
     assert!(!outputs.is_empty());
     assert!(!inputs.is_empty());
     let inputs = if outputs.len() != inputs.len() {
@@ -31,27 +32,24 @@ pub fn residual_layer(
             depth: NonZeroUsize::new(outputs.len()).unwrap(),
             lambda: None,
         };
-        linear_layer(inputs, config, param_injection).unwrap()
+        linear_layer(graph, inputs, config, param_injection).unwrap()
     } else {
         inputs
     };
-    same_size_residual_layer(outputs, inputs)
+    graph.insert_nodes(same_size_residual_layer(outputs, inputs))
 }
 
 /// ```math
 /// f(o, i) = o + i
 /// ```
-pub fn same_size_residual_layer(
-    outputs: Vec<SharedNode>,
-    inputs: Vec<SharedNode>,
-) -> Vec<SharedNode> {
+pub fn same_size_residual_layer(outputs: Vec<NodeIdx>, inputs: Vec<NodeIdx>) -> Vec<CompNode> {
     assert!(!outputs.is_empty());
     assert!(!inputs.is_empty());
     assert_eq!(outputs.len(), inputs.len());
     let mut layer = vec![];
     for (o, i) in outputs.into_iter().zip(inputs.into_iter()) {
         let node = sum_node(vec![o, i]);
-        layer.push(RefCtr::new(MutCell::new(node)));
+        layer.push(node);
     }
     layer
 }

@@ -8,8 +8,9 @@
 //! - $E$: the outmost function represented by the root node of the computation graph
 //!   - "root" in code
 
-use std::{collections::VecDeque, ops::DerefMut};
+use std::ops::DerefMut;
 
+use graph::{breath_first_search, Graph, NextMove, Node, NodeArray, NodeIdx, VisitParams};
 use thiserror::Error;
 
 use crate::{
@@ -20,8 +21,6 @@ use crate::{
     ref_ctr::RefCtr,
     reused_buf::ReusedBuffers,
 };
-
-pub type SharedNode = RefCtr<MutCell<Node>>;
 
 #[derive(Debug)]
 pub struct NodeContext {
@@ -44,73 +43,105 @@ impl Default for NodeContext {
     }
 }
 
+#[derive(Debug)]
+pub struct GraphBuilder {
+    nodes: NodeArray<CompNode>,
+}
+impl GraphBuilder {
+    pub fn new() -> Self {
+        Self {
+            nodes: NodeArray::with_key(),
+        }
+    }
+
+    pub fn insert_nodes(&mut self, nodes: Vec<CompNode>) -> Vec<NodeIdx> {
+        nodes.into_iter().map(|n| self.insert_node(n)).collect()
+    }
+    pub fn insert_node(&mut self, node: CompNode) -> NodeIdx {
+        for &child in node.children() {
+            self.nodes
+                .get_mut(child)
+                .unwrap()
+                .increment_num_successors();
+        }
+        self.nodes.insert(node)
+    }
+
+    pub fn build(self) -> Graph<CompNode> {
+        Graph::new(self.nodes)
+    }
+}
+impl Default for GraphBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// The function of this node should be
 /// ```math
 /// f : \mathbb{R}^n \to \mathbb{R}
 /// ```
 #[derive(Debug)]
-pub struct Node {
+pub struct CompNode {
     parameters: SharedParams,
-    operands: Vec<SharedNode>,
+    operands: Vec<NodeIdx>,
     num_successors: usize,
     batch_cache: Option<NodeCache>,
     computation: RefCtr<MutCell<NodeComputation>>,
-
-    is_in_bfs_queue: bool,
 }
-
-impl Node {
+impl Node for CompNode {
+    fn children(&self) -> &[NodeIdx] {
+        &self.operands
+    }
+}
+impl CompNode {
     fn check_rep(&self) {
         if !cfg!(debug_assertions) {}
     }
 
     pub fn new(
-        operands: Vec<SharedNode>,
+        operands: Vec<NodeIdx>,
         computation: RefCtr<MutCell<NodeComputation>>,
         parameters: RefCtr<MutCell<Vec<f64>>>,
-    ) -> Node {
-        operands.iter().for_each(|operand| {
-            let mut operand = operand.borrow_mut();
-            operand.increment_num_successors();
-        });
+    ) -> CompNode {
         let this = Self {
             parameters,
             operands,
             num_successors: 0,
             batch_cache: None,
             computation,
-            is_in_bfs_queue: false,
         };
         this.check_rep();
         this
     }
 
+    fn increment_num_successors(&mut self) {
+        self.num_successors += 1;
+        self.check_rep();
+    }
+    pub fn set_cache(&mut self, cache: NodeCache) {
+        self.batch_cache = Some(cache);
+    }
+    pub fn clear_cache(&mut self) {
+        self.batch_cache = None;
+    }
+    pub fn has_evaluated(&self) -> bool {
+        self.batch_cache.is_some()
+    }
+
     pub fn evaluate_once<I>(
         &mut self,
         inputs_batch: &[I],
+        operand_outputs: Vec<f64>,
         cx: &mut NodeContext,
         mode: ComputationMode,
     ) where
         I: AsRef<[f64]>,
     {
-        if self.batch_cache.is_some() {
-            return;
-        }
+        assert!(!self.has_evaluated());
 
-        for operand in &self.operands {
-            let mut operand = operand.borrow_mut();
-            operand.evaluate_once(inputs_batch, cx, mode);
-        }
-
-        // Collect operand outputs
-        let mut eval_buf = cx.buf().take();
-        for batch_index in 0..inputs_batch.len() {
-            for operand in &self.operands {
-                let operand = operand.as_ref().borrow();
-                eval_buf.push(operand.output().unwrap()[batch_index])
-            }
-        }
-        let operand_outputs_len = eval_buf.len();
+        let operand_outputs_len = operand_outputs.len();
+        let mut eval_buf = operand_outputs;
 
         // Compute outputs
         let mut computation = self.computation.as_ref().borrow_mut();
@@ -156,11 +187,7 @@ impl Node {
         self.check_rep();
     }
 
-    pub fn do_gradient_descent_step(
-        &mut self,
-        step_size: f64,
-        cx: &mut NodeContext,
-    ) -> Result<(), GradientDescentError> {
+    pub fn is_ok_do_gradient_descent_step(&self) -> Result<(), GradientDescentError> {
         let Some(cache) = &self.batch_cache else {
             return Err(GradientDescentError::NoEvaluationOutputCaches);
         };
@@ -172,22 +199,18 @@ impl Node {
         ) {
             return Err(GradientDescentError::NotReceivingEnoughAddendsOfGradientFromSuccessors);
         }
-        self.adjust_parameters(step_size, cx);
-        self.check_rep();
         Ok(())
     }
 
-    fn increment_num_successors(&mut self) {
-        self.num_successors += 1;
-        self.check_rep();
-    }
-
-    fn adjust_parameters(&mut self, step_size: f64, cx: &mut NodeContext) {
+    /// Distribute addends of partial derivatives of root at operands to operands
+    pub fn distribute_gradient_to_operands(
+        &self,
+        buf: &mut Vec<(NodeIdx, usize, f64)>,
+        cx: &mut NodeContext,
+    ) {
         let batch_size = self.batch_cache.as_ref().unwrap().batch_size();
+        let parameters = self.parameters.borrow();
 
-        let mut parameters = self.parameters.borrow_mut();
-
-        // Distribute addends of partial derivatives of root at operands to operands
         for batch_index in 0..batch_size {
             let gradient_of_this_at_operand = self
                 .gradient_of_this_at_operand(batch_index, &parameters, cx)
@@ -202,11 +225,15 @@ impl Node {
                 // \frac{\partial E}{\partial f} \cdot \frac{\partial f}{\partial z}
                 // ```
                 let addend = d_root_at_this * d_this_at_operand;
-                let mut operand = operand.borrow_mut();
-                operand.add_addend_of_partial_derivative_of_root_at_this(addend, batch_index);
+                buf.push((*operand, batch_index, addend));
             }
             cx.buf().put(gradient_of_this_at_operand);
         }
+    }
+
+    pub fn adjust_parameters(&mut self, step_size: f64, cx: &mut NodeContext) {
+        let batch_size = self.batch_cache.as_ref().unwrap().batch_size();
+        let mut parameters = self.parameters.borrow_mut();
 
         let mut partial_derivative_of_root_at_parameter = cx.buf().take();
         partial_derivative_of_root_at_parameter
@@ -236,7 +263,7 @@ impl Node {
         self.check_rep();
     }
 
-    fn add_addend_of_partial_derivative_of_root_at_this(
+    pub fn add_addend_of_partial_derivative_of_root_at_this(
         &mut self,
         addend: f64,
         batch_index: usize,
@@ -363,85 +390,6 @@ impl Node {
     pub fn parameters(&self) -> &SharedParams {
         &self.parameters
     }
-    pub fn is_in_bfs_queue(&self) -> bool {
-        self.is_in_bfs_queue
-    }
-    pub fn set_is_in_bfs_queue(&mut self, value: bool) {
-        self.is_in_bfs_queue = value;
-    }
-}
-
-pub fn clone_node_batch(nodes: &[SharedNode]) -> Vec<SharedNode> {
-    nodes.iter().map(RefCtr::clone).collect()
-}
-
-pub fn graph_delete_caches(root_note: &SharedNode) {
-    let f = |n: &mut Node| {
-        if n.batch_cache.is_none() {
-            return BfsNextMove::Noop;
-        }
-        n.batch_cache = None;
-        BfsNextMove::VisitChildren
-    };
-    bfs_operands(root_note, f);
-}
-
-pub fn graph_do_gradient_descent_steps(
-    root_note: &SharedNode,
-    step_size: f64,
-    cx: &mut NodeContext,
-) {
-    let f = |n: &mut Node| match n.do_gradient_descent_step(step_size, cx) {
-        Ok(_) => BfsNextMove::VisitChildren,
-        Err(e) => match e {
-            GradientDescentError::NotReceivingEnoughAddendsOfGradientFromSuccessors => {
-                BfsNextMove::Reschedule
-            }
-            // This node has had it parameters updated already
-            GradientDescentError::NoEvaluationOutputCaches => BfsNextMove::Noop,
-        },
-    };
-    bfs_operands(root_note, f);
-}
-
-fn bfs_operands<V>(root_node: &SharedNode, mut visit: V)
-where
-    V: FnMut(&mut Node) -> BfsNextMove,
-{
-    let mut q = VecDeque::new();
-    q.push_back(RefCtr::clone(root_node));
-
-    while let Some(node) = q.pop_front() {
-        let mut n = node.borrow_mut();
-        n.set_is_in_bfs_queue(false);
-        let next_move = visit(&mut n);
-        match next_move {
-            BfsNextMove::Reschedule => {
-                n.set_is_in_bfs_queue(true);
-                drop(n);
-                q.push_back(node);
-                continue;
-            }
-            BfsNextMove::Noop => continue,
-            BfsNextMove::VisitChildren => (),
-        }
-        for op in &n.operands {
-            {
-                let mut op = op.borrow_mut();
-                if op.is_in_bfs_queue() {
-                    continue;
-                }
-                op.set_is_in_bfs_queue(true);
-            }
-            q.push_back(RefCtr::clone(op));
-        }
-    }
-}
-enum BfsNextMove {
-    /// Put self back to the queue
-    Reschedule,
-    Noop,
-    VisitChildren,
 }
 
 #[derive(Debug, Error)]
@@ -476,4 +424,91 @@ pub enum GradientOfThisAtParameterError {
 pub enum GradientOfThisAtOperandError {
     #[error("No evaluation output caches")]
     NoEvaluationOutputCaches,
+}
+
+pub fn evaluate_once<I>(
+    graph: &mut Graph<CompNode>,
+    nodes_forward: &[NodeIdx],
+    inputs_batch: &[I],
+    cx: &mut NodeContext,
+    mode: ComputationMode,
+) where
+    I: AsRef<[f64]>,
+{
+    let mut buf = vec![];
+    for &node in nodes_forward {
+        {
+            let node = graph.nodes().get(node).unwrap();
+            if node.has_evaluated() {
+                continue;
+            }
+            buf.clear();
+            buf.extend(node.children());
+        }
+
+        // Collect operand outputs
+        let mut operand_outputs = cx.buf().take();
+        for batch_index in 0..inputs_batch.len() {
+            for &operand in &buf {
+                let operand = graph.nodes().get(operand).unwrap();
+                operand_outputs.push(operand.output().unwrap()[batch_index])
+            }
+        }
+
+        let node = graph.nodes_mut().get_mut(node).unwrap();
+        node.evaluate_once(inputs_batch, operand_outputs, cx, mode);
+    }
+}
+pub fn delete_cache(graph: &mut Graph<CompNode>, nodes_forward: &[NodeIdx]) {
+    for &node in nodes_forward {
+        graph.nodes_mut().get_mut(node).unwrap().clear_cache();
+    }
+}
+
+pub fn backpropagate(
+    graph: &mut Graph<CompNode>,
+    start: NodeIdx,
+    step_size: f64,
+    cx: &mut NodeContext,
+) {
+    let mut buf = vec![];
+    let mut visit = |params: VisitParams<'_, CompNode>| -> NextMove {
+        let node = params.node;
+        let graph = params.graph;
+        match graph
+            .nodes()
+            .get(node)
+            .unwrap()
+            .is_ok_do_gradient_descent_step()
+        {
+            Ok(()) => (),
+            Err(GradientDescentError::NotReceivingEnoughAddendsOfGradientFromSuccessors) => {
+                return NextMove::Postpone;
+            }
+            Err(GradientDescentError::NoEvaluationOutputCaches) => {
+                // This node has had it parameters updated already
+                return NextMove::TerminateBranch;
+            }
+        }
+        buf.clear();
+        graph
+            .nodes()
+            .get(node)
+            .unwrap()
+            .distribute_gradient_to_operands(&mut buf, cx);
+        for &(child, batch_index, addend) in &buf {
+            graph
+                .nodes_mut()
+                .get_mut(child)
+                .unwrap()
+                .add_addend_of_partial_derivative_of_root_at_this(addend, batch_index);
+        }
+        graph
+            .nodes_mut()
+            .get_mut(node)
+            .unwrap()
+            .adjust_parameters(step_size, cx);
+        NextMove::VisitChildren
+    };
+    breath_first_search(graph, start, &mut visit);
 }

@@ -1,14 +1,14 @@
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
-    node::Node,
+    node::CompNode,
     param::empty_shared_params,
     ref_ctr::RefCtr,
 };
 
-pub fn constant_node(value: f64) -> Node {
+pub fn constant_node(value: f64) -> CompNode {
     let computation = ConstantNodeComputation { value };
-    Node::new(
+    CompNode::new(
         vec![],
         RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
         empty_shared_params(),

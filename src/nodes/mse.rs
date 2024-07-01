@@ -1,7 +1,9 @@
+use graph::NodeIdx;
+
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
-    node::{Node, SharedNode},
+    node::CompNode,
     param::empty_shared_params,
     ref_ctr::RefCtr,
 };
@@ -9,12 +11,12 @@ use crate::{
 /// ```math
 /// f(y, \hat{y}) = \frac{1}{n} \sum (y - \hat{y})^2
 /// ```
-pub fn mse_node(operands: Vec<SharedNode>) -> Node {
-    assert!(!operands.is_empty());
-    assert!(operands.len() % 2 == 0);
+pub fn mse_node(y: Vec<NodeIdx>, y_hat: Vec<NodeIdx>) -> CompNode {
+    assert!(!y.is_empty());
+    assert_eq!(y.len(), y_hat.len());
     let computation = MseNodeComputation {};
-    Node::new(
-        operands,
+    CompNode::new(
+        y.into_iter().chain(y_hat).collect(),
         RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
         empty_shared_params(),
     )

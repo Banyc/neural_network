@@ -1,28 +1,29 @@
+use graph::NodeIdx;
+
 use crate::{
     layers::kernel::{kernel_layer, KernelLayerConfig, KernelParams},
-    mut_cell::MutCell,
-    node::SharedNode,
+    node::GraphBuilder,
     nodes::{max::max_node, mean::mean_node},
-    ref_ctr::RefCtr,
     tensor::{OwnedShape, Tensor},
 };
 
 pub fn max_pooling_layer(
-    inputs: Tensor<'_, SharedNode>,
+    graph: &mut GraphBuilder,
+    inputs: Tensor<'_, NodeIdx>,
     config: KernelLayerConfig<'_>,
-) -> (Vec<SharedNode>, OwnedShape) {
+) -> (Vec<NodeIdx>, OwnedShape) {
     let create_filter =
-        |params: KernelParams| -> SharedNode { RefCtr::new(MutCell::new(max_node(params.inputs))) };
+        |params: KernelParams| -> NodeIdx { graph.insert_node(max_node(params.inputs)) };
     kernel_layer(inputs, config, create_filter)
 }
 
 pub fn avg_pooling_layer(
-    inputs: Tensor<'_, SharedNode>,
+    graph: &mut GraphBuilder,
+    inputs: Tensor<'_, NodeIdx>,
     config: KernelLayerConfig<'_>,
-) -> (Vec<SharedNode>, OwnedShape) {
-    let create_filter = |params: KernelParams| -> SharedNode {
-        RefCtr::new(MutCell::new(mean_node(params.inputs)))
-    };
+) -> (Vec<NodeIdx>, OwnedShape) {
+    let create_filter =
+        |params: KernelParams| -> NodeIdx { graph.insert_node(mean_node(params.inputs)) };
     kernel_layer(inputs, config, create_filter)
 }
 
@@ -30,9 +31,11 @@ pub fn avg_pooling_layer(
 mod tests {
     use std::num::NonZeroUsize;
 
+    use graph::dependency_order;
+
     use crate::{
         computation::ComputationMode,
-        node::NodeContext,
+        node::{evaluate_once, NodeContext},
         nodes::input::{input_node_batch, InputNodeBatchParams},
         tensor::{OwnedNonZeroShape, OwnedStride},
     };
@@ -52,10 +55,11 @@ mod tests {
             .copied()
             .map(|x| x as f64)
             .collect::<Vec<f64>>();
-        let input_nodes = input_node_batch(InputNodeBatchParams {
+        let mut graph = GraphBuilder::new();
+        let input_nodes = graph.insert_nodes(input_node_batch(InputNodeBatchParams {
             start: 0,
             len: image.len(),
-        });
+        }));
         let input_shape = [4, 4];
         let inputs = Tensor::new(&input_nodes, &input_shape).unwrap();
         let stride = [2, 2];
@@ -73,12 +77,21 @@ mod tests {
             kernel_shape: &kernel_shape,
             assert_output_shape: Some(&[2, 2]),
         };
-        let (max_pooling_layer, _layer_shape) = max_pooling_layer(inputs, kernel_layer_config);
+        let (max_pooling_layer, _layer_shape) =
+            max_pooling_layer(&mut graph, inputs, kernel_layer_config);
+        let mut graph = graph.build();
         let mut outputs = vec![];
         let mut cx = NodeContext::new();
-        for output_node in &max_pooling_layer {
-            let mut output_node = output_node.borrow_mut();
-            output_node.evaluate_once(&[&image], &mut cx, ComputationMode::Inference);
+        let nodes_forward = dependency_order(&graph, &max_pooling_layer);
+        evaluate_once(
+            &mut graph,
+            &nodes_forward,
+            &[&image],
+            &mut cx,
+            ComputationMode::Inference,
+        );
+        for &output_node in &max_pooling_layer {
+            let output_node = graph.nodes().get(output_node).unwrap();
             let output = output_node.output().unwrap()[0];
             outputs.push(output);
         }

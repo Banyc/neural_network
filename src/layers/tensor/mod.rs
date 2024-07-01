@@ -1,11 +1,12 @@
 use std::num::NonZeroUsize;
 
 use conv::{deep_conv_layer, DeepConvLayerConfig};
+use graph::NodeIdx;
 use pooling::max_pooling_layer;
 
 use crate::{
     layers::residual::residual_layer,
-    node::SharedNode,
+    node::GraphBuilder,
     param::ParamInjection,
     tensor::{OwnedShape, Shape, Tensor},
 };
@@ -16,27 +17,29 @@ pub mod conv;
 pub mod pooling;
 
 pub fn conv_max_pooling_layer(
-    inputs: Tensor<'_, SharedNode>,
+    graph: &mut GraphBuilder,
+    inputs: Tensor<'_, NodeIdx>,
     conv: DeepConvLayerConfig<'_>,
     max_pooling: KernelLayerConfig<'_>,
     activation: &Activation,
     normalization: Option<Normalization>,
     mut param_injection: ParamInjection<'_>,
-) -> (Vec<SharedNode>, OwnedShape) {
+) -> (Vec<NodeIdx>, OwnedShape) {
     let (conv_layer, shape) = {
         let param_injection = param_injection.name_append(":conv");
-        deep_conv_layer(inputs, conv, param_injection)
+        deep_conv_layer(graph, inputs, conv, param_injection)
     };
-    let activation_layer = activation.activate(&conv_layer);
+    let activation_layer = graph.insert_nodes(activation.activate(&conv_layer));
     let normalization_layer = if let Some(norm) = normalization {
         let param_injection = param_injection.name_append(":norm");
-        norm.normalize(activation_layer, param_injection)
+        let norm = norm.normalize(graph, activation_layer, param_injection);
+        graph.insert_nodes(norm)
     } else {
         activation_layer
     };
     {
         let inputs = Tensor::new(&normalization_layer, &shape).unwrap();
-        max_pooling_layer(inputs, max_pooling)
+        max_pooling_layer(graph, inputs, max_pooling)
     }
 }
 
@@ -47,14 +50,15 @@ pub struct ResidualConvConfig<'a> {
     pub num_conv_layers: NonZeroUsize,
 }
 pub fn residual_conv_layers(
-    inputs: Vec<SharedNode>,
+    graph: &mut GraphBuilder,
+    inputs: Vec<NodeIdx>,
     inputs_shape: &Shape,
     activation: &Activation,
     normalization: Normalization,
     config: ResidualConvConfig<'_>,
     mut param_injection: ParamInjection<'_>,
-) -> (Vec<SharedNode>, OwnedShape) {
-    let mut prev_layer: Option<(Vec<SharedNode>, OwnedShape)> = None;
+) -> (Vec<NodeIdx>, OwnedShape) {
+    let mut prev_layer: Option<(Vec<NodeIdx>, OwnedShape)> = None;
 
     for i in 0..config.num_conv_layers.get() {
         let imm_inputs = match &prev_layer {
@@ -77,18 +81,21 @@ pub fn residual_conv_layers(
             } else {
                 &config.following_conv
             };
-            deep_conv_layer(imm_inputs, config.clone(), param_injection)
+            deep_conv_layer(graph, imm_inputs, config.clone(), param_injection)
         };
         let res_layer = if is_end {
             let param_injection = param_injection.name_append(&format!(":res.{i}"));
-            residual_layer(conv_layer, inputs.clone(), param_injection)
+            residual_layer(graph, conv_layer, inputs.clone(), param_injection)
         } else {
             conv_layer
         };
-        let act_layer = activation.activate(&res_layer);
+        let act_layer = graph.insert_nodes(activation.activate(&res_layer));
         let layer = {
             let param_injection = param_injection.name_append(&format!(":norm.{i}"));
-            normalization.clone().normalize(act_layer, param_injection)
+            let norm = normalization
+                .clone()
+                .normalize(graph, act_layer, param_injection);
+            graph.insert_nodes(norm)
         };
         prev_layer = Some((layer, shape));
     }

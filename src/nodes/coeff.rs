@@ -1,7 +1,9 @@
+use graph::NodeIdx;
+
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
-    node::{Node, SharedNode},
+    node::CompNode,
     param::empty_shared_params,
     ref_ctr::RefCtr,
 };
@@ -9,9 +11,9 @@ use crate::{
 /// ```math
 /// f(x) = ax
 /// ```
-pub fn coeff_node(operand: SharedNode, coefficient: f64) -> Node {
+pub fn coeff_node(operand: NodeIdx, coefficient: f64) -> CompNode {
     let computation = CoeffNodeComputation { coefficient };
-    Node::new(
+    CompNode::new(
         vec![operand],
         RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
         empty_shared_params(),

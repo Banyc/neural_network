@@ -1,8 +1,10 @@
 use std::num::NonZeroUsize;
 
+use graph::NodeIdx;
+
 use crate::{
     layers::kernel::{kernel_layer, KernelLayerConfig, KernelParams},
-    node::SharedNode,
+    node::GraphBuilder,
     nodes::linear::linear_node,
     param::ParamInjection,
     tensor::{append_tensors, non_zero_to_shape, OwnedShape, Shape, Tensor},
@@ -14,13 +16,14 @@ pub struct ConvLayerConfig<'a> {
     pub lambda: Option<f64>,
 }
 pub fn conv_layer(
-    inputs: Tensor<'_, SharedNode>,
+    graph: &mut GraphBuilder,
+    inputs: Tensor<'_, NodeIdx>,
     config: ConvLayerConfig<'_>,
     mut param_injection: ParamInjection<'_>,
-) -> (Vec<SharedNode>, OwnedShape) {
-    let create_filter = |params: KernelParams| -> SharedNode {
+) -> (Vec<NodeIdx>, OwnedShape) {
+    let create_filter = |params: KernelParams| -> NodeIdx {
         let param_injection = param_injection.name_append(":kernel");
-        let feature_node = linear_node(params.inputs, config.lambda, param_injection);
+        let feature_node = linear_node(graph, params.inputs, config.lambda, param_injection);
         feature_node.unwrap()
     };
     kernel_layer(inputs, config.kernel_layer, create_filter)
@@ -33,15 +36,16 @@ pub struct DeepConvLayerConfig<'a> {
     pub assert_output_shape: Option<&'a Shape>,
 }
 pub fn deep_conv_layer(
-    inputs: Tensor<'_, SharedNode>,
+    graph: &mut GraphBuilder,
+    inputs: Tensor<'_, NodeIdx>,
     config: DeepConvLayerConfig<'_>,
     mut param_injection: ParamInjection<'_>,
-) -> (Vec<SharedNode>, OwnedShape) {
+) -> (Vec<NodeIdx>, OwnedShape) {
     let mut kernel_layers = vec![];
     let mut kernel_layer_shape = None;
     for depth in 0..config.depth.get() {
         let param_injection = param_injection.name_append(&format!(":depth.{depth}"));
-        let (layer, shape) = conv_layer(inputs, config.conv.clone(), param_injection);
+        let (layer, shape) = conv_layer(graph, inputs, config.conv.clone(), param_injection);
         if let Some(layer_shape) = &kernel_layer_shape {
             assert_eq!(&shape, layer_shape);
         }

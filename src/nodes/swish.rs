@@ -1,7 +1,9 @@
+use graph::NodeIdx;
+
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
-    node::{Node, SharedNode},
+    node::CompNode,
     param::empty_shared_params,
     ref_ctr::RefCtr,
 };
@@ -11,9 +13,9 @@ use super::sigmoid::sigmoid;
 /// ```math
 /// f(x) = x \text{sigmoid}(x)
 /// ```
-pub fn swish_node(operand: SharedNode) -> Node {
+pub fn swish_node(operand: NodeIdx) -> CompNode {
     let computation = SwishNodeComputation {};
-    Node::new(
+    CompNode::new(
         vec![operand],
         RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
         empty_shared_params(),

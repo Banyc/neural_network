@@ -1,33 +1,34 @@
 use std::num::NonZeroUsize;
 
+use graph::NodeIdx;
+
 use crate::{
     layers::activation::Activation,
-    mut_cell::MutCell,
-    node::SharedNode,
+    node::GraphBuilder,
     nodes::{
         linear::{linear_layer, LinearLayerConfig},
         sum::sum_node,
     },
     param::ParamInjection,
-    ref_ctr::RefCtr,
 };
 
 /// gradient computation algorithm: BPTT
 pub fn rnn(
-    init_hidden_states: Vec<SharedNode>,
-    inputs_seq: Vec<Vec<SharedNode>>,
+    graph: &mut GraphBuilder,
+    init_hidden_states: Vec<NodeIdx>,
+    inputs_seq: Vec<Vec<NodeIdx>>,
     activation: &Activation,
     mut param_injection: ParamInjection<'_>,
-) -> Vec<Vec<SharedNode>> {
+) -> Vec<Vec<NodeIdx>> {
     assert!(!inputs_seq.is_empty());
 
     let mut hidden_states = init_hidden_states;
-    let mut outputs_seq: Vec<Vec<SharedNode>> = vec![];
+    let mut outputs_seq: Vec<Vec<NodeIdx>> = vec![];
 
     for inputs in inputs_seq.into_iter() {
         let param_injection = param_injection.name_append(":unit");
         let depth = hidden_states.len();
-        let outputs = rnn_unit(hidden_states, inputs, activation, param_injection);
+        let outputs = rnn_unit(graph, hidden_states, inputs, activation, param_injection);
         hidden_states = outputs.clone();
         assert_eq!(outputs.len(), depth);
         outputs_seq.push(outputs);
@@ -37,11 +38,12 @@ pub fn rnn(
 }
 
 pub fn rnn_unit(
-    prev_hidden_states: Vec<SharedNode>,
-    inputs: Vec<SharedNode>,
+    graph: &mut GraphBuilder,
+    prev_hidden_states: Vec<NodeIdx>,
+    inputs: Vec<NodeIdx>,
     activation: &Activation,
     mut param_injection: ParamInjection<'_>,
-) -> Vec<SharedNode> {
+) -> Vec<NodeIdx> {
     let depth = NonZeroUsize::new(prev_hidden_states.len()).unwrap();
     let x = {
         let param_injection = param_injection.name_append(":input");
@@ -49,7 +51,7 @@ pub fn rnn_unit(
             depth,
             lambda: None,
         };
-        linear_layer(inputs, config, param_injection).unwrap()
+        linear_layer(graph, inputs, config, param_injection).unwrap()
     };
     let rec = {
         let param_injection = param_injection.name_append(":rec");
@@ -57,14 +59,14 @@ pub fn rnn_unit(
             depth,
             lambda: None,
         };
-        linear_layer(prev_hidden_states, config, param_injection).unwrap()
+        linear_layer(graph, prev_hidden_states, config, param_injection).unwrap()
     };
     let mut sum_layer = vec![];
     for (x, rec) in x.into_iter().zip(rec.into_iter()) {
-        let node = sum_node(vec![x, rec]);
-        sum_layer.push(RefCtr::new(MutCell::new(node)));
+        let node = graph.insert_node(sum_node(vec![x, rec]));
+        sum_layer.push(node);
     }
-    let act_layer = activation.activate(&sum_layer);
+    let act_layer = graph.insert_nodes(activation.activate(&sum_layer));
     assert_eq!(act_layer.len(), depth.get());
     act_layer
 }

@@ -1,7 +1,9 @@
+use graph::NodeIdx;
+
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
-    node::{Node, SharedNode},
+    node::CompNode,
     param::empty_shared_params,
     ref_ctr::RefCtr,
 };
@@ -9,9 +11,9 @@ use crate::{
 /// ```math
 /// f(x) = a^x
 /// ```
-pub fn exp_node(operand: SharedNode, base: f64) -> Node {
+pub fn exp_node(operand: NodeIdx, base: f64) -> CompNode {
     let computation = ExpNodeComputation { base };
-    Node::new(
+    CompNode::new(
         vec![operand],
         RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
         empty_shared_params(),

@@ -1,28 +1,30 @@
+use graph::NodeIdx;
+
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
-    node::{Node, SharedNode},
+    node::CompNode,
     param::empty_shared_params,
     ref_ctr::RefCtr,
 };
 
-pub fn recurrent_reader_node() -> (Node, RefCtr<MutCell<f64>>) {
+pub fn recurrent_reader_node() -> (CompNode, RefCtr<MutCell<f64>>) {
     let value = RefCtr::new(MutCell::new(0.));
     let computation = RecurrentReaderNodeComputation {
         value: RefCtr::clone(&value),
     };
-    let reader = Node::new(
+    let reader = CompNode::new(
         vec![],
         RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
         empty_shared_params(),
     );
     (reader, value)
 }
-pub fn recurrent_writer_node(operand: SharedNode, value: RefCtr<MutCell<f64>>) -> Node {
+pub fn recurrent_writer_node(operand: NodeIdx, value: RefCtr<MutCell<f64>>) -> CompNode {
     let computation = RecurrentWriterNodeComputation {
         value: RefCtr::clone(&value),
     };
-    Node::new(
+    CompNode::new(
         vec![operand],
         RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
         empty_shared_params(),

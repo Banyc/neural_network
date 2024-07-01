@@ -50,6 +50,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "graph"
+version = "0.1.0"
+source = "git+https://github.com/Banyc/graph.git?tag=v0.0.13#045f900282cae453483bdf67a6995a4c9151847c"
+dependencies = [
+ "slotmap",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.155"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -60,6 +68,7 @@ name = "neural_network"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "graph",
  "rand",
  "ron",
  "strict-num",
@@ -153,6 +162,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "slotmap"
+version = "1.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dbff4acf519f630b3a3ddcfaea6c06b42174d9a44bc70c620e9ed1649d58b82a"
+dependencies = [
+ "version_check",
+]
+
+[[package]]
 name = "strict-num"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -197,6 +215,12 @@ name = "unicode-ident"
 version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3354b9ac3fae1ff6755cb6db53683adb661634f67557942dea4facebec0fee4b"
+
+[[package]]
+name = "version_check"
+version = "0.9.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 
 [[package]]
 name = "wasi"

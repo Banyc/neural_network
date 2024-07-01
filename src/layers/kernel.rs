@@ -1,10 +1,8 @@
 use std::num::NonZeroUsize;
 
-use crate::{
-    node::SharedNode,
-    ref_ctr::RefCtr,
-    tensor::{IndexIter, NonZeroShape, OwnedShape, OwnedStride, Shape, Stride, Tensor},
-};
+use graph::NodeIdx;
+
+use crate::tensor::{IndexIter, NonZeroShape, OwnedShape, OwnedStride, Shape, Stride, Tensor};
 
 #[derive(Debug, Clone)]
 pub struct KernelLayerConfig<'a> {
@@ -13,10 +11,10 @@ pub struct KernelLayerConfig<'a> {
     pub assert_output_shape: Option<&'a Shape>,
 }
 pub fn kernel_layer(
-    inputs: Tensor<'_, SharedNode>,
+    inputs: Tensor<'_, NodeIdx>,
     config: KernelLayerConfig<'_>,
-    mut create_kernel: impl FnMut(KernelParams) -> SharedNode,
-) -> (Vec<SharedNode>, OwnedShape) {
+    mut create_kernel: impl FnMut(KernelParams) -> NodeIdx,
+) -> (Vec<NodeIdx>, OwnedShape) {
     let mut shape = inputs.shape().to_vec();
     shape
         .iter_mut()
@@ -38,8 +36,8 @@ pub fn kernel_layer(
         let mut kernel_input_indices = IndexIter::new(&range, &stride);
         let mut kernel_inputs = vec![];
         while let Some(kernel_input_index) = kernel_input_indices.next_index() {
-            let node = inputs.get(kernel_input_index).unwrap();
-            kernel_inputs.push(RefCtr::clone(node));
+            let node = *inputs.get(kernel_input_index).unwrap();
+            kernel_inputs.push(node);
         }
         let params = KernelParams {
             i: kernels.len(),
@@ -57,5 +55,5 @@ pub fn kernel_layer(
 #[derive(Debug, Clone)]
 pub struct KernelParams {
     pub i: usize,
-    pub inputs: Vec<SharedNode>,
+    pub inputs: Vec<NodeIdx>,
 }

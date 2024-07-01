@@ -1,7 +1,9 @@
+use graph::NodeIdx;
+
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
-    node::{Node, SharedNode},
+    node::CompNode,
     param::empty_shared_params,
     ref_ctr::RefCtr,
 };
@@ -9,10 +11,10 @@ use crate::{
 /// ```math
 /// f(\mu, x) = \sqrt{\frac{\sum (x - \mu)^2}{n}}
 /// ```
-pub fn std_dev_node(operands: Vec<SharedNode>) -> Node {
+pub fn std_dev_node(operands: Vec<NodeIdx>) -> CompNode {
     assert!(2 <= operands.len());
     let computation = StdDevNodeComputation {};
-    Node::new(
+    CompNode::new(
         operands,
         RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
         empty_shared_params(),

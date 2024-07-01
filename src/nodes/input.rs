@@ -1,7 +1,7 @@
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
-    node::{Node, SharedNode},
+    node::CompNode,
     param::empty_shared_params,
     ref_ctr::RefCtr,
 };
@@ -9,9 +9,9 @@ use crate::{
 /// ```math
 /// f(x) = x[i]
 /// ```
-pub fn input_node(input_index: usize) -> Node {
+pub fn input_node(input_index: usize) -> CompNode {
     let computation = InputNodeComputation { input_index };
-    Node::new(
+    CompNode::new(
         Vec::new(),
         RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
         empty_shared_params(),
@@ -27,7 +27,7 @@ impl InputNodeGen {
         Self { next_index: 0 }
     }
 
-    pub fn gen(&mut self, len: usize) -> Vec<SharedNode> {
+    pub fn gen(&mut self, len: usize) -> Vec<CompNode> {
         let start = self.next_index;
         self.next_index = start + len;
         input_node_batch(InputNodeBatchParams { start, len })
@@ -44,12 +44,9 @@ pub struct InputNodeBatchParams {
     pub start: usize,
     pub len: usize,
 }
-pub fn input_node_batch(params: InputNodeBatchParams) -> Vec<SharedNode> {
+pub fn input_node_batch(params: InputNodeBatchParams) -> Vec<CompNode> {
     (0..params.len)
-        .map(|i| {
-            let node = input_node(params.start + i);
-            RefCtr::new(MutCell::new(node))
-        })
+        .map(|i| input_node(params.start + i))
         .collect()
 }
 
@@ -95,29 +92,32 @@ impl NodeBackpropagationComputation for InputNodeComputation {
 
 #[cfg(test)]
 mod tests {
+    use graph::dependency_order;
+
     use crate::{
         computation::{ComputationMode, NodeScalarComputation},
-        node::NodeContext,
+        node::{evaluate_once, GraphBuilder, NodeContext},
     };
 
     use super::{input_node, InputNodeComputation};
 
     #[test]
     fn node_output1() {
-        let mut node = input_node(0);
+        let mut graph = GraphBuilder::new();
+        let node = graph.insert_node(input_node(0));
+        let mut graph = graph.build();
+        let nodes_forward = dependency_order(&graph, &[node]);
         let mut cx = NodeContext::new();
-        node.evaluate_once(&[&[3.0]], &mut cx, ComputationMode::Inference);
+        evaluate_once(
+            &mut graph,
+            &nodes_forward,
+            &[&[3.0]],
+            &mut cx,
+            ComputationMode::Inference,
+        );
+        let node = graph.nodes().get(node).unwrap();
         let output = node.output().unwrap()[0];
         assert_eq!(output, 3.0);
-    }
-
-    #[test]
-    fn node_output2() {
-        let mut node = input_node(0);
-        let mut cx = NodeContext::new();
-        node.evaluate_once(&[&[-4.0]], &mut cx, ComputationMode::Inference);
-        let output = node.output().unwrap()[0];
-        assert_eq!(output, -4.0);
     }
 
     #[test]

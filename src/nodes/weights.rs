@@ -1,10 +1,11 @@
+use graph::NodeIdx;
 use rand::Rng;
 use thiserror::Error;
 
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
-    node::{Node, SharedNode},
+    node::CompNode,
     param::SharedParams,
     ref_ctr::RefCtr,
 };
@@ -32,17 +33,17 @@ pub fn rnd_weights(op_len: usize) -> Vec<f64> {
 ///
 /// - `lambda`: for regularization
 pub fn weight_node(
-    operands: Vec<SharedNode>,
+    operands: Vec<NodeIdx>,
     weights: SharedParams,
     lambda: Option<f64>,
-) -> Result<Node, WeightNodeError> {
+) -> Result<CompNode, WeightNodeError> {
     if operands.len() != weights.borrow().len() {
         return Err(WeightNodeError::ParameterSizeNotMatched);
     }
     let computation = WeightNodeComputation {
         lambda: lambda.unwrap_or(0.),
     };
-    let node = Node::new(
+    let node = CompNode::new(
         operands,
         RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
         weights,
@@ -122,56 +123,66 @@ pub enum WeightNodeError {
 
 #[cfg(test)]
 mod tests {
+    use graph::dependency_order;
+
     use super::*;
 
     use crate::{
         computation::ComputationMode,
-        node::NodeContext,
+        node::{evaluate_once, GraphBuilder, NodeContext},
         nodes::input::{input_node_batch, InputNodeBatchParams},
     };
 
-    #[test]
-    fn evaluate() {
-        let input_nodes = input_node_batch(InputNodeBatchParams { start: 0, len: 3 });
+    fn assertion(assert_weight: impl Fn(&CompNode, &mut NodeContext)) {
+        let mut graph = GraphBuilder::new();
+        let input_nodes =
+            graph.insert_nodes(input_node_batch(InputNodeBatchParams { start: 0, len: 3 }));
         let inputs = vec![1.0, 2.0, 3.0];
         let initial_weights = vec![3.0, 2.0, 1.0];
         let initial_weights = RefCtr::new(MutCell::new(initial_weights));
-        let mut weight_node = weight_node(input_nodes, initial_weights, None).unwrap();
+        let weight_node =
+            graph.insert_node(weight_node(input_nodes, initial_weights, None).unwrap());
+        let mut graph = graph.build();
+        let nodes_forward = dependency_order(&graph, &[weight_node]);
         let mut cx = NodeContext::new();
-        weight_node.evaluate_once(&[&inputs], &mut cx, ComputationMode::Inference);
-        let output = weight_node.output().unwrap()[0];
-        assert_eq!(output, 3.0 * 1.0 + 2.0 * 2.0 + 1.0 * 3.0);
+        evaluate_once(
+            &mut graph,
+            &nodes_forward,
+            &[inputs],
+            &mut cx,
+            ComputationMode::Inference,
+        );
+        let weight_node = graph.nodes().get(weight_node).unwrap();
+        assert_weight(weight_node, &mut cx);
+    }
+
+    #[test]
+    fn evaluate() {
+        assertion(|weight_node, _| {
+            let output = weight_node.output().unwrap()[0];
+            assert_eq!(output, 3.0 * 1.0 + 2.0 * 2.0 + 1.0 * 3.0);
+        });
     }
 
     #[test]
     fn gradient_of_this_at_operand() {
-        let input_nodes = input_node_batch(InputNodeBatchParams { start: 0, len: 3 });
-        let inputs = vec![1.0, 2.0, 3.0];
-        let initial_weights = vec![3.0, 2.0, 1.0];
-        let initial_weights = RefCtr::new(MutCell::new(initial_weights));
-        let mut weight_node = weight_node(input_nodes, initial_weights, None).unwrap();
-        let mut cx = NodeContext::new();
-        weight_node.evaluate_once(&[&inputs], &mut cx, ComputationMode::Inference);
-        let batch_index = 0;
-        let ret = weight_node
-            .gradient_of_this_at_operand(batch_index, &weight_node.parameters().borrow(), &mut cx)
-            .unwrap();
-        assert_eq!(&ret, &[3.0, 2.0, 1.0]);
+        assertion(|weight_node, cx| {
+            let batch_index = 0;
+            let ret = weight_node
+                .gradient_of_this_at_operand(batch_index, &weight_node.parameters().borrow(), cx)
+                .unwrap();
+            assert_eq!(&ret, &[3.0, 2.0, 1.0]);
+        });
     }
 
     #[test]
     fn gradient_of_this_at_parameter() {
-        let input_nodes = input_node_batch(InputNodeBatchParams { start: 0, len: 3 });
-        let inputs = vec![1.0, 2.0, 3.0];
-        let initial_weights = vec![3.0, 2.0, 1.0];
-        let initial_weights = RefCtr::new(MutCell::new(initial_weights));
-        let mut weight_node = weight_node(input_nodes, initial_weights, None).unwrap();
-        let mut cx = NodeContext::new();
-        weight_node.evaluate_once(&[&inputs], &mut cx, ComputationMode::Inference);
-        let batch_index = 0;
-        let ret = weight_node
-            .gradient_of_this_at_parameter(batch_index, &weight_node.parameters().borrow(), &mut cx)
-            .unwrap();
-        assert_eq!(&ret, &[1.0, 2.0, 3.0]);
+        assertion(|weight_node, cx| {
+            let batch_index = 0;
+            let ret = weight_node
+                .gradient_of_this_at_parameter(batch_index, &weight_node.parameters().borrow(), cx)
+                .unwrap();
+            assert_eq!(&ret, &[1.0, 2.0, 3.0]);
+        });
     }
 }

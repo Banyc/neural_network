@@ -1,7 +1,9 @@
+use graph::NodeIdx;
+
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
-    node::{Node, SharedNode},
+    node::CompNode,
     param::empty_shared_params,
     ref_ctr::RefCtr,
 };
@@ -9,9 +11,9 @@ use crate::{
 /// ```math
 /// f(x) = \prod x
 /// ```
-pub fn product_node(operands: Vec<SharedNode>) -> Node {
+pub fn product_node(operands: Vec<NodeIdx>) -> CompNode {
     let computation = ProductNodeComputation {};
-    Node::new(
+    CompNode::new(
         operands,
         RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
         empty_shared_params(),

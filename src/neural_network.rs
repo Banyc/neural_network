@@ -1,45 +1,62 @@
 use std::time::{Duration, Instant};
 
+use graph::{dependency_order, Graph, NodeIdx};
 use rand::Rng;
 
 use crate::{
     computation::ComputationMode,
-    node::{graph_delete_caches, NodeContext, SharedNode},
+    node::{backpropagate, delete_cache, evaluate_once, CompNode, NodeContext},
 };
 
-use super::node::graph_do_gradient_descent_steps;
+type PostOrder = Vec<NodeIdx>;
 
 #[derive(Debug)]
 pub struct NeuralNetwork {
+    graph: Graph<CompNode>,
     /// output: a prediction
-    terminal_nodes: Vec<SharedNode>,
+    terminal_nodes: Vec<NodeIdx>,
+    terminals_forward: PostOrder,
     /// output: the error between the prediction and the label
-    error_node: SharedNode,
+    error_node: NodeIdx,
+    error_forward: PostOrder,
     /// global necessity
     cx: NodeContext,
 }
 impl NeuralNetwork {
     fn check_rep(&self) {}
 
-    pub fn new(terminal_nodes: Vec<SharedNode>, error_node: SharedNode) -> NeuralNetwork {
+    pub fn new(
+        graph: Graph<CompNode>,
+        terminal_nodes: Vec<NodeIdx>,
+        error_node: NodeIdx,
+    ) -> NeuralNetwork {
+        let error_forward = dependency_order(&graph, &[error_node]);
+        let terminals_forward = dependency_order(&graph, &terminal_nodes);
         let cx = NodeContext::new();
         let this = NeuralNetwork {
+            graph,
             terminal_nodes,
+            terminals_forward,
             error_node,
+            error_forward,
             cx,
         };
         this.check_rep();
         this
     }
 
+    pub fn graph(&self) -> &Graph<CompNode> {
+        &self.graph
+    }
+
     /// `step_size`: learning rate
-    pub fn backpropagation_step<I>(&mut self, samples: &[I], step_size: f64)
+    pub fn compute_error_and_backpropagate<I>(&mut self, samples: &[I], step_size: f64)
     where
         I: AsRef<[f64]>,
     {
         let err = self.compute_error(samples, EvalOption::KeepCache, ComputationMode::Training);
         self.cx.buf().put(err);
-        graph_do_gradient_descent_steps(&self.error_node, step_size, &mut self.cx);
+        backpropagate(&mut self.graph, self.error_node, step_size, &mut self.cx);
         self.check_rep();
     }
 
@@ -51,16 +68,19 @@ impl NeuralNetwork {
         I: AsRef<[f64]>,
     {
         let mut outputs = vec![];
-
-        for terminal_node in &self.terminal_nodes {
-            let mut terminal_node = terminal_node.borrow_mut();
-            terminal_node.evaluate_once(inputs, &mut self.cx, ComputationMode::Inference);
+        evaluate_once(
+            &mut self.graph,
+            &self.terminals_forward,
+            inputs,
+            &mut self.cx,
+            ComputationMode::Inference,
+        );
+        for &terminal_node in &self.terminal_nodes {
+            let terminal_node = self.graph.nodes().get(terminal_node).unwrap();
             let output = terminal_node.output().unwrap();
             outputs.push(output.to_vec());
         }
-        for terminal_node in &self.terminal_nodes {
-            graph_delete_caches(terminal_node);
-        }
+        delete_cache(&mut self.graph, &self.terminals_forward);
         self.check_rep();
         outputs
     }
@@ -90,13 +110,21 @@ impl NeuralNetwork {
     where
         I: AsRef<[f64]>,
     {
-        let mut error_node = self.error_node.borrow_mut();
-        error_node.evaluate_once(inputs, &mut self.cx, mode);
+        evaluate_once(
+            &mut self.graph,
+            &self.error_forward,
+            inputs,
+            &mut self.cx,
+            mode,
+        );
         let mut output = self.cx.buf().take();
+        let error_node = self.graph.nodes().get(self.error_node).unwrap();
         output.extend(error_node.output().unwrap());
-        drop(error_node);
-        if matches!(option, EvalOption::ClearCache) {
-            graph_delete_caches(&self.error_node);
+        match option {
+            EvalOption::KeepCache => (),
+            EvalOption::ClearCache => {
+                delete_cache(&mut self.graph, &self.error_forward);
+            }
         }
         self.check_rep();
         output
@@ -120,7 +148,7 @@ impl NeuralNetwork {
                 let dataset_index: usize = rng.gen_range(0..dataset.len());
                 batch_input.push(dataset[dataset_index].as_ref());
             }
-            self.backpropagation_step(&batch_input, step_size);
+            self.compute_error_and_backpropagate(&batch_input, step_size);
             progress_printer.print_progress(i, max_steps);
         }
         self.check_rep();

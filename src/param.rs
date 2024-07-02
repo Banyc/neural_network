@@ -3,10 +3,12 @@ use std::collections::HashMap;
 use rand::Rng;
 use rand_distr::Distribution;
 use strict_num::NormalizedF64;
-use vec_seg::{SegKey, VecSeg};
 
-pub fn empty_shared_params() -> SegKey {
-    SegKey::empty_slice()
+use crate::{mut_cell::MutCell, ref_ctr::RefCtr};
+
+pub type SharedParams = RefCtr<MutCell<Vec<f64>>>;
+pub fn empty_shared_params() -> SharedParams {
+    RefCtr::new(MutCell::new(vec![]))
 }
 
 #[derive(Debug)]
@@ -24,10 +26,7 @@ impl<'a> ParamInjection<'a> {
         }
     }
 
-    pub fn get_or_create_params<I>(self, create: impl Fn() -> I) -> SegKey
-    where
-        I: Iterator<Item = f64>,
-    {
+    pub fn get_or_create_params(self, create: impl Fn() -> SharedParams) -> SharedParams {
         self.injector.get_or_create_params(self.name, create)
     }
 }
@@ -35,130 +34,67 @@ impl<'a> ParamInjection<'a> {
 #[derive(Debug)]
 pub struct ParamInjector {
     prev_params: HashMap<String, Vec<f64>>,
-    params: Params,
+    params: HashMap<String, SharedParams>,
 }
 impl ParamInjector {
     pub fn new(parameters: HashMap<String, Vec<f64>>) -> Self {
         Self {
             prev_params: parameters,
-            params: Params::new(),
+            params: HashMap::new(),
         }
     }
     pub fn empty() -> Self {
         Self {
             prev_params: HashMap::new(),
-            params: Params::new(),
+            params: HashMap::new(),
         }
     }
 
-    pub fn get_or_create_params<I>(&mut self, name: String, create: impl Fn() -> I) -> SegKey
-    where
-        I: Iterator<Item = f64>,
-    {
-        if let Some(key) = self.params.key_by_name(&name) {
-            return key;
+    pub fn get_or_create_params(
+        &mut self,
+        name: String,
+        create: impl Fn() -> SharedParams,
+    ) -> SharedParams {
+        if let Some(params) = self.params.get(&name) {
+            return RefCtr::clone(params);
         }
-        match self.prev_params.get(&name) {
-            Some(p) => self.params.try_insert_by_name(name, || p.iter().copied()),
-            None => self.params.try_insert_by_name(name, create),
+        let params = create();
+        if let Some(p) = self.prev_params.get(&name) {
+            *params.borrow_mut() = p.clone();
         }
+        self.params.insert(name, RefCtr::clone(&params));
+        params
     }
 
-    pub fn into_params(self) -> Params {
-        self.params
+    pub fn collect_parameters(&self) -> HashMap<String, Vec<f64>> {
+        let mut collected = HashMap::new();
+        for (name, params) in &self.params {
+            collected.insert(name.clone(), params.borrow().clone());
+        }
+        collected
     }
 }
 
-#[derive(Debug)]
-pub struct Params {
-    seg: VecSeg<f64>,
-    name: HashMap<String, SegKey>,
-}
-impl Params {
-    pub fn new() -> Self {
-        Self {
-            seg: VecSeg::new(),
-            name: HashMap::new(),
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        self.name.len()
-    }
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    pub fn try_insert_by_name<I>(&mut self, name: String, params: impl Fn() -> I) -> SegKey
-    where
-        I: Iterator<Item = f64>,
-    {
-        if let Some(&key) = self.name.get(&name) {
-            return key;
-        }
-        self.seg.extend(params())
-    }
-
-    pub fn seg(&self) -> &VecSeg<f64> {
-        &self.seg
-    }
-    pub fn seg_mut(&mut self) -> &mut VecSeg<f64> {
-        &mut self.seg
-    }
-
-    pub fn iter_name_key(&self) -> impl Iterator<Item = (&str, SegKey)> {
-        self.name.iter().map(|(name, &key)| (name.as_str(), key))
-    }
-    pub fn key_by_name(&self, name: &str) -> Option<SegKey> {
-        self.name.get(name).copied()
-    }
-
-    pub fn iter_name_slice(&self) -> impl Iterator<Item = (&str, &[f64])> {
-        self.name
-            .iter()
-            .map(|(name, &key)| (name.as_str(), self.seg.slice(key)))
-    }
-    pub fn iter_name_slice_mut(&mut self, f: &mut impl FnMut(&str, &mut [f64])) {
-        for (name, &key) in &self.name {
-            let params = self.seg.slice_mut(key);
-            f(name.as_str(), params);
-        }
-    }
-    pub fn slice_by_name(&self, name: &str) -> Option<&[f64]> {
-        let key = *self.name.get(name)?;
-        Some(self.seg.slice(key))
-    }
-    pub fn slice_mut_by_name(&mut self, name: &str) -> Option<&mut [f64]> {
-        let key = *self.name.get(name)?;
-        Some(self.seg.slice_mut(key))
-    }
-}
-impl Default for Params {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-pub fn crossover(a: &mut Params, b: &Params) {
+pub fn crossover(a: &HashMap<String, SharedParams>, b: &HashMap<String, SharedParams>) {
     assert_eq!(a.len(), b.len());
     let mut coin_flip = rand::thread_rng();
-    a.iter_name_slice_mut(&mut |name, a| {
-        let b = b.slice_by_name(name).unwrap();
-        assert_eq!(a.len(), b.len());
-        for (a, &b) in a.iter_mut().zip(b) {
+    for (k, a) in a.iter() {
+        let b = b.get(k).unwrap().borrow();
+        assert_eq!(a.borrow().len(), b.len());
+        for (a, b) in a.borrow_mut().iter_mut().zip(b.iter().copied()) {
             if coin_flip.gen_bool(0.5) {
                 continue;
             }
             *a = b;
         }
-    });
+    }
 }
 
-pub fn mutate(params: &mut Params, rate: NormalizedF64) {
+pub fn mutate(params: &HashMap<String, SharedParams>, rate: NormalizedF64) {
     let mut rng = rand::thread_rng();
     let normal = rand_distr::Normal::new(0., 1.).unwrap();
-    params.iter_name_slice_mut(&mut |_name, slice| {
-        for param in slice {
+    for (_, params) in params.iter() {
+        for param in params.borrow_mut().iter_mut() {
             let chance = rng.gen_bool(rate.get());
             if !chance {
                 continue;
@@ -167,7 +103,7 @@ pub fn mutate(params: &mut Params, rate: NormalizedF64) {
             *param += change;
             *param = param.clamp(-1., 1.);
         }
-    });
+    }
 }
 
 #[cfg(test)]

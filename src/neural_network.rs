@@ -9,7 +9,6 @@ use rand::Rng;
 use crate::{
     computation::ComputationMode,
     node::{backpropagate, delete_cache, evaluate_once, CompNode, NodeContext},
-    param::Params,
 };
 
 type PostOrder = Vec<NodeIdx>;
@@ -23,7 +22,6 @@ pub struct NeuralNetwork {
     /// output: the error between the prediction and the label
     error_node: NodeIdx,
     error_forward: PostOrder,
-    params: Params,
     /// global necessity
     cx: NodeContext,
 }
@@ -34,7 +32,6 @@ impl NeuralNetwork {
         graph: Graph<CompNode>,
         terminal_nodes: Vec<NodeIdx>,
         error_node: NodeIdx,
-        params: Params,
     ) -> NeuralNetwork {
         let error_forward = dependency_order(&graph, &[error_node]);
         let error_unique = BTreeSet::from_iter(error_forward.iter().copied());
@@ -47,7 +44,6 @@ impl NeuralNetwork {
             terminals_forward,
             error_node,
             error_forward,
-            params,
             cx,
         };
         this.check_rep();
@@ -56,9 +52,6 @@ impl NeuralNetwork {
 
     pub fn graph(&self) -> &Graph<CompNode> {
         &self.graph
-    }
-    pub fn params(&self) -> &Params {
-        &self.params
     }
 
     /// `step_size`: learning rate
@@ -71,7 +64,6 @@ impl NeuralNetwork {
         backpropagate(
             &mut self.graph,
             &self.error_forward,
-            &mut self.params,
             step_size,
             &mut self.cx,
         );
@@ -89,7 +81,6 @@ impl NeuralNetwork {
         evaluate_once(
             &mut self.graph,
             &self.terminals_forward,
-            &mut self.params,
             inputs,
             &mut self.cx,
             ComputationMode::Inference,
@@ -132,7 +123,6 @@ impl NeuralNetwork {
         evaluate_once(
             &mut self.graph,
             &self.error_forward,
-            &mut self.params,
             inputs,
             &mut self.cx,
             mode,

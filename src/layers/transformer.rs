@@ -395,9 +395,8 @@ mod tests {
         error_inputs.extend(terminal_nodes.clone());
         let error_node = graph.insert_node(log_loss_node(error_inputs));
         let graph = graph.build();
-        let params = param_injector.into_params();
 
-        let mut nn = NeuralNetwork::new(graph, terminal_nodes, error_node, params);
+        let mut nn = NeuralNetwork::new(graph, terminal_nodes, error_node);
 
         let mut dataset = vec![];
 

@@ -97,7 +97,6 @@ mod tests {
     use crate::{
         computation::{ComputationMode, NodeScalarComputation},
         node::{evaluate_once, GraphBuilder, NodeContext},
-        param::Params,
     };
 
     use super::{input_node, InputNodeComputation};
@@ -108,12 +107,10 @@ mod tests {
         let node = graph.insert_node(input_node(0));
         let mut graph = graph.build();
         let nodes_forward = dependency_order(&graph, &[node]);
-        let mut params = Params::new();
         let mut cx = NodeContext::new();
         evaluate_once(
             &mut graph,
             &nodes_forward,
-            &mut params,
             &[&[3.0]],
             &mut cx,
             ComputationMode::Inference,

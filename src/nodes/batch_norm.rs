@@ -1,5 +1,4 @@
 use graph::NodeIdx;
-use vec_seg::SegKey;
 
 use crate::{
     computation::{
@@ -7,7 +6,7 @@ use crate::{
     },
     mut_cell::MutCell,
     node::CompNode,
-    param::{ParamInjection, Params},
+    param::{ParamInjection, SharedParams},
     ref_ctr::RefCtr,
     tensor::Shape,
 };
@@ -30,8 +29,8 @@ pub fn default_saved_params() -> Vec<f64> {
 /// ```
 pub fn batch_norm_node(
     operand: NodeIdx,
-    saved_params: SegKey,
-    trainable_params: SegKey,
+    saved_params: SharedParams,
+    trainable_params: SharedParams,
     alpha: f64,
 ) -> CompNode {
     let computation = BatchNormComputation {
@@ -59,10 +58,10 @@ pub fn batch_norm_layer(
         let mut param_injection = param_injection.name_append(&format!(":bn.{i}"));
         let saved_params = param_injection
             .name_append(":saved")
-            .get_or_create_params(|| default_saved_params().into_iter());
+            .get_or_create_params(|| RefCtr::new(MutCell::new(default_saved_params())));
         let trainable_params = param_injection
             .name_append(":trainable")
-            .get_or_create_params(|| default_trainable_params().into_iter());
+            .get_or_create_params(|| RefCtr::new(MutCell::new(default_trainable_params())));
         let batch_norm_node =
             batch_norm_node(input_node, saved_params, trainable_params, config.alpha);
         layer.push(batch_norm_node);
@@ -73,21 +72,19 @@ pub fn batch_norm_layer(
 #[derive(Debug)]
 struct BatchNormComputation {
     /// $(mean, std)$
-    saved_params: SegKey,
+    saved_params: SharedParams,
     alpha: f64,
 }
 impl NodeBatchComputation for BatchNormComputation {
     fn compute_output(
         &mut self,
-        params: &mut Params,
-        param_key: SegKey,
+        parameters: &[f64],
         operand_outputs: &[f64],
         operand_outputs_shape: &Shape,
         mut buf: Vec<f64>,
         mode: ComputationMode,
     ) -> Vec<f64> {
-        assert_eq!(param_key.len(), 2);
-        let parameters = params.seg().slice(param_key);
+        assert_eq!(parameters.len(), 2);
         let beta = parameters[0];
         let gamma = parameters[1];
 
@@ -116,19 +113,17 @@ impl NodeBatchComputation for BatchNormComputation {
                 let normalized = each_operand.map(|x| x - mean).map(|x| x / std_dev);
                 let scaled_shifted = normalized.map(|x| x * gamma + beta);
 
-                let saved_params = params.seg_mut().slice_mut(self.saved_params);
-                let ema_mean = &mut saved_params[0];
+                let ema_mean = &mut self.saved_params.as_ref().borrow_mut()[0];
                 *ema_mean = *ema_mean * self.alpha + mean * (1. - self.alpha);
-                let ema_std_dev = &mut saved_params[1];
+                let ema_std_dev = &mut self.saved_params.as_ref().borrow_mut()[1];
                 *ema_std_dev = *ema_std_dev * self.alpha + std_dev * (1. - self.alpha);
 
                 buf.extend(scaled_shifted);
                 buf
             }
             ComputationMode::Inference => {
-                let saved_params = params.seg().slice(self.saved_params);
-                let mean = saved_params[0];
-                let std_dev = saved_params[1];
+                let mean = self.saved_params.as_ref().borrow()[0];
+                let std_dev = self.saved_params.as_ref().borrow()[1];
 
                 let normalized = each_operand.map(|x| x - mean).map(|x| x / std_dev);
                 let scaled_shifted = normalized.map(|x| x * gamma + beta);

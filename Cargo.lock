@@ -52,7 +52,7 @@ dependencies = [
 [[package]]
 name = "graph"
 version = "0.1.0"
-source = "git+https://github.com/Banyc/graph.git?tag=v0.0.13#045f900282cae453483bdf67a6995a4c9151847c"
+source = "git+https://github.com/Banyc/graph.git?tag=v0.0.14#751c48e928b8e18a46d94252a41ad9ff558f0cb9"
 dependencies = [
  "slotmap",
 ]

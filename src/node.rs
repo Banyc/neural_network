@@ -10,7 +10,7 @@
 
 use std::ops::DerefMut;
 
-use graph::{breath_first_search, Graph, NextMove, Node, NodeArray, NodeIdx, VisitParams};
+use graph::{Graph, Node, NodeArray, NodeIdx};
 use thiserror::Error;
 
 use crate::{
@@ -467,14 +467,12 @@ pub fn delete_cache(graph: &mut Graph<CompNode>, nodes_forward: &[NodeIdx]) {
 
 pub fn backpropagate(
     graph: &mut Graph<CompNode>,
-    start: NodeIdx,
+    nodes_forward: &[NodeIdx],
     step_size: f64,
     cx: &mut NodeContext,
 ) {
     let mut buf = vec![];
-    let mut visit = |params: VisitParams<'_, CompNode>| -> NextMove {
-        let node = params.node;
-        let graph = params.graph;
+    for &node in nodes_forward.iter().rev() {
         match graph
             .nodes()
             .get(node)
@@ -483,11 +481,11 @@ pub fn backpropagate(
         {
             Ok(()) => (),
             Err(GradientDescentError::NotReceivingEnoughAddendsOfGradientFromSuccessors) => {
-                return NextMove::Postpone;
+                panic!();
             }
             Err(GradientDescentError::NoEvaluationOutputCaches) => {
                 // This node has had it parameters updated already
-                return NextMove::TerminateBranch;
+                panic!();
             }
         }
         buf.clear();
@@ -508,7 +506,5 @@ pub fn backpropagate(
             .get_mut(node)
             .unwrap()
             .adjust_parameters(step_size, cx);
-        NextMove::VisitChildren
-    };
-    breath_first_search(graph, start, &mut visit);
+    }
 }

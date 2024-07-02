@@ -120,6 +120,7 @@ impl BackpropagateCache<'_> {
             return GradRootThis::AllOnes;
         }
         if self.num_successors_distributed < num_successors {
+            // FIXME: The output could be lead to terminal nodes that not covered by the error node
             return GradRootThis::NoEnoughAddends;
         }
         GradRootThis::Some(self.sum_gradient_of_root_at_this)

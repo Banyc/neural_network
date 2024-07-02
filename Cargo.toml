@@ -9,7 +9,7 @@ edition = "2021"
 rand = "0.8"
 strict-num = "0.2"
 thiserror = "1"
-graph = { git = "https://github.com/Banyc/graph.git", tag = "v0.0.13" }
+graph = { git = "https://github.com/Banyc/graph.git", tag = "v0.0.14" }
 
 [dev-dependencies]
 bincode = "1"

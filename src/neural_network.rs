@@ -1,4 +1,7 @@
-use std::time::{Duration, Instant};
+use std::{
+    collections::BTreeSet,
+    time::{Duration, Instant},
+};
 
 use graph::{dependency_order, Graph, NodeIdx};
 use rand::Rng;
@@ -31,6 +34,8 @@ impl NeuralNetwork {
         error_node: NodeIdx,
     ) -> NeuralNetwork {
         let error_forward = dependency_order(&graph, &[error_node]);
+        let error_unique = BTreeSet::from_iter(error_forward.iter().copied());
+        assert_eq!(error_forward.len(), error_unique.len());
         let terminals_forward = dependency_order(&graph, &terminal_nodes);
         let cx = NodeContext::new();
         let this = NeuralNetwork {
@@ -56,7 +61,12 @@ impl NeuralNetwork {
     {
         let err = self.compute_error(samples, EvalOption::KeepCache, ComputationMode::Training);
         self.cx.buf().put(err);
-        backpropagate(&mut self.graph, self.error_node, step_size, &mut self.cx);
+        backpropagate(
+            &mut self.graph,
+            &self.error_forward,
+            step_size,
+            &mut self.cx,
+        );
         self.check_rep();
     }
 

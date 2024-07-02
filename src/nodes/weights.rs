@@ -133,7 +133,7 @@ mod tests {
     };
 
     fn assertion(assert_weight: impl Fn(&CompNode, &Params, &mut NodeContext)) {
-        let mut params = ParamInjector::empty();
+        let mut params = ParamInjector::new();
         let mut param_injection = ParamInjection {
             injector: &mut params,
             name: "".into(),

@@ -31,7 +31,7 @@ fn single_linear_relu_network(
     initial_weights: Vec<f64>,
     initial_bias: f64,
 ) -> NeuralNetwork {
-    let mut params = ParamInjector::empty();
+    let mut params = ParamInjector::new();
     let mut param_injection = ParamInjection {
         injector: &mut params,
         name: "".into(),
@@ -104,7 +104,7 @@ fn errors_on_dataset() {
 
 #[test]
 fn gradients() {
-    let mut params = ParamInjector::empty();
+    let mut params = ParamInjector::new();
     let mut param_injection = ParamInjection {
         injector: &mut params,
         name: "".into(),
@@ -139,7 +139,7 @@ fn gradients() {
 
 #[test]
 fn backpropagate() {
-    let mut params = ParamInjector::empty();
+    let mut params = ParamInjector::new();
     let mut param_injection = ParamInjection {
         injector: &mut params,
         name: "".into(),
@@ -181,7 +181,7 @@ fn backpropagate() {
 
 #[test]
 fn backpropagate_2() {
-    let mut params = ParamInjector::empty();
+    let mut params = ParamInjector::new();
     let mut param_injection = ParamInjection {
         injector: &mut params,
         name: "".into(),
@@ -222,7 +222,7 @@ fn backpropagate_2() {
 
 #[test]
 fn learn_xor_sigmoid() {
-    let mut param_injector = ParamInjector::empty();
+    let mut param_injector = ParamInjector::new();
     let mut param_injection = ParamInjection {
         injector: &mut param_injector,
         name: "".to_string(),
@@ -282,7 +282,7 @@ fn learn_xor_sigmoid() {
 
 #[test]
 fn learn_xor_regularized_sigmoid() {
-    let mut param_injector = ParamInjector::empty();
+    let mut param_injector = ParamInjector::new();
     let mut param_injection = ParamInjection {
         injector: &mut param_injector,
         name: "".to_string(),
@@ -362,7 +362,7 @@ fn learn_xor_regularized_sigmoid() {
 
 #[test]
 fn learn_xor_relu() {
-    let mut param_injector = ParamInjector::empty();
+    let mut param_injector = ParamInjector::new();
     let mut param_injection = ParamInjection {
         injector: &mut param_injector,
         name: "".to_string(),

@@ -60,6 +60,9 @@ impl NeuralNetwork {
     pub fn params(&self) -> &Params {
         &self.params
     }
+    pub fn params_mut(&mut self) -> &mut Params {
+        &mut self.params
+    }
 
     /// `step_size`: learning rate
     pub fn compute_error_and_backpropagate<I>(&mut self, samples: &[I], step_size: f64)

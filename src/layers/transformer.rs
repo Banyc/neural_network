@@ -325,7 +325,7 @@ mod tests {
 
     #[test]
     fn test_converge() {
-        let mut param_injector = ParamInjector::empty();
+        let mut param_injector = ParamInjector::new();
         let param_injection = ParamInjection {
             injector: &mut param_injector,
             name: "".to_string(),

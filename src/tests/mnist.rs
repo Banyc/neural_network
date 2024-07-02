@@ -14,7 +14,7 @@ use crate::{
     node::GraphBuilder,
     nodes::{input::InputNodeGen, linear::LinearLayerConfig, mse::mse_node},
     param::{
-        tests::{param_injector, save_params},
+        tests::{read_params, save_params},
         ParamInjection, ParamInjector,
     },
     tensor::{primitive_to_stride, shape_to_non_zero, Tensor},
@@ -33,8 +33,7 @@ const PARAMS_TXT: &str = "local/mnist/params.ron";
 fn converge() {
     let train_dataset = read_mnist(TRAIN_IMAGE, TRAIN_LABEL).unwrap();
     println!("inputs: {:?}", train_dataset[0]);
-    let param_injector = ParamInjector::empty();
-    let mut nn = neural_network(param_injector);
+    let mut nn = neural_network();
     let loss = nn.error(&train_dataset[0..1]);
     println!("loss: {loss}");
     let mut step_size = loss;
@@ -56,8 +55,7 @@ fn converge() {
         let loss = nn.error(&train_dataset[0..1]);
         println!("loss: {loss}");
         if (prev_loss - loss).abs() < 0.001 {
-            let param_injector = ParamInjector::empty();
-            nn = neural_network(param_injector);
+            nn = neural_network();
             continue;
         }
         prev_loss = loss;
@@ -71,8 +69,11 @@ fn train() {
     let train_dataset = read_mnist(TRAIN_IMAGE, TRAIN_LABEL).unwrap();
     let test_dataset = read_mnist(TEST_IMAGE, TEST_LABEL).unwrap();
     // epochs
-    let param_injector = param_injector(PARAMS_BIN);
-    let mut nn = neural_network(param_injector);
+    let mut nn = neural_network();
+    if let Some(params) = read_params(PARAMS_BIN) {
+        println!("read params");
+        nn.params_mut().overridden_by(&params);
+    }
     let loss = nn.error(&train_dataset[0..1]);
     println!("loss: {loss}");
     let mut step_size = loss;
@@ -94,9 +95,10 @@ fn train() {
 }
 
 /// a LeNet variant
-fn neural_network(mut params: ParamInjector) -> NeuralNetwork {
+fn neural_network() -> NeuralNetwork {
+    let mut param_injector = ParamInjector::new();
     let mut param_injection = ParamInjection {
-        injector: &mut params,
+        injector: &mut param_injector,
         name: "".into(),
     };
     let mut graph = GraphBuilder::new();
@@ -196,7 +198,7 @@ fn neural_network(mut params: ParamInjector) -> NeuralNetwork {
     let label_nodes = graph.insert_nodes(input_node_gen.gen(CLASSES));
     let error_node = graph.insert_node(mse_node(label_nodes, outputs.clone()));
     let graph = graph.build();
-    let params = params.into_params();
+    let params = param_injector.into_params();
     NeuralNetwork::new(graph, outputs, error_node, params)
 }
 

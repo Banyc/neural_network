@@ -34,19 +34,11 @@ impl<'a> ParamInjection<'a> {
 
 #[derive(Debug)]
 pub struct ParamInjector {
-    prev_params: HashMap<String, Vec<f64>>,
     params: Params,
 }
 impl ParamInjector {
-    pub fn new(parameters: HashMap<String, Vec<f64>>) -> Self {
+    pub fn new() -> Self {
         Self {
-            prev_params: parameters,
-            params: Params::new(),
-        }
-    }
-    pub fn empty() -> Self {
-        Self {
-            prev_params: HashMap::new(),
             params: Params::new(),
         }
     }
@@ -58,14 +50,16 @@ impl ParamInjector {
         if let Some(key) = self.params.key_by_name(&name) {
             return key;
         }
-        match self.prev_params.get(&name) {
-            Some(p) => self.params.try_insert_by_name(name, || p.iter().copied()),
-            None => self.params.try_insert_by_name(name, create),
-        }
+        self.params.try_insert_by_name(name, create)
     }
 
     pub fn into_params(self) -> Params {
         self.params
+    }
+}
+impl Default for ParamInjector {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -96,7 +90,9 @@ impl Params {
         if let Some(&key) = self.name.get(&name) {
             return key;
         }
-        self.seg.extend(params())
+        let key = self.seg.extend(params());
+        self.name.insert(name, key);
+        key
     }
 
     pub fn seg(&self) -> &VecSeg<f64> {
@@ -193,18 +189,14 @@ pub mod tests {
 
     use super::*;
 
-    pub fn param_injector(path: impl AsRef<Path>) -> ParamInjector {
-        let read_params = || {
-            let params_bin = std::fs::File::options().read(true).open(path).ok()?;
-            let params: HashMap<String, Vec<f64>> = bincode::deserialize_from(params_bin).ok()?;
-            Some(params)
-        };
-        let params = read_params().unwrap_or_default();
-        ParamInjector::new(params)
+    pub fn read_params(path: impl AsRef<Path>) -> Option<CollectedParams> {
+        let params_bin = std::fs::File::options().read(true).open(path).ok()?;
+        let params: HashMap<String, Vec<f64>> = bincode::deserialize_from(params_bin).ok()?;
+        Some(params)
     }
 
     pub fn save_params(
-        params: &HashMap<String, Vec<f64>>,
+        params: &CollectedParams,
         bin_path: impl AsRef<Path>,
         txt_path: impl AsRef<Path>,
     ) -> std::io::Result<()> {

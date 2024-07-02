@@ -10,7 +10,7 @@ use crate::{
 use super::{bias::bias_node, input::input_node_batch, relu::relu_node, weights::weight_node};
 
 fn assertion(assert_node: impl Fn(&CompNode, &Params, &mut NodeContext)) {
-    let mut params = ParamInjector::empty();
+    let mut params = ParamInjector::new();
     let mut param_injection = ParamInjection {
         injector: &mut params,
         name: "".into(),
@@ -75,7 +75,7 @@ fn linear_gradient_of_this_at_parameter() {
 
 #[test]
 fn linear_with_relu_evaluate() {
-    let mut params = ParamInjector::empty();
+    let mut params = ParamInjector::new();
     let mut param_injection = ParamInjection {
         injector: &mut params,
         name: "".into(),

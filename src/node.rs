@@ -12,12 +12,13 @@ use std::ops::DerefMut;
 
 use graph::{Graph, Node, NodeArray, NodeIdx};
 use thiserror::Error;
+use vec_seg::SegKey;
 
 use crate::{
     cache::{GradRootThis, NodeCache, NodeCacheBuilder, OperandOutputs},
     computation::{ComputationMode, NodeBackpropagationComputation, NodeComputation},
     mut_cell::MutCell,
-    param::SharedParams,
+    param::Params,
     ref_ctr::RefCtr,
     reused_buf::ReusedBuffers,
 };
@@ -83,7 +84,7 @@ impl Default for GraphBuilder {
 /// ```
 #[derive(Debug)]
 pub struct CompNode {
-    parameters: SharedParams,
+    parameters: SegKey,
     operands: Vec<NodeIdx>,
     num_successors: usize,
     batch_cache: Option<NodeCache>,
@@ -102,7 +103,7 @@ impl CompNode {
     pub fn new(
         operands: Vec<NodeIdx>,
         computation: RefCtr<MutCell<NodeComputation>>,
-        parameters: RefCtr<MutCell<Vec<f64>>>,
+        parameters: SegKey,
     ) -> CompNode {
         let this = Self {
             parameters,
@@ -131,6 +132,7 @@ impl CompNode {
 
     pub fn evaluate_once<I>(
         &mut self,
+        params: &mut Params,
         inputs_batch: &[I],
         operand_outputs: Vec<f64>,
         cx: &mut NodeContext,
@@ -147,18 +149,18 @@ impl CompNode {
         let mut computation = self.computation.as_ref().borrow_mut();
         match computation.deref_mut() {
             NodeComputation::Scalar(comp) => {
+                let parameters = params.seg().slice(self.parameters);
                 for (batch_index, inputs) in inputs_batch.iter().enumerate() {
                     let operand_outputs = OperandOutputs {
                         slice: &eval_buf[..operand_outputs_len],
                         num_operands: self.operands.len(),
                     }
                     .get(batch_index);
-                    let parameters = self.parameters.as_ref().borrow();
-                    let o = comp.compute_output(&parameters, operand_outputs, inputs.as_ref());
+                    let o = comp.compute_output(parameters, operand_outputs, inputs.as_ref());
                     if !o.is_finite() {
                         let e = format!(
                             "{self:?}; {comp:?}; output: {o}; params: {:?}; operands: {operand_outputs:?}; inputs: {:?}",
-                            *parameters,
+                            parameters,
                             inputs.as_ref(),
                         );
                         panic!("{e}");
@@ -168,10 +170,10 @@ impl CompNode {
             }
             NodeComputation::Batch(bat) => {
                 let buf = cx.buf().take();
-                let parameters = self.parameters.as_ref().borrow();
                 let operand_outputs = &eval_buf;
                 let shape = &[self.operands.len(), inputs_batch.len()];
-                let o = bat.compute_output(&parameters, operand_outputs, shape, buf, mode);
+                let o =
+                    bat.compute_output(params, self.parameters, operand_outputs, shape, buf, mode);
                 eval_buf.extend(o.iter().copied());
                 cx.buf().put(o);
             }
@@ -205,15 +207,16 @@ impl CompNode {
     /// Distribute addends of partial derivatives of root at operands to operands
     pub fn distribute_gradient_to_operands(
         &self,
+        params: &Params,
         buf: &mut Vec<(NodeIdx, usize, f64)>,
         cx: &mut NodeContext,
     ) {
         let batch_size = self.batch_cache.as_ref().unwrap().batch_size();
-        let parameters = self.parameters.borrow();
+        let params = params.seg().slice(self.parameters);
 
         for batch_index in 0..batch_size {
             let gradient_of_this_at_operand = self
-                .gradient_of_this_at_operand(batch_index, &parameters, cx)
+                .gradient_of_this_at_operand(batch_index, params, cx)
                 .unwrap();
             let d_root_at_this = self
                 .partial_derivative_of_root_at_this(batch_index)
@@ -231,16 +234,15 @@ impl CompNode {
         }
     }
 
-    pub fn adjust_parameters(&mut self, step_size: f64, cx: &mut NodeContext) {
+    pub fn adjust_parameters(&mut self, params: &mut Params, step_size: f64, cx: &mut NodeContext) {
         let batch_size = self.batch_cache.as_ref().unwrap().batch_size();
-        let mut parameters = self.parameters.borrow_mut();
+        let params = params.seg_mut().slice_mut(self.parameters);
 
         let mut partial_derivative_of_root_at_parameter = cx.buf().take();
-        partial_derivative_of_root_at_parameter
-            .extend(core::iter::repeat(0.).take(parameters.len()));
+        partial_derivative_of_root_at_parameter.extend(core::iter::repeat(0.).take(params.len()));
         for batch_index in 0..batch_size {
             let gradient_of_root_at_parameter = self
-                .gradient_of_root_at_parameter(batch_index, &parameters, cx)
+                .gradient_of_root_at_parameter(batch_index, params, cx)
                 .unwrap();
             for (batch_sum, x) in partial_derivative_of_root_at_parameter
                 .iter_mut()
@@ -250,7 +252,7 @@ impl CompNode {
             }
             cx.buf().put(gradient_of_root_at_parameter);
         }
-        for (param, der) in parameters
+        for (param, der) in params
             .iter_mut()
             .zip(partial_derivative_of_root_at_parameter.iter().copied())
         {
@@ -387,8 +389,8 @@ impl CompNode {
         Some(cache.output())
     }
 
-    pub fn parameters(&self) -> &SharedParams {
-        &self.parameters
+    pub fn parameters(&self) -> SegKey {
+        self.parameters
     }
 }
 
@@ -429,6 +431,7 @@ pub enum GradientOfThisAtOperandError {
 pub fn evaluate_once<I>(
     graph: &mut Graph<CompNode>,
     nodes_forward: &[NodeIdx],
+    params: &mut Params,
     inputs_batch: &[I],
     cx: &mut NodeContext,
     mode: ComputationMode,
@@ -456,7 +459,7 @@ pub fn evaluate_once<I>(
         }
 
         let node = graph.nodes_mut().get_mut(node).unwrap();
-        node.evaluate_once(inputs_batch, operand_outputs, cx, mode);
+        node.evaluate_once(params, inputs_batch, operand_outputs, cx, mode);
     }
 }
 pub fn delete_cache(graph: &mut Graph<CompNode>, nodes_forward: &[NodeIdx]) {
@@ -468,6 +471,7 @@ pub fn delete_cache(graph: &mut Graph<CompNode>, nodes_forward: &[NodeIdx]) {
 pub fn backpropagate(
     graph: &mut Graph<CompNode>,
     nodes_forward: &[NodeIdx],
+    params: &mut Params,
     step_size: f64,
     cx: &mut NodeContext,
 ) {
@@ -493,7 +497,7 @@ pub fn backpropagate(
             .nodes()
             .get(node)
             .unwrap()
-            .distribute_gradient_to_operands(&mut buf, cx);
+            .distribute_gradient_to_operands(params, &mut buf, cx);
         for &(child, batch_index, addend) in &buf {
             graph
                 .nodes_mut()
@@ -505,6 +509,6 @@ pub fn backpropagate(
             .nodes_mut()
             .get_mut(node)
             .unwrap()
-            .adjust_parameters(step_size, cx);
+            .adjust_parameters(params, step_size, cx);
     }
 }

@@ -1,7 +1,7 @@
 use graph::NodeIdx;
+use vec_seg::SegKey;
 
 use crate::{
-    mut_cell::MutCell,
     neural_network::{AccurateFnParams, NeuralNetwork, TrainOption},
     node::{CompNode, GraphBuilder},
     nodes::{
@@ -13,43 +13,51 @@ use crate::{
         sigmoid::sigmoid_node,
         weights::weight_node,
     },
-    param::{ParamInjection, ParamInjector, SharedParams},
-    ref_ctr::RefCtr,
+    param::{ParamInjection, ParamInjector, Params},
 };
 
 fn single_linear_relu(
     graph: &mut GraphBuilder,
     input_nodes: Vec<NodeIdx>,
-    initial_weights: SharedParams,
-    initial_bias: SharedParams,
+    weights: SegKey,
+    bias: SegKey,
 ) -> CompNode {
-    let linear_node =
-        linear_node_manual(graph, input_nodes, None, initial_weights, initial_bias).unwrap();
+    let linear_node = linear_node_manual(graph, input_nodes, None, weights, bias).unwrap();
     relu_node(linear_node)
 }
 
 fn single_linear_relu_network(
     node_count: usize,
-    initial_weights: SharedParams,
-    initial_bias: SharedParams,
+    initial_weights: Vec<f64>,
+    initial_bias: f64,
 ) -> NeuralNetwork {
+    let mut params = ParamInjector::empty();
+    let mut param_injection = ParamInjection {
+        injector: &mut params,
+        name: "".into(),
+    };
+    let weights = param_injection
+        .name_append(":weights")
+        .get_or_create_params(|| initial_weights.iter().copied());
+    let bias = param_injection
+        .name_append(":bias")
+        .get_or_create_params(|| [initial_bias].into_iter());
     let mut graph = GraphBuilder::new();
     let mut input_gen = InputNodeGen::new();
     let input_nodes = graph.insert_nodes(input_gen.gen(node_count));
-    let relu_node = single_linear_relu(&mut graph, input_nodes, initial_weights, initial_bias);
+    let relu_node = single_linear_relu(&mut graph, input_nodes, weights, bias);
     let relu_node = graph.insert_node(relu_node);
     let label_node = graph.insert_nodes(input_gen.gen(1))[0];
     let error_node = graph.insert_node(l2_error_node(relu_node, label_node));
     let graph = graph.build();
-    NeuralNetwork::new(graph, vec![relu_node], error_node)
+    let params = params.into_params();
+    NeuralNetwork::new(graph, vec![relu_node], error_node, params)
 }
 
 #[test]
 fn evaluate() {
     let initial_weights = vec![3.0, 2.0, 1.0];
-    let initial_weights = RefCtr::new(MutCell::new(initial_weights));
     let initial_bias = -20.0;
-    let initial_bias = RefCtr::new(MutCell::new(vec![initial_bias]));
     let mut network = single_linear_relu_network(3, initial_weights, initial_bias);
     let ret = network.evaluate(&[&[1.0, 2.0, 3.0]]);
     assert_eq!(ret[0][0], 0.0);
@@ -63,7 +71,8 @@ fn error() {
     let label = graph.insert_node(input_node(1));
     let error = graph.insert_node(l2_error_node(relu, label));
     let graph = graph.build();
-    let mut network = NeuralNetwork::new(graph, vec![relu], error);
+    let params = Params::new();
+    let mut network = NeuralNetwork::new(graph, vec![relu], error, params);
     let inputs = vec![-2.0, 1.0];
     let ret = network.evaluate(&[&inputs]);
     assert_eq!(ret[0][0], 0.0);
@@ -74,9 +83,7 @@ fn error() {
 #[test]
 fn cache_reset() {
     let initial_weights = vec![2.0, 1.0];
-    let initial_weights = RefCtr::new(MutCell::new(initial_weights));
     let initial_bias = 3.0;
-    let initial_bias = RefCtr::new(MutCell::new(vec![initial_bias]));
     let mut network = single_linear_relu_network(2, initial_weights, initial_bias);
     let ret = network.evaluate(&[&[2.0, -2.0]]);
     assert_eq!(ret[0][0], 5.0);
@@ -87,9 +94,7 @@ fn cache_reset() {
 #[test]
 fn errors_on_dataset() {
     let initial_weights = vec![2.0, 1.0];
-    let initial_weights = RefCtr::new(MutCell::new(initial_weights));
     let initial_bias = 3.0;
-    let initial_bias = RefCtr::new(MutCell::new(vec![initial_bias]));
     let mut network = single_linear_relu_network(2, initial_weights, initial_bias);
     let dataset = vec![vec![2.0, -2.0, 5.0], vec![6.0, -2.0, 5.0]];
     let ret = network.accuracy(&dataset, binary_accurate);
@@ -99,20 +104,30 @@ fn errors_on_dataset() {
 
 #[test]
 fn gradients() {
+    let mut params = ParamInjector::empty();
+    let mut param_injection = ParamInjection {
+        injector: &mut params,
+        name: "".into(),
+    };
     let mut graph = GraphBuilder::new();
     let mut input_gen = InputNodeGen::new();
     let input_nodes = graph.insert_nodes(input_gen.gen(2));
-    let initial_weights = vec![2.0, 1.0];
-    let initial_weights = RefCtr::new(MutCell::new(initial_weights));
-    let weight_node = graph.insert_node(weight_node(input_nodes, initial_weights, None).unwrap());
+    let initial_weights = [2.0, 1.0];
+    let weights = param_injection
+        .name_append(":weights")
+        .get_or_create_params(|| initial_weights.iter().copied());
+    let weight_node = graph.insert_node(weight_node(input_nodes, weights, None).unwrap());
     let initial_bias = 3.0;
-    let initial_bias = RefCtr::new(MutCell::new(vec![initial_bias]));
-    let bias_node = graph.insert_node(bias_node(weight_node, initial_bias));
+    let bias = param_injection
+        .name_append(":bias")
+        .get_or_create_params(|| [initial_bias].into_iter());
+    let bias_node = graph.insert_node(bias_node(weight_node, bias));
     let relu_node = graph.insert_node(relu_node(bias_node));
     let label_node = graph.insert_nodes(input_gen.gen(1))[0];
     let error_node = graph.insert_node(l2_error_node(relu_node, label_node));
     let graph = graph.build();
-    let mut network = NeuralNetwork::new(graph, vec![relu_node], error_node);
+    let params = params.into_params();
+    let mut network = NeuralNetwork::new(graph, vec![relu_node], error_node, params);
 
     let inputs = vec![2.0, -2.0, 1.0];
 
@@ -124,65 +139,84 @@ fn gradients() {
 
 #[test]
 fn backpropagate() {
+    let mut params = ParamInjector::empty();
+    let mut param_injection = ParamInjection {
+        injector: &mut params,
+        name: "".into(),
+    };
     let mut graph = GraphBuilder::new();
     let mut input_gen = InputNodeGen::new();
     let input_nodes = graph.insert_nodes(input_gen.gen(2));
-    let initial_weights = vec![2.0, 1.0];
-    let initial_weights = RefCtr::new(MutCell::new(initial_weights));
-    let weight_node = graph.insert_node(weight_node(input_nodes, initial_weights, None).unwrap());
+    let initial_weights = [2.0, 1.0];
+    let weights = param_injection
+        .name_append(":weights")
+        .get_or_create_params(|| initial_weights.iter().copied());
+    let weight_node = graph.insert_node(weight_node(input_nodes, weights, None).unwrap());
     let initial_bias = 3.0;
-    let initial_bias = RefCtr::new(MutCell::new(vec![initial_bias]));
-    let bias_node = graph.insert_node(bias_node(weight_node, initial_bias));
+    let bias = param_injection
+        .name_append(":bias")
+        .get_or_create_params(|| [initial_bias].into_iter());
+    let bias_node = graph.insert_node(bias_node(weight_node, bias));
     let relu_node = graph.insert_node(relu_node(bias_node));
     let label_node = graph.insert_nodes(input_gen.gen(1))[0];
     let error_node = graph.insert_node(l2_error_node(relu_node, label_node));
     let graph = graph.build();
+    let params = params.into_params();
     let step_size = 0.5;
-    let mut network = NeuralNetwork::new(graph, vec![relu_node], error_node);
+    let mut network = NeuralNetwork::new(graph, vec![relu_node], error_node, params);
 
     let inputs = vec![2.0, -2.0, 1.0];
     network.compute_error_and_backpropagate(&[&inputs], step_size);
     {
         let weight_node = network.graph().nodes().get(weight_node).unwrap();
-        let weights = weight_node.parameters().borrow();
-        assert_eq!(*weights, &[-6.0, 9.0])
+        let weights = network.params().seg().slice(weight_node.parameters());
+        assert_eq!(weights, &[-6.0, 9.0])
     }
     {
         let bias_node = network.graph().nodes().get(bias_node).unwrap();
-        let bias = bias_node.parameters().borrow();
-        assert_eq!(*bias, &[-1.0])
+        let bias = network.params().seg().slice(bias_node.parameters());
+        assert_eq!(bias, &[-1.0])
     }
 }
 
 #[test]
 fn backpropagate_2() {
+    let mut params = ParamInjector::empty();
+    let mut param_injection = ParamInjection {
+        injector: &mut params,
+        name: "".into(),
+    };
     let mut graph = GraphBuilder::new();
     let mut input_gen = InputNodeGen::new();
     let input_nodes = graph.insert_nodes(input_gen.gen(1));
-    let initial_weights1 = vec![2.0];
-    let initial_weights1 = RefCtr::new(MutCell::new(initial_weights1));
-    let weight_node1 = graph.insert_node(weight_node(input_nodes, initial_weights1, None).unwrap());
-    let initial_weights2 = vec![3.0];
-    let initial_weights2 = RefCtr::new(MutCell::new(initial_weights2));
-    let weight_node2 =
-        graph.insert_node(weight_node(vec![weight_node1], initial_weights2, None).unwrap());
+    let initial_weights1 = [2.0];
+    let weights1 = param_injection
+        .name_append(":weights_1")
+        .get_or_create_params(|| initial_weights1.iter().copied());
+    let weight_node1 = graph.insert_node(weight_node(input_nodes, weights1, None).unwrap());
+    let initial_weights2 = [3.0];
+    let weights2 = param_injection
+        .name_append(":weights_2")
+        .get_or_create_params(|| initial_weights2.iter().copied());
+    let weight_node2 = graph.insert_node(weight_node(vec![weight_node1], weights2, None).unwrap());
     let label_node = graph.insert_nodes(input_gen.gen(1))[0];
     let error_node = graph.insert_node(l2_error_node(weight_node2, label_node));
     let graph = graph.build();
+    let params = params.into_params();
     let step_size = 0.5;
-    let mut network = NeuralNetwork::new(graph, vec![weight_node2], error_node);
+    let mut network = NeuralNetwork::new(graph, vec![weight_node2], error_node, params);
 
     let inputs = vec![2.0, 1.0];
     network.compute_error_and_backpropagate(&[&inputs], step_size);
     {
         let weight_node = network.graph().nodes().get(weight_node2).unwrap();
-        let weights = weight_node.parameters().borrow();
-        assert_eq!(*weights, &[-41.0]); // 3 - 0.5 * 88
+        let weights = network.params().seg().slice(weight_node.parameters());
+        assert_eq!(weights, &[-41.0]); // 3 - 0.5 * 88
     }
     {
         let weight_node = network.graph().nodes().get(weight_node1).unwrap();
-        let weights = weight_node.parameters().borrow();
-        assert_eq!(*weights, &[-64.0]); // 2 - 0.5 * 121
+        let weights = network.params().seg().slice(weight_node.parameters());
+        assert_eq!(weights, &[-64.0]); // 2 - 0.5 * 121
     }
 }
 
@@ -193,7 +227,6 @@ fn learn_xor_sigmoid() {
         injector: &mut param_injector,
         name: "".to_string(),
     };
-
     let mut graph = GraphBuilder::new();
     let mut input_gen = InputNodeGen::new();
     let input_nodes = graph.insert_nodes(input_gen.gen(2));
@@ -221,8 +254,9 @@ fn learn_xor_sigmoid() {
     let label_node = graph.insert_nodes(input_gen.gen(1))[0];
     let error_node = graph.insert_node(l2_error_node(output, label_node));
     let graph = graph.build();
+    let params = param_injector.into_params();
     let step_size = 0.5;
-    let mut network = NeuralNetwork::new(graph, vec![output], error_node);
+    let mut network = NeuralNetwork::new(graph, vec![output], error_node, params);
 
     let dataset = vec![
         vec![0.0, 0.0, 0.0],
@@ -300,8 +334,9 @@ fn learn_xor_regularized_sigmoid() {
     let label_node = graph.insert_nodes(input_gen.gen(1))[0];
     let error_node = graph.insert_node(l2_error_node(output, label_node));
     let graph = graph.build();
+    let params = param_injector.into_params();
     let step_size = 0.5;
-    let mut network = NeuralNetwork::new(graph, vec![output], error_node);
+    let mut network = NeuralNetwork::new(graph, vec![output], error_node, params);
 
     let dataset = vec![
         vec![-1.0, -1.0, 0.0],
@@ -382,8 +417,9 @@ fn learn_xor_relu() {
     let label_node = graph.insert_nodes(input_gen.gen(1))[0];
     let error_node = graph.insert_node(l2_error_node(output, label_node));
     let graph = graph.build();
+    let params = param_injector.into_params();
     let step_size = 0.05;
-    let mut network = NeuralNetwork::new(graph, vec![output], error_node);
+    let mut network = NeuralNetwork::new(graph, vec![output], error_node, params);
 
     let dataset = vec![
         vec![0.0, 0.0, 0.0],

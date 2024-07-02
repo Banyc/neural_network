@@ -81,11 +81,13 @@ mod tests {
         computation::ComputationMode,
         node::{evaluate_once, GraphBuilder, NodeContext},
         nodes::input::input_node,
+        param::Params,
     };
 
     use super::*;
 
-    fn assertion(input: f64, assert_relu: impl Fn(&CompNode, &mut NodeContext)) {
+    fn assertion(input: f64, assert_relu: impl Fn(&CompNode, &Params, &mut NodeContext)) {
+        let mut params = Params::new();
         let mut graph = GraphBuilder::new();
         let input_node = graph.insert_node(input_node(0));
         let relu = graph.insert_node(relu_node(input_node));
@@ -95,17 +97,18 @@ mod tests {
         evaluate_once(
             &mut graph,
             &nodes_forward,
+            &mut params,
             &[&[input]],
             &mut cx,
             ComputationMode::Inference,
         );
         let relu = graph.nodes().get(relu).unwrap();
-        assert_relu(relu, &mut cx);
+        assert_relu(relu, &params, &mut cx);
     }
 
     #[test]
     fn evaluate_negative() {
-        assertion(-2.0, |relu, _| {
+        assertion(-2.0, |relu, _, _| {
             let output = relu.output().unwrap()[0];
             assert_eq!(output, 0.0);
         });
@@ -113,7 +116,7 @@ mod tests {
 
     #[test]
     fn evaluate_positive() {
-        assertion(3.0, |relu, _| {
+        assertion(3.0, |relu, _, _| {
             let output = relu.output().unwrap()[0];
             assert_eq!(output, 3.0);
         });
@@ -121,10 +124,10 @@ mod tests {
 
     #[test]
     fn positive_gradient_of_this_at_operand() {
-        assertion(3.0, |relu, cx| {
+        assertion(3.0, |relu, params, cx| {
             let batch_index = 0;
             let ret = relu
-                .gradient_of_this_at_operand(batch_index, &relu.parameters().borrow(), cx)
+                .gradient_of_this_at_operand(batch_index, params.seg().slice(relu.parameters()), cx)
                 .unwrap();
             assert_eq!(ret[0], 1.0);
         });
@@ -132,10 +135,10 @@ mod tests {
 
     #[test]
     fn negative_gradient_of_this_at_operand() {
-        assertion(-3.0, |relu, cx| {
+        assertion(-3.0, |relu, params, cx| {
             let batch_index = 0;
             let ret = relu
-                .gradient_of_this_at_operand(batch_index, &relu.parameters().borrow(), cx)
+                .gradient_of_this_at_operand(batch_index, params.seg().slice(relu.parameters()), cx)
                 .unwrap();
             assert_eq!(ret[0], 0.0);
         });
@@ -143,10 +146,14 @@ mod tests {
 
     #[test]
     fn empty_gradient_of_this_at_parameter() {
-        assertion(3.0, |relu, cx| {
+        assertion(3.0, |relu, params, cx| {
             let batch_index = 0;
             let ret = relu
-                .gradient_of_this_at_parameter(batch_index, &relu.parameters().borrow(), cx)
+                .gradient_of_this_at_parameter(
+                    batch_index,
+                    params.seg().slice(relu.parameters()),
+                    cx,
+                )
                 .unwrap();
             assert_eq!(ret.len(), 0);
         });

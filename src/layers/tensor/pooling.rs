@@ -37,6 +37,7 @@ mod tests {
         computation::ComputationMode,
         node::{evaluate_once, NodeContext},
         nodes::input::{input_node_batch, InputNodeBatchParams},
+        param::Params,
         tensor::{OwnedNonZeroShape, OwnedStride},
     };
 
@@ -83,9 +84,11 @@ mod tests {
         let mut outputs = vec![];
         let mut cx = NodeContext::new();
         let nodes_forward = dependency_order(&graph, &max_pooling_layer);
+        let mut params = Params::new();
         evaluate_once(
             &mut graph,
             &nodes_forward,
+            &mut params,
             &[&image],
             &mut cx,
             ComputationMode::Inference,

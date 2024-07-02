@@ -86,6 +86,7 @@ dependencies = [
  "ron",
  "strict-num",
  "thiserror",
+ "vec_seg",
 ]
 
 [[package]]
@@ -248,6 +249,11 @@ name = "unicode-ident"
 version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3354b9ac3fae1ff6755cb6db53683adb661634f67557942dea4facebec0fee4b"
+
+[[package]]
+name = "vec_seg"
+version = "0.1.0"
+source = "git+https://github.com/Banyc/vec_seg.git?tag=v0.0.2#fda87c5d08fcb00119ee981d2a31da39e8aa9267"
 
 [[package]]
 name = "version_check"

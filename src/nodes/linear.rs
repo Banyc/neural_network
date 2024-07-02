@@ -1,13 +1,9 @@
 use std::num::NonZeroUsize;
 
 use graph::NodeIdx;
+use vec_seg::SegKey;
 
-use crate::{
-    mut_cell::MutCell,
-    node::GraphBuilder,
-    param::{ParamInjection, SharedParams},
-    ref_ctr::RefCtr,
-};
+use crate::{node::GraphBuilder, param::ParamInjection};
 
 use super::{
     bias::{bias_node, default_bias},
@@ -27,18 +23,18 @@ pub fn linear_node(
 ) -> Result<NodeIdx, WeightNodeError> {
     let weights = param_injection
         .name_append(":weights")
-        .get_or_create_params(|| RefCtr::new(MutCell::new(rnd_weights(input_nodes.len()))));
+        .get_or_create_params(|| rnd_weights(input_nodes.len()).into_iter());
     let bias = param_injection
         .name_append(":bias")
-        .get_or_create_params(|| RefCtr::new(MutCell::new(vec![default_bias()])));
+        .get_or_create_params(|| [default_bias()].into_iter());
     linear_node_manual(graph, input_nodes, lambda, weights, bias)
 }
 pub fn linear_node_manual(
     graph: &mut GraphBuilder,
     input_nodes: Vec<NodeIdx>,
     lambda: Option<f64>,
-    weights: SharedParams,
-    bias: SharedParams,
+    weights: SegKey,
+    bias: SegKey,
 ) -> Result<NodeIdx, WeightNodeError> {
     let weight_node = graph.insert_node(weight_node(input_nodes, weights, lambda)?);
     let bias_node = graph.insert_node(bias_node(weight_node, bias));

@@ -1,4 +1,4 @@
-use std::{io::Read, num::NonZeroUsize, path::Path};
+use std::{collections::HashMap, io::Read, num::NonZeroUsize, path::Path};
 
 use crate::{
     layers::{
@@ -33,12 +33,8 @@ const PARAMS_TXT: &str = "local/mnist/params.ron";
 fn converge() {
     let train_dataset = read_mnist(TRAIN_IMAGE, TRAIN_LABEL).unwrap();
     println!("inputs: {:?}", train_dataset[0]);
-    let mut param_injector = ParamInjector::empty();
-    let param_injection = ParamInjection {
-        injector: &mut param_injector,
-        name: "".to_string(),
-    };
-    let mut nn = neural_network(param_injection);
+    let param_injector = ParamInjector::empty();
+    let mut nn = neural_network(param_injector);
     let loss = nn.error(&train_dataset[0..1]);
     println!("loss: {loss}");
     let mut step_size = loss;
@@ -60,12 +56,8 @@ fn converge() {
         let loss = nn.error(&train_dataset[0..1]);
         println!("loss: {loss}");
         if (prev_loss - loss).abs() < 0.001 {
-            param_injector = ParamInjector::empty();
-            let param_injection = ParamInjection {
-                injector: &mut param_injector,
-                name: "".to_string(),
-            };
-            nn = neural_network(param_injection);
+            let param_injector = ParamInjector::empty();
+            nn = neural_network(param_injector);
             continue;
         }
         prev_loss = loss;
@@ -79,12 +71,8 @@ fn train() {
     let train_dataset = read_mnist(TRAIN_IMAGE, TRAIN_LABEL).unwrap();
     let test_dataset = read_mnist(TEST_IMAGE, TEST_LABEL).unwrap();
     // epochs
-    let mut param_injector = param_injector(PARAMS_BIN);
-    let param_injection = ParamInjection {
-        injector: &mut param_injector,
-        name: "".into(),
-    };
-    let mut nn = neural_network(param_injection);
+    let param_injector = param_injector(PARAMS_BIN);
+    let mut nn = neural_network(param_injector);
     let loss = nn.error(&train_dataset[0..1]);
     println!("loss: {loss}");
     let mut step_size = loss;
@@ -100,12 +88,21 @@ fn train() {
         let loss = nn.error(&test_dataset[..128]);
         println!("loss: {loss}");
         step_size = loss;
-        save_params(&param_injector.collect_parameters(), PARAMS_BIN, PARAMS_TXT).unwrap();
+        let params = nn
+            .params()
+            .iter_name_slice()
+            .map(|(name, slice)| (name.to_string(), slice.to_vec()));
+        let params = HashMap::from_iter(params);
+        save_params(&params, PARAMS_BIN, PARAMS_TXT).unwrap();
     }
 }
 
 /// a LeNet variant
-fn neural_network(mut param_injection: ParamInjection<'_>) -> NeuralNetwork {
+fn neural_network(mut params: ParamInjector) -> NeuralNetwork {
+    let mut param_injection = ParamInjection {
+        injector: &mut params,
+        name: "".into(),
+    };
     let mut graph = GraphBuilder::new();
     let activation = Activation::Swish;
     let width = 28;
@@ -203,7 +200,8 @@ fn neural_network(mut param_injection: ParamInjection<'_>) -> NeuralNetwork {
     let label_nodes = graph.insert_nodes(input_node_gen.gen(CLASSES));
     let error_node = graph.insert_node(mse_node(label_nodes, outputs.clone()));
     let graph = graph.build();
-    NeuralNetwork::new(graph, outputs, error_node)
+    let params = params.into_params();
+    NeuralNetwork::new(graph, outputs, error_node, params)
 }
 
 fn read_mnist(image: impl AsRef<Path>, label: impl AsRef<Path>) -> std::io::Result<Vec<Vec<f64>>> {

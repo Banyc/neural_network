@@ -1,12 +1,12 @@
 use graph::NodeIdx;
 use rand::Rng;
 use thiserror::Error;
+use vec_seg::SegKey;
 
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
     mut_cell::MutCell,
     node::CompNode,
-    param::SharedParams,
     ref_ctr::RefCtr,
 };
 
@@ -34,10 +34,10 @@ pub fn rnd_weights(op_len: usize) -> Vec<f64> {
 /// - `lambda`: for regularization
 pub fn weight_node(
     operands: Vec<NodeIdx>,
-    weights: SharedParams,
+    weights: SegKey,
     lambda: Option<f64>,
 ) -> Result<CompNode, WeightNodeError> {
-    if operands.len() != weights.borrow().len() {
+    if operands.len() != weights.len() {
         return Err(WeightNodeError::ParameterSizeNotMatched);
     }
     let computation = WeightNodeComputation {
@@ -131,34 +131,42 @@ mod tests {
         computation::ComputationMode,
         node::{evaluate_once, GraphBuilder, NodeContext},
         nodes::input::{input_node_batch, InputNodeBatchParams},
+        param::{ParamInjection, ParamInjector, Params},
     };
 
-    fn assertion(assert_weight: impl Fn(&CompNode, &mut NodeContext)) {
+    fn assertion(assert_weight: impl Fn(&CompNode, &Params, &mut NodeContext)) {
+        let mut params = ParamInjector::empty();
+        let mut param_injection = ParamInjection {
+            injector: &mut params,
+            name: "".into(),
+        };
         let mut graph = GraphBuilder::new();
         let input_nodes =
             graph.insert_nodes(input_node_batch(InputNodeBatchParams { start: 0, len: 3 }));
         let inputs = vec![1.0, 2.0, 3.0];
-        let initial_weights = vec![3.0, 2.0, 1.0];
-        let initial_weights = RefCtr::new(MutCell::new(initial_weights));
-        let weight_node =
-            graph.insert_node(weight_node(input_nodes, initial_weights, None).unwrap());
+        let weights = param_injection
+            .name_append(":weights")
+            .get_or_create_params(|| [3.0, 2.0, 1.0].into_iter());
+        let weight_node = graph.insert_node(weight_node(input_nodes, weights, None).unwrap());
         let mut graph = graph.build();
         let nodes_forward = dependency_order(&graph, &[weight_node]);
+        let mut params = params.into_params();
         let mut cx = NodeContext::new();
         evaluate_once(
             &mut graph,
             &nodes_forward,
+            &mut params,
             &[inputs],
             &mut cx,
             ComputationMode::Inference,
         );
         let weight_node = graph.nodes().get(weight_node).unwrap();
-        assert_weight(weight_node, &mut cx);
+        assert_weight(weight_node, &params, &mut cx);
     }
 
     #[test]
     fn evaluate() {
-        assertion(|weight_node, _| {
+        assertion(|weight_node, _, _| {
             let output = weight_node.output().unwrap()[0];
             assert_eq!(output, 3.0 * 1.0 + 2.0 * 2.0 + 1.0 * 3.0);
         });
@@ -166,10 +174,14 @@ mod tests {
 
     #[test]
     fn gradient_of_this_at_operand() {
-        assertion(|weight_node, cx| {
+        assertion(|weight_node, params, cx| {
             let batch_index = 0;
             let ret = weight_node
-                .gradient_of_this_at_operand(batch_index, &weight_node.parameters().borrow(), cx)
+                .gradient_of_this_at_operand(
+                    batch_index,
+                    params.seg().slice(weight_node.parameters()),
+                    cx,
+                )
                 .unwrap();
             assert_eq!(&ret, &[3.0, 2.0, 1.0]);
         });
@@ -177,10 +189,14 @@ mod tests {
 
     #[test]
     fn gradient_of_this_at_parameter() {
-        assertion(|weight_node, cx| {
+        assertion(|weight_node, params, cx| {
             let batch_index = 0;
             let ret = weight_node
-                .gradient_of_this_at_parameter(batch_index, &weight_node.parameters().borrow(), cx)
+                .gradient_of_this_at_parameter(
+                    batch_index,
+                    params.seg().slice(weight_node.parameters()),
+                    cx,
+                )
                 .unwrap();
             assert_eq!(&ret, &[1.0, 2.0, 3.0]);
         });

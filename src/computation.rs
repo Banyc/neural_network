@@ -1,4 +1,6 @@
-use crate::tensor::Shape;
+use vec_seg::SegKey;
+
+use crate::{param::Params, tensor::Shape};
 
 /// The function of this node should be
 /// ```math
@@ -16,7 +18,8 @@ pub trait NodeScalarComputation: core::fmt::Debug + NodeBackpropagationComputati
 pub trait NodeBatchComputation: core::fmt::Debug + NodeBackpropagationComputation {
     fn compute_output(
         &mut self,
-        parameters: &[f64],
+        params: &mut Params,
+        param_key: SegKey,
         operand_outputs: &[f64],
         operand_outputs_shape: &Shape,
         buf: Vec<f64>,

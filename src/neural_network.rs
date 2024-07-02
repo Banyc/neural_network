@@ -14,6 +14,11 @@ use crate::{
 
 type PostOrder = Vec<NodeIdx>;
 
+const _: fn() = || {
+    fn assert_send<T: Sync + Send + 'static>() {}
+    assert_send::<NeuralNetwork>();
+};
+
 #[derive(Debug)]
 pub struct NeuralNetwork {
     graph: Graph<CompNode>,

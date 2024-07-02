@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 
-use rand::Rng;
-use rand_distr::Distribution;
 use strict_num::NormalizedF64;
 use vec_seg::{SegKey, VecSeg};
 
@@ -153,13 +151,13 @@ pub type CollectedParams = HashMap<String, Vec<f64>>;
 pub fn crossover(a: &Params, b: &Params) -> CollectedParams {
     let mut collected = HashMap::new();
     assert_eq!(a.len(), b.len());
-    let mut coin_flip = rand::thread_rng();
+    let mut rng = rand::thread_rng();
     for (name, a) in a.iter_name_slice() {
         let b = b.slice_by_name(name).unwrap();
         assert_eq!(a.len(), b.len());
         let mut params = vec![];
         for (&a, &b) in a.iter().zip(b) {
-            let param = if coin_flip.gen_bool(0.5) { a } else { b };
+            let param = genetic_algorithm::crossover(a, b, &mut rng);
             params.push(param);
         }
         collected.insert(name.to_owned(), params);
@@ -169,16 +167,9 @@ pub fn crossover(a: &Params, b: &Params) -> CollectedParams {
 
 pub fn mutate(params: &mut CollectedParams, rate: NormalizedF64) {
     let mut rng = rand::thread_rng();
-    let normal = rand_distr::Normal::new(0., 1.).unwrap();
     for params in params.values_mut() {
         for param in params {
-            let chance = rng.gen_bool(rate.get());
-            if !chance {
-                continue;
-            }
-            let change = normal.sample(&mut rng);
-            *param += change;
-            *param = param.clamp(-1., 1.);
+            *param = genetic_algorithm::mutate(*param, rate, &mut rng);
         }
     }
 }

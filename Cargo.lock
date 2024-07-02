@@ -45,6 +45,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "98de4bbd547a563b716d8dfa9aad1cb19bfab00f4fa09a6a4ed21dbcf44ce9c4"
 
 [[package]]
+name = "genetic_algorithm"
+version = "0.1.0"
+source = "git+https://github.com/Banyc/genetic_algorithm.git?tag=v0.0.1#0127ca8ded8b0e86e8cb2eb51599a1dc41ee5a9b"
+dependencies = [
+ "rand",
+ "rand_distr",
+ "strict-num",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -80,6 +90,7 @@ name = "neural_network"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "genetic_algorithm",
  "graph",
  "rand",
  "rand_distr",

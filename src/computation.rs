@@ -27,7 +27,7 @@ pub trait NodeBatchComputation: core::fmt::Debug + NodeBackpropagationComputatio
     ) -> Vec<f64>;
 }
 
-pub trait NodeBackpropagationComputation: core::fmt::Debug {
+pub trait NodeBackpropagationComputation: core::fmt::Debug + Sync + Send + 'static {
     /// ```math
     /// \frac{\partial f}{\partial z}
     /// ```

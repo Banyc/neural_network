@@ -1,5 +1,9 @@
 use std::collections::HashMap;
 
+use rand::Rng;
+use rand_distr::Distribution;
+use strict_num::NormalizedF64;
+
 use crate::{mut_cell::MutCell, ref_ctr::RefCtr};
 
 pub type SharedParams = RefCtr<MutCell<Vec<f64>>>;
@@ -68,6 +72,37 @@ impl ParamInjector {
             collected.insert(name.clone(), params.borrow().clone());
         }
         collected
+    }
+}
+
+pub fn crossover(a: &HashMap<String, SharedParams>, b: &HashMap<String, SharedParams>) {
+    assert_eq!(a.len(), b.len());
+    let mut coin_flip = rand::thread_rng();
+    for (k, a) in a.iter() {
+        let b = b.get(k).unwrap().borrow();
+        assert_eq!(a.borrow().len(), b.len());
+        for (a, b) in a.borrow_mut().iter_mut().zip(b.iter().copied()) {
+            if coin_flip.gen_bool(0.5) {
+                continue;
+            }
+            *a = b;
+        }
+    }
+}
+
+pub fn mutate(params: &HashMap<String, SharedParams>, rate: NormalizedF64) {
+    let mut rng = rand::thread_rng();
+    let normal = rand_distr::Normal::new(0., 1.).unwrap();
+    for (_, params) in params.iter() {
+        for param in params.borrow_mut().iter_mut() {
+            let chance = rng.gen_bool(rate.get());
+            if !chance {
+                continue;
+            }
+            let change = normal.sample(&mut rng);
+            *param += change;
+            *param = param.clamp(-1., 1.);
+        }
     }
 }
 

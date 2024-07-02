@@ -2,11 +2,9 @@ use graph::NodeIdx;
 
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
-    mut_cell::MutCell,
     node::{CompNode, GraphBuilder},
     nodes::{mean::mean_node, std_dev::std_dev_node},
     param::empty_shared_params,
-    ref_ctr::RefCtr,
 };
 
 /// ```math
@@ -24,7 +22,7 @@ pub fn layer_norm_layer(graph: &mut GraphBuilder, operands: Vec<NodeIdx>) -> Vec
         let operands = vec![mean, std_dev, operand];
         let node = CompNode::new(
             operands,
-            RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+            NodeComputation::Scalar(Box::new(computation)),
             empty_shared_params(),
         );
         layer_norm_nodes.push(node);
@@ -32,7 +30,7 @@ pub fn layer_norm_layer(graph: &mut GraphBuilder, operands: Vec<NodeIdx>) -> Vec
     layer_norm_nodes
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct LayerNormNodeComputation {}
 impl NodeScalarComputation for LayerNormNodeComputation {
     fn compute_output(

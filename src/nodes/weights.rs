@@ -5,9 +5,7 @@ use vec_seg::SegKey;
 
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
-    mut_cell::MutCell,
     node::CompNode,
-    ref_ctr::RefCtr,
 };
 
 /// ```math
@@ -45,13 +43,13 @@ pub fn weight_node(
     };
     let node = CompNode::new(
         operands,
-        RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+        NodeComputation::Scalar(Box::new(computation)),
         weights,
     );
     Ok(node)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct WeightNodeComputation {
     lambda: f64,
 }

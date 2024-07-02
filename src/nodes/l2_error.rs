@@ -2,10 +2,8 @@ use graph::NodeIdx;
 
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
-    mut_cell::MutCell,
     node::CompNode,
     param::empty_shared_params,
-    ref_ctr::RefCtr,
 };
 
 /// ```math
@@ -15,12 +13,12 @@ pub fn l2_error_node(operand: NodeIdx, label: NodeIdx) -> CompNode {
     let computation = L2ErrorNodeComputation {};
     CompNode::new(
         vec![operand, label],
-        RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+        NodeComputation::Scalar(Box::new(computation)),
         empty_shared_params(),
     )
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct L2ErrorNodeComputation {}
 impl NodeScalarComputation for L2ErrorNodeComputation {
     fn compute_output(

@@ -1,9 +1,7 @@
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
-    mut_cell::MutCell,
     node::CompNode,
     param::empty_shared_params,
-    ref_ctr::RefCtr,
 };
 
 /// ```math
@@ -13,7 +11,7 @@ pub fn input_node(input_index: usize) -> CompNode {
     let computation = InputNodeComputation { input_index };
     CompNode::new(
         Vec::new(),
-        RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+        NodeComputation::Scalar(Box::new(computation)),
         empty_shared_params(),
     )
 }
@@ -50,7 +48,7 @@ pub fn input_node_batch(params: InputNodeBatchParams) -> Vec<CompNode> {
         .collect()
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct InputNodeComputation {
     input_index: usize,
 }

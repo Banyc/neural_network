@@ -2,10 +2,8 @@ use graph::NodeIdx;
 
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
-    mut_cell::MutCell,
     node::CompNode,
     param::empty_shared_params,
-    ref_ctr::RefCtr,
 };
 
 /// ```math
@@ -15,12 +13,12 @@ pub fn power_node(operand: NodeIdx, power: f64) -> CompNode {
     let computation = PowerNodeComputation { power };
     CompNode::new(
         vec![operand],
-        RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+        NodeComputation::Scalar(Box::new(computation)),
         empty_shared_params(),
     )
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct PowerNodeComputation {
     power: f64,
 }

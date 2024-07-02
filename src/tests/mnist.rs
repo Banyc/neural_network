@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io::Read, num::NonZeroUsize, path::Path};
+use std::{io::Read, num::NonZeroUsize, path::Path};
 
 use crate::{
     layers::{
@@ -88,11 +88,7 @@ fn train() {
         let loss = nn.error(&test_dataset[..128]);
         println!("loss: {loss}");
         step_size = loss;
-        let params = nn
-            .params()
-            .iter_name_slice()
-            .map(|(name, slice)| (name.to_string(), slice.to_vec()));
-        let params = HashMap::from_iter(params);
+        let params = nn.params().collect();
         save_params(&params, PARAMS_BIN, PARAMS_TXT).unwrap();
     }
 }

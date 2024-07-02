@@ -8,8 +8,6 @@
 //! - $E$: the outmost function represented by the root node of the computation graph
 //!   - "root" in code
 
-use std::ops::DerefMut;
-
 use graph::{Graph, Node, NodeArray, NodeIdx};
 use thiserror::Error;
 use vec_seg::SegKey;
@@ -17,9 +15,7 @@ use vec_seg::SegKey;
 use crate::{
     cache::{GradRootThis, NodeCache, NodeCacheBuilder, OperandOutputs},
     computation::{ComputationMode, NodeBackpropagationComputation, NodeComputation},
-    mut_cell::MutCell,
     param::Params,
-    ref_ctr::RefCtr,
     reused_buf::ReusedBuffers,
 };
 
@@ -88,7 +84,7 @@ pub struct CompNode {
     operands: Vec<NodeIdx>,
     num_successors: usize,
     batch_cache: Option<NodeCache>,
-    computation: RefCtr<MutCell<NodeComputation>>,
+    computation: NodeComputation,
 }
 impl Node for CompNode {
     fn children(&self) -> &[NodeIdx] {
@@ -102,7 +98,7 @@ impl CompNode {
 
     pub fn new(
         operands: Vec<NodeIdx>,
-        computation: RefCtr<MutCell<NodeComputation>>,
+        computation: NodeComputation,
         parameters: SegKey,
     ) -> CompNode {
         let this = Self {
@@ -146,8 +142,7 @@ impl CompNode {
         let mut eval_buf = operand_outputs;
 
         // Compute outputs
-        let mut computation = self.computation.as_ref().borrow_mut();
-        match computation.deref_mut() {
+        match &mut self.computation {
             NodeComputation::Scalar(comp) => {
                 let parameters = params.seg().slice(self.parameters);
                 for (batch_index, inputs) in inputs_batch.iter().enumerate() {
@@ -159,7 +154,7 @@ impl CompNode {
                     let o = comp.compute_output(parameters, operand_outputs, inputs.as_ref());
                     if !o.is_finite() {
                         let e = format!(
-                            "{self:?}; {comp:?}; output: {o}; params: {:?}; operands: {operand_outputs:?}; inputs: {:?}",
+                            "{comp:?}; output: {o}; params: {:?}; operands: {operand_outputs:?}; inputs: {:?}",
                             parameters,
                             inputs.as_ref(),
                         );
@@ -256,7 +251,7 @@ impl CompNode {
             .iter_mut()
             .zip(partial_derivative_of_root_at_parameter.iter().copied())
         {
-            let regularization = self.computation.borrow().regularization(*param);
+            let regularization = self.computation.regularization(*param);
             *param -= step_size * (der + regularization);
         }
         cx.buf().put(partial_derivative_of_root_at_parameter);
@@ -291,10 +286,9 @@ impl CompNode {
             .operand_outputs(batch_index)
             .ok_or(GradientOfThisAtOperandError::NoEvaluationOutputCaches)?;
         let buf = cx.buf().take();
-        let x = self
-            .computation
-            .borrow()
-            .compute_gradient_of_this_at_operand(parameters, operand_outputs, buf);
+        let x =
+            self.computation
+                .compute_gradient_of_this_at_operand(parameters, operand_outputs, buf);
         Ok(x)
     }
 
@@ -346,10 +340,11 @@ impl CompNode {
             .operand_outputs(batch_index)
             .ok_or(GradientOfThisAtParameterError::NoEvaluationOutputCaches)?;
         let buf = cx.buf().take();
-        let x = self
-            .computation
-            .borrow()
-            .compute_gradient_of_this_at_parameter(parameters, operand_outputs.as_ref(), buf);
+        let x = self.computation.compute_gradient_of_this_at_parameter(
+            parameters,
+            operand_outputs.as_ref(),
+            buf,
+        );
         Ok(x)
     }
 

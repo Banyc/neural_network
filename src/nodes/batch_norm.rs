@@ -5,10 +5,8 @@ use crate::{
     computation::{
         ComputationMode, NodeBackpropagationComputation, NodeBatchComputation, NodeComputation,
     },
-    mut_cell::MutCell,
     node::CompNode,
     param::{ParamInjection, Params},
-    ref_ctr::RefCtr,
     tensor::Shape,
 };
 
@@ -40,7 +38,7 @@ pub fn batch_norm_node(
     };
     CompNode::new(
         vec![operand],
-        RefCtr::new(MutCell::new(NodeComputation::Batch(Box::new(computation)))),
+        NodeComputation::Batch(Box::new(computation)),
         trainable_params,
     )
 }
@@ -70,7 +68,7 @@ pub fn batch_norm_layer(
     layer
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct BatchNormComputation {
     /// $(mean, std)$
     saved_params: SegKey,

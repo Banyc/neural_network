@@ -3,9 +3,7 @@ use vec_seg::SegKey;
 
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
-    mut_cell::MutCell,
     node::CompNode,
-    ref_ctr::RefCtr,
 };
 
 pub fn default_bias() -> f64 {
@@ -20,12 +18,12 @@ pub fn bias_node(operand: NodeIdx, bias: SegKey) -> CompNode {
     assert_eq!(bias.len(), 1);
     CompNode::new(
         vec![operand],
-        RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+        NodeComputation::Scalar(Box::new(computation)),
         bias,
     )
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct BiasNodeComputation {}
 impl NodeScalarComputation for BiasNodeComputation {
     fn compute_output(

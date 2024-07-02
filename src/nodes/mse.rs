@@ -2,10 +2,8 @@ use graph::NodeIdx;
 
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
-    mut_cell::MutCell,
     node::CompNode,
     param::empty_shared_params,
-    ref_ctr::RefCtr,
 };
 
 /// ```math
@@ -17,12 +15,12 @@ pub fn mse_node(y: Vec<NodeIdx>, y_hat: Vec<NodeIdx>) -> CompNode {
     let computation = MseNodeComputation {};
     CompNode::new(
         y.into_iter().chain(y_hat).collect(),
-        RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+        NodeComputation::Scalar(Box::new(computation)),
         empty_shared_params(),
     )
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct MseNodeComputation {}
 impl NodeScalarComputation for MseNodeComputation {
     fn compute_output(

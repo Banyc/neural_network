@@ -132,6 +132,19 @@ impl Params {
         let key = *self.name.get(name)?;
         Some(self.seg.slice_mut(key))
     }
+
+    pub fn collect(&self) -> CollectedParams {
+        let params = self
+            .iter_name_slice()
+            .map(|(name, slice)| (name.to_string(), slice.to_vec()));
+        HashMap::from_iter(params)
+    }
+    pub fn overridden_by(&mut self, params: &CollectedParams) {
+        self.iter_name_slice_mut(&mut |name, slice| {
+            let params = params.get(name).unwrap();
+            slice.copy_from_slice(params);
+        });
+    }
 }
 impl Default for Params {
     fn default() -> Self {
@@ -139,26 +152,30 @@ impl Default for Params {
     }
 }
 
-pub fn crossover(a: &mut Params, b: &Params) {
+pub type CollectedParams = HashMap<String, Vec<f64>>;
+
+pub fn crossover(a: &Params, b: &Params) -> CollectedParams {
+    let mut collected = HashMap::new();
     assert_eq!(a.len(), b.len());
     let mut coin_flip = rand::thread_rng();
-    a.iter_name_slice_mut(&mut |name, a| {
+    for (name, a) in a.iter_name_slice() {
         let b = b.slice_by_name(name).unwrap();
         assert_eq!(a.len(), b.len());
-        for (a, &b) in a.iter_mut().zip(b) {
-            if coin_flip.gen_bool(0.5) {
-                continue;
-            }
-            *a = b;
+        let mut params = vec![];
+        for (&a, &b) in a.iter().zip(b) {
+            let param = if coin_flip.gen_bool(0.5) { a } else { b };
+            params.push(param);
         }
-    });
+        collected.insert(name.to_owned(), params);
+    }
+    collected
 }
 
-pub fn mutate(params: &mut Params, rate: NormalizedF64) {
+pub fn mutate(params: &mut CollectedParams, rate: NormalizedF64) {
     let mut rng = rand::thread_rng();
     let normal = rand_distr::Normal::new(0., 1.).unwrap();
-    params.iter_name_slice_mut(&mut |_name, slice| {
-        for param in slice {
+    for params in params.values_mut() {
+        for param in params {
             let chance = rng.gen_bool(rate.get());
             if !chance {
                 continue;
@@ -167,7 +184,7 @@ pub fn mutate(params: &mut Params, rate: NormalizedF64) {
             *param += change;
             *param = param.clamp(-1., 1.);
         }
-    });
+    }
 }
 
 #[cfg(test)]

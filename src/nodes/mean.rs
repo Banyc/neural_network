@@ -2,10 +2,8 @@ use graph::NodeIdx;
 
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
-    mut_cell::MutCell,
     node::CompNode,
     param::empty_shared_params,
-    ref_ctr::RefCtr,
 };
 
 /// ```math
@@ -15,12 +13,12 @@ pub fn mean_node(operands: Vec<NodeIdx>) -> CompNode {
     let computation = MeanNodeComputation {};
     CompNode::new(
         operands,
-        RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+        NodeComputation::Scalar(Box::new(computation)),
         empty_shared_params(),
     )
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct MeanNodeComputation {}
 impl NodeScalarComputation for MeanNodeComputation {
     fn compute_output(

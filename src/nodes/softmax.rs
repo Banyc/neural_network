@@ -2,10 +2,8 @@ use graph::NodeIdx;
 
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
-    mut_cell::MutCell,
     node::CompNode,
     param::empty_shared_params,
-    ref_ctr::RefCtr,
 };
 
 pub fn softmax_layer(operands: Vec<NodeIdx>) -> Vec<CompNode> {
@@ -24,12 +22,12 @@ pub fn softmax_node(operands: Vec<NodeIdx>, operand_index: usize) -> CompNode {
     let computation = SoftmaxNodeComputation { operand_index };
     CompNode::new(
         operands,
-        RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+        NodeComputation::Scalar(Box::new(computation)),
         empty_shared_params(),
     )
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct SoftmaxNodeComputation {
     operand_index: usize,
 }

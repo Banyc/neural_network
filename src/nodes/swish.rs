@@ -2,10 +2,8 @@ use graph::NodeIdx;
 
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
-    mut_cell::MutCell,
     node::CompNode,
     param::empty_shared_params,
-    ref_ctr::RefCtr,
 };
 
 use super::sigmoid::sigmoid;
@@ -17,12 +15,12 @@ pub fn swish_node(operand: NodeIdx) -> CompNode {
     let computation = SwishNodeComputation {};
     CompNode::new(
         vec![operand],
-        RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+        NodeComputation::Scalar(Box::new(computation)),
         empty_shared_params(),
     )
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct SwishNodeComputation {}
 impl NodeScalarComputation for SwishNodeComputation {
     fn compute_output(

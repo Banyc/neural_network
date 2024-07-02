@@ -1,39 +1,37 @@
+use std::sync::{Arc, Mutex};
+
 use graph::NodeIdx;
 
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},
-    mut_cell::MutCell,
     node::CompNode,
     param::empty_shared_params,
-    ref_ctr::RefCtr,
 };
 
-pub fn recurrent_reader_node() -> (CompNode, RefCtr<MutCell<f64>>) {
-    let value = RefCtr::new(MutCell::new(0.));
+pub fn recurrent_reader_node() -> (CompNode, Arc<Mutex<f64>>) {
+    let value = Arc::new(Mutex::new(0.));
     let computation = RecurrentReaderNodeComputation {
-        value: RefCtr::clone(&value),
+        value: Arc::clone(&value),
     };
     let reader = CompNode::new(
         vec![],
-        RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+        NodeComputation::Scalar(Box::new(computation)),
         empty_shared_params(),
     );
     (reader, value)
 }
-pub fn recurrent_writer_node(operand: NodeIdx, value: RefCtr<MutCell<f64>>) -> CompNode {
-    let computation = RecurrentWriterNodeComputation {
-        value: RefCtr::clone(&value),
-    };
+pub fn recurrent_writer_node(operand: NodeIdx, value: Arc<Mutex<f64>>) -> CompNode {
+    let computation = RecurrentWriterNodeComputation { value };
     CompNode::new(
         vec![operand],
-        RefCtr::new(MutCell::new(NodeComputation::Scalar(Box::new(computation)))),
+        NodeComputation::Scalar(Box::new(computation)),
         empty_shared_params(),
     )
 }
 
 #[derive(Debug)]
 struct RecurrentReaderNodeComputation {
-    value: RefCtr<MutCell<f64>>,
+    value: Arc<Mutex<f64>>,
 }
 impl NodeScalarComputation for RecurrentReaderNodeComputation {
     fn compute_output(
@@ -44,7 +42,7 @@ impl NodeScalarComputation for RecurrentReaderNodeComputation {
     ) -> f64 {
         assert!(parameters.is_empty());
         assert!(operand_outputs.is_empty());
-        *self.value.as_ref().borrow()
+        *self.value.lock().unwrap()
     }
 }
 impl NodeBackpropagationComputation for RecurrentReaderNodeComputation {
@@ -73,7 +71,7 @@ impl NodeBackpropagationComputation for RecurrentReaderNodeComputation {
 
 #[derive(Debug)]
 struct RecurrentWriterNodeComputation {
-    value: RefCtr<MutCell<f64>>,
+    value: Arc<Mutex<f64>>,
 }
 impl NodeScalarComputation for RecurrentWriterNodeComputation {
     fn compute_output(
@@ -85,7 +83,7 @@ impl NodeScalarComputation for RecurrentWriterNodeComputation {
         assert!(parameters.is_empty());
         assert_eq!(operand_outputs.len(), 1);
         let x = operand_outputs[0];
-        *self.value.as_ref().borrow_mut() = x;
+        *self.value.lock().unwrap() = x;
         x
     }
 }

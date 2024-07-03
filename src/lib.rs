@@ -4,7 +4,7 @@ mod cache;
 pub mod computation;
 pub mod layers;
 mod mut_cell;
-pub mod neural_network;
+pub mod network;
 pub mod node;
 pub mod nodes;
 pub mod param;

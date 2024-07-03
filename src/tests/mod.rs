@@ -1,6 +1,6 @@
 use strict_num::FiniteF64;
 
-use crate::neural_network::AccurateFnParams;
+use crate::network::AccurateFnParams;
 
 mod mnist;
 mod neural_network;

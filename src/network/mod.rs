@@ -1,7 +1,4 @@
-use std::{
-    collections::BTreeSet,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use graph::{dependency_order, Graph, NodeIdx};
 use rand::Rng;
@@ -12,7 +9,8 @@ use crate::{
     param::Params,
 };
 
-type PostOrder = Vec<NodeIdx>;
+pub mod inference;
+pub mod train;
 
 const _: fn() = || {
     fn assert_send<T: Sync + Send + 'static>() {}
@@ -22,12 +20,6 @@ const _: fn() = || {
 #[derive(Debug)]
 pub struct NeuralNetwork {
     graph: Graph<CompNode>,
-    /// output: a prediction
-    terminal_nodes: Vec<NodeIdx>,
-    terminals_forward: PostOrder,
-    /// output: the error between the prediction and the label
-    error_node: NodeIdx,
-    error_forward: PostOrder,
     params: Params,
     /// global necessity
     cx: NodeContext,
@@ -35,26 +27,9 @@ pub struct NeuralNetwork {
 impl NeuralNetwork {
     fn check_rep(&self) {}
 
-    pub fn new(
-        graph: Graph<CompNode>,
-        terminal_nodes: Vec<NodeIdx>,
-        error_node: NodeIdx,
-        params: Params,
-    ) -> NeuralNetwork {
-        let error_forward = dependency_order(&graph, &[error_node]);
-        let error_unique = BTreeSet::from_iter(error_forward.iter().copied());
-        assert_eq!(error_forward.len(), error_unique.len());
-        let terminals_forward = dependency_order(&graph, &terminal_nodes);
+    pub fn new(graph: Graph<CompNode>, params: Params) -> NeuralNetwork {
         let cx = NodeContext::new();
-        let this = NeuralNetwork {
-            graph,
-            terminal_nodes,
-            terminals_forward,
-            error_node,
-            error_forward,
-            params,
-            cx,
-        };
+        let this = NeuralNetwork { graph, params, cx };
         this.check_rep();
         this
     }
@@ -70,15 +45,24 @@ impl NeuralNetwork {
     }
 
     /// `step_size`: learning rate
-    pub fn compute_error_and_backpropagate<I>(&mut self, samples: &[I], step_size: f64)
-    where
+    pub fn compute_error_and_backpropagate<I>(
+        &mut self,
+        error: &GraphOrder,
+        samples: &[I],
+        step_size: f64,
+    ) where
         I: AsRef<[f64]>,
     {
-        let err = self.compute_error(samples, EvalOption::KeepCache, ComputationMode::Training);
+        let err = self.compute_error(
+            error,
+            samples,
+            EvalOption::KeepCache,
+            ComputationMode::Training,
+        );
         self.cx.buf().put(err);
         backpropagate(
             &mut self.graph,
-            &self.error_forward,
+            error.forward(),
             &mut self.params,
             step_size,
             &mut self.cx,
@@ -89,47 +73,53 @@ impl NeuralNetwork {
     /// Return outputs from all terminal nodes
     ///
     /// `evaluate()[i]`: outputs from terminal node $i$
-    pub fn evaluate<I>(&mut self, inputs: &[I]) -> Vec<Vec<f64>>
+    pub fn evaluate<I>(&mut self, terminals: &GraphOrder, inputs: &[I]) -> Vec<Vec<f64>>
     where
         I: AsRef<[f64]>,
     {
         let mut outputs = vec![];
         evaluate_once(
             &mut self.graph,
-            &self.terminals_forward,
+            terminals.forward(),
             &mut self.params,
             inputs,
             &mut self.cx,
             ComputationMode::Inference,
         );
-        for &terminal_node in &self.terminal_nodes {
+        for &terminal_node in terminals.destinations() {
             let terminal_node = self.graph.nodes().get(terminal_node).unwrap();
             let output = terminal_node.output().unwrap();
             outputs.push(output.to_vec());
         }
-        delete_cache(&mut self.graph, &self.terminals_forward);
+        delete_cache(&mut self.graph, terminals.forward());
         self.check_rep();
         outputs
     }
 
-    pub fn error<S>(&mut self, dataset: &[S]) -> f64
+    pub fn compute_avg_error<S>(&mut self, error: &GraphOrder, dataset: &[S]) -> f64
     where
         S: AsRef<[f64]>,
     {
         let option = EvalOption::ClearCache;
         let mut progress_printer = ProgressPrinter::new();
-        let mut error = 0.;
+        let mut avg = 0.;
         for (i, inputs) in dataset.iter().enumerate() {
-            let err = self.compute_error(&[inputs.as_ref()], option, ComputationMode::Inference);
-            error += err[0] / dataset.len() as f64;
+            let err = self.compute_error(
+                error,
+                &[inputs.as_ref()],
+                option,
+                ComputationMode::Inference,
+            );
+            avg += err[0] / dataset.len() as f64;
             self.cx.buf().put(err);
             progress_printer.print_progress(i, dataset.len());
         }
-        error
+        avg
     }
 
     fn compute_error<I>(
         &mut self,
+        error: &GraphOrder,
         inputs: &[I],
         option: EvalOption,
         mode: ComputationMode,
@@ -139,27 +129,33 @@ impl NeuralNetwork {
     {
         evaluate_once(
             &mut self.graph,
-            &self.error_forward,
+            error.forward(),
             &mut self.params,
             inputs,
             &mut self.cx,
             mode,
         );
         let mut output = self.cx.buf().take();
-        let error_node = self.graph.nodes().get(self.error_node).unwrap();
+        let error_node = self.graph.nodes().get(error.only_destination()).unwrap();
         output.extend(error_node.output().unwrap());
         match option {
             EvalOption::KeepCache => (),
             EvalOption::ClearCache => {
-                delete_cache(&mut self.graph, &self.error_forward);
+                delete_cache(&mut self.graph, error.forward());
             }
         }
         self.check_rep();
         output
     }
 
-    pub fn train<S>(&mut self, dataset: &[S], step_size: f64, max_steps: usize, option: TrainOption)
-    where
+    pub fn train<S>(
+        &mut self,
+        error: &GraphOrder,
+        dataset: &[S],
+        step_size: f64,
+        max_steps: usize,
+        option: TrainOption,
+    ) where
         S: AsRef<[f64]>,
     {
         let batch_size = match option {
@@ -176,7 +172,7 @@ impl NeuralNetwork {
                 let dataset_index: usize = rng.gen_range(0..dataset.len());
                 batch_input.push(dataset[dataset_index].as_ref());
             }
-            self.compute_error_and_backpropagate(&batch_input, step_size);
+            self.compute_error_and_backpropagate(error, &batch_input, step_size);
             progress_printer.print_progress(i, max_steps);
         }
         self.check_rep();
@@ -184,6 +180,7 @@ impl NeuralNetwork {
 
     pub fn accuracy<S>(
         &mut self,
+        terminals: &GraphOrder,
         dataset: &[S],
         accurate: impl Fn(AccurateFnParams<'_>) -> bool,
     ) -> f64
@@ -193,7 +190,7 @@ impl NeuralNetwork {
         let mut progress_printer = ProgressPrinter::new();
         let mut accurate_count = 0;
         for (i, inputs) in dataset.iter().enumerate() {
-            let eval = self.evaluate(&[inputs.as_ref()]);
+            let eval = self.evaluate(terminals, &[inputs.as_ref()]);
             let eval = eval.iter().map(|x| x[0]).collect::<Vec<f64>>();
             let params = AccurateFnParams {
                 inputs: inputs.as_ref(),
@@ -226,6 +223,35 @@ pub enum TrainOption {
     StochasticGradientDescent,
     MiniBatchGradientDescent { batch_size: usize },
     BatchGradientDescent,
+}
+
+#[derive(Debug, Clone)]
+pub struct GraphOrder {
+    destinations: Vec<NodeIdx>,
+    forward: Vec<NodeIdx>,
+}
+impl GraphOrder {
+    pub fn new<T>(graph: &Graph<T>, destinations: Vec<NodeIdx>) -> Self
+    where
+        T: graph::Node,
+    {
+        let forward = dependency_order(graph, &destinations);
+        Self {
+            destinations,
+            forward,
+        }
+    }
+
+    pub fn only_destination(&self) -> NodeIdx {
+        assert_eq!(self.destinations.len(), 1);
+        self.destinations[0]
+    }
+    pub fn destinations(&self) -> &[NodeIdx] {
+        &self.destinations
+    }
+    pub fn forward(&self) -> &[NodeIdx] {
+        &self.forward
+    }
 }
 
 struct ProgressPrinter {

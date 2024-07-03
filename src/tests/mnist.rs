@@ -10,7 +10,7 @@ use crate::{
             conv_max_pooling_layer,
         },
     },
-    neural_network::{NeuralNetwork, TrainOption},
+    network::{inference::InferenceNetwork, train::TrainNetwork, NeuralNetwork, TrainOption},
     node::GraphBuilder,
     nodes::{input::InputNodeGen, linear::LinearLayerConfig, mse::mse_node},
     param::{
@@ -34,7 +34,7 @@ fn converge() {
     let train_dataset = read_mnist(TRAIN_IMAGE, TRAIN_LABEL).unwrap();
     println!("inputs: {:?}", train_dataset[0]);
     let mut nn = neural_network();
-    let loss = nn.error(&train_dataset[0..1]);
+    let loss = nn.compute_avg_error(&train_dataset[0..1]);
     println!("loss: {loss}");
     let mut step_size = loss;
     let mut prev_loss = loss;
@@ -43,16 +43,16 @@ fn converge() {
         let option = TrainOption::StochasticGradientDescent;
         nn.train(&train_dataset[0..1], step_size, max_steps, option);
 
-        let eval = nn.evaluate(&train_dataset[0..1]);
+        let eval = nn.inference_mut().evaluate(&train_dataset[0..1]);
         let eval = eval.iter().map(|x| x[0]).collect::<Vec<f64>>();
         println!("eval: {eval:?}");
-        let acc = nn.accuracy(&train_dataset[0..1], |x| {
+        let acc = nn.inference_mut().accuracy(&train_dataset[0..1], |x| {
             multi_class_one_hot_accurate(x, CLASSES)
         });
         if acc == 1. {
             break;
         }
-        let loss = nn.error(&train_dataset[0..1]);
+        let loss = nn.compute_avg_error(&train_dataset[0..1]);
         println!("loss: {loss}");
         if (prev_loss - loss).abs() < 0.001 {
             nn = neural_network();
@@ -72,9 +72,12 @@ fn train() {
     let mut nn = neural_network();
     if let Some(params) = read_params(PARAMS_BIN) {
         println!("read params");
-        nn.params_mut().overridden_by(&params);
+        nn.inference_mut()
+            .network_mut()
+            .params_mut()
+            .overridden_by(&params);
     }
-    let loss = nn.error(&train_dataset[0..1]);
+    let loss = nn.compute_avg_error(&train_dataset[0..1]);
     println!("loss: {loss}");
     let mut step_size = loss;
     for i in 0.. {
@@ -82,20 +85,20 @@ fn train() {
         let max_steps = 2 << 10;
         let option = TrainOption::StochasticGradientDescent;
         nn.train(&train_dataset, step_size, max_steps, option);
-        let acc = nn.accuracy(&test_dataset[..128], |x| {
+        let acc = nn.inference_mut().accuracy(&test_dataset[..128], |x| {
             multi_class_one_hot_accurate(x, CLASSES)
         });
         println!("acc: {acc}");
-        let loss = nn.error(&test_dataset[..128]);
+        let loss = nn.compute_avg_error(&test_dataset[..128]);
         println!("loss: {loss}");
         step_size = loss;
-        let params = nn.params().collect();
+        let params = nn.inference().network().params().collect();
         save_params(&params, PARAMS_BIN, PARAMS_TXT).unwrap();
     }
 }
 
 /// a LeNet variant
-fn neural_network() -> NeuralNetwork {
+fn neural_network() -> TrainNetwork {
     let mut param_injector = ParamInjector::new();
     let mut param_injection = ParamInjection {
         injector: &mut param_injector,
@@ -199,7 +202,9 @@ fn neural_network() -> NeuralNetwork {
     let error_node = graph.insert_node(mse_node(label_nodes, outputs.clone()));
     let graph = graph.build();
     let params = param_injector.into_params();
-    NeuralNetwork::new(graph, outputs, error_node, params)
+    let nn = NeuralNetwork::new(graph, params);
+    let nn = InferenceNetwork::new(nn, outputs);
+    TrainNetwork::new(nn, error_node)
 }
 
 fn read_mnist(image: impl AsRef<Path>, label: impl AsRef<Path>) -> std::io::Result<Vec<Vec<f64>>> {

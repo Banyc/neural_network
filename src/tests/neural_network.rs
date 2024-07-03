@@ -2,7 +2,10 @@ use graph::NodeIdx;
 use vec_seg::SegKey;
 
 use crate::{
-    neural_network::{AccurateFnParams, NeuralNetwork, TrainOption},
+    network::{
+        inference::InferenceNetwork, train::TrainNetwork, AccurateFnParams, NeuralNetwork,
+        TrainOption,
+    },
     node::{CompNode, GraphBuilder},
     nodes::{
         bias::bias_node,
@@ -30,7 +33,7 @@ fn single_linear_relu_network(
     node_count: usize,
     initial_weights: Vec<f64>,
     initial_bias: f64,
-) -> NeuralNetwork {
+) -> TrainNetwork {
     let mut params = ParamInjector::new();
     let mut param_injection = ParamInjection {
         injector: &mut params,
@@ -51,7 +54,9 @@ fn single_linear_relu_network(
     let error_node = graph.insert_node(l2_error_node(relu_node, label_node));
     let graph = graph.build();
     let params = params.into_params();
-    NeuralNetwork::new(graph, vec![relu_node], error_node, params)
+    let nn = NeuralNetwork::new(graph, params);
+    let nn = InferenceNetwork::new(nn, vec![relu_node]);
+    TrainNetwork::new(nn, error_node)
 }
 
 #[test]
@@ -59,7 +64,7 @@ fn evaluate() {
     let initial_weights = vec![3.0, 2.0, 1.0];
     let initial_bias = -20.0;
     let mut network = single_linear_relu_network(3, initial_weights, initial_bias);
-    let ret = network.evaluate(&[&[1.0, 2.0, 3.0]]);
+    let ret = network.inference_mut().evaluate(&[&[1.0, 2.0, 3.0]]);
     assert_eq!(ret[0][0], 0.0);
 }
 
@@ -72,11 +77,13 @@ fn error() {
     let error = graph.insert_node(l2_error_node(relu, label));
     let graph = graph.build();
     let params = Params::new();
-    let mut network = NeuralNetwork::new(graph, vec![relu], error, params);
+    let network = NeuralNetwork::new(graph, params);
+    let network = InferenceNetwork::new(network, vec![relu]);
+    let mut network = TrainNetwork::new(network, error);
     let inputs = vec![-2.0, 1.0];
-    let ret = network.evaluate(&[&inputs]);
+    let ret = network.inference_mut().evaluate(&[&inputs]);
     assert_eq!(ret[0][0], 0.0);
-    let ret = network.error(&[&inputs]);
+    let ret = network.compute_avg_error(&[&inputs]);
     assert_eq!(ret, 1.0);
 }
 
@@ -85,9 +92,9 @@ fn cache_reset() {
     let initial_weights = vec![2.0, 1.0];
     let initial_bias = 3.0;
     let mut network = single_linear_relu_network(2, initial_weights, initial_bias);
-    let ret = network.evaluate(&[&[2.0, -2.0]]);
+    let ret = network.inference_mut().evaluate(&[&[2.0, -2.0]]);
     assert_eq!(ret[0][0], 5.0);
-    let ret = network.evaluate(&[&[6.0, -2.0]]);
+    let ret = network.inference_mut().evaluate(&[&[6.0, -2.0]]);
     assert!(ret[0][0] != 5.0);
 }
 
@@ -97,7 +104,7 @@ fn errors_on_dataset() {
     let initial_bias = 3.0;
     let mut network = single_linear_relu_network(2, initial_weights, initial_bias);
     let dataset = vec![vec![2.0, -2.0, 5.0], vec![6.0, -2.0, 5.0]];
-    let ret = network.accuracy(&dataset, binary_accurate);
+    let ret = network.inference_mut().accuracy(&dataset, binary_accurate);
     assert!(ret > 0.499);
     assert!(ret < 0.501);
 }
@@ -127,13 +134,15 @@ fn gradients() {
     let error_node = graph.insert_node(l2_error_node(relu_node, label_node));
     let graph = graph.build();
     let params = params.into_params();
-    let mut network = NeuralNetwork::new(graph, vec![relu_node], error_node, params);
+    let network = NeuralNetwork::new(graph, params);
+    let network = InferenceNetwork::new(network, vec![relu_node]);
+    let mut network = TrainNetwork::new(network, error_node);
 
     let inputs = vec![2.0, -2.0, 1.0];
 
-    let ret = network.evaluate(&[&inputs]);
+    let ret = network.inference_mut().evaluate(&[&inputs]);
     assert_eq!(ret[0][0], 5.0);
-    let ret = network.error(&[&inputs]);
+    let ret = network.compute_avg_error(&[&inputs]);
     assert_eq!(ret, 16.0);
 }
 
@@ -163,10 +172,13 @@ fn backpropagate() {
     let graph = graph.build();
     let params = params.into_params();
     let step_size = 0.5;
-    let mut network = NeuralNetwork::new(graph, vec![relu_node], error_node, params);
+    let network = NeuralNetwork::new(graph, params);
+    let network = InferenceNetwork::new(network, vec![relu_node]);
+    let mut network = TrainNetwork::new(network, error_node);
 
     let inputs = vec![2.0, -2.0, 1.0];
     network.compute_error_and_backpropagate(&[&inputs], step_size);
+    let network = network.inference().network();
     {
         let weight_node = network.graph().nodes().get(weight_node).unwrap();
         let weights = network.params().seg().slice(weight_node.parameters());
@@ -204,10 +216,13 @@ fn backpropagate_2() {
     let graph = graph.build();
     let params = params.into_params();
     let step_size = 0.5;
-    let mut network = NeuralNetwork::new(graph, vec![weight_node2], error_node, params);
+    let network = NeuralNetwork::new(graph, params);
+    let network = InferenceNetwork::new(network, vec![weight_node2]);
+    let mut network = TrainNetwork::new(network, error_node);
 
     let inputs = vec![2.0, 1.0];
     network.compute_error_and_backpropagate(&[&inputs], step_size);
+    let network = network.inference().network();
     {
         let weight_node = network.graph().nodes().get(weight_node2).unwrap();
         let weights = network.params().seg().slice(weight_node.parameters());
@@ -256,7 +271,9 @@ fn learn_xor_sigmoid() {
     let graph = graph.build();
     let params = param_injector.into_params();
     let step_size = 0.5;
-    let mut network = NeuralNetwork::new(graph, vec![output], error_node, params);
+    let network = NeuralNetwork::new(graph, params);
+    let network = InferenceNetwork::new(network, vec![output]);
+    let mut network = TrainNetwork::new(network, error_node);
 
     let dataset = vec![
         vec![0.0, 0.0, 0.0],
@@ -273,10 +290,10 @@ fn learn_xor_sigmoid() {
         TrainOption::StochasticGradientDescent,
     );
     for inputs in &dataset {
-        let ret = network.evaluate(&[inputs]);
+        let ret = network.inference_mut().evaluate(&[inputs]);
         assert!((ret[0][0] - inputs.last().unwrap()).abs() < 0.1);
     }
-    let ret = network.accuracy(&dataset, binary_accurate);
+    let ret = network.inference_mut().accuracy(&dataset, binary_accurate);
     assert_eq!(ret, 1.0);
 }
 
@@ -336,7 +353,9 @@ fn learn_xor_regularized_sigmoid() {
     let graph = graph.build();
     let params = param_injector.into_params();
     let step_size = 0.5;
-    let mut network = NeuralNetwork::new(graph, vec![output], error_node, params);
+    let network = NeuralNetwork::new(graph, params);
+    let network = InferenceNetwork::new(network, vec![output]);
+    let mut network = TrainNetwork::new(network, error_node);
 
     let dataset = vec![
         vec![-1.0, -1.0, 0.0],
@@ -353,10 +372,10 @@ fn learn_xor_regularized_sigmoid() {
         TrainOption::StochasticGradientDescent,
     );
     for inputs in &dataset {
-        let ret = network.evaluate(&[inputs]);
+        let ret = network.inference_mut().evaluate(&[inputs]);
         assert!((ret[0][0] - inputs.last().unwrap()).abs() < 0.1);
     }
-    let ret = network.accuracy(&dataset, binary_accurate);
+    let ret = network.inference_mut().accuracy(&dataset, binary_accurate);
     assert_eq!(ret, 1.0);
 }
 
@@ -419,7 +438,9 @@ fn learn_xor_relu() {
     let graph = graph.build();
     let params = param_injector.into_params();
     let step_size = 0.05;
-    let mut network = NeuralNetwork::new(graph, vec![output], error_node, params);
+    let network = NeuralNetwork::new(graph, params);
+    let network = InferenceNetwork::new(network, vec![output]);
+    let mut network = TrainNetwork::new(network, error_node);
 
     let dataset = vec![
         vec![0.0, 0.0, 0.0],
@@ -436,10 +457,10 @@ fn learn_xor_relu() {
         TrainOption::StochasticGradientDescent,
     );
     for inputs in &dataset {
-        let ret = network.evaluate(&[inputs]);
+        let ret = network.inference_mut().evaluate(&[inputs]);
         assert!((ret[0][0] - inputs.last().unwrap()).abs() < 0.1);
     }
-    let ret = network.accuracy(&dataset, binary_accurate);
+    let ret = network.inference_mut().accuracy(&dataset, binary_accurate);
     assert_eq!(ret, 1.0);
 }
 

@@ -315,7 +315,10 @@ pub fn normalize_seq(
 #[cfg(test)]
 mod tests {
     use crate::{
-        neural_network::{AccurateFnParams, NeuralNetwork, TrainOption},
+        network::{
+            inference::InferenceNetwork, train::TrainNetwork, AccurateFnParams, NeuralNetwork,
+            TrainOption,
+        },
         nodes::{input::InputNodeGen, log_loss::log_loss_node},
         param::ParamInjector,
         tests::max_i,
@@ -397,7 +400,9 @@ mod tests {
         let graph = graph.build();
         let params = param_injector.into_params();
 
-        let mut nn = NeuralNetwork::new(graph, terminal_nodes, error_node, params);
+        let nn = NeuralNetwork::new(graph, params);
+        let nn = InferenceNetwork::new(nn, terminal_nodes);
+        let mut nn = TrainNetwork::new(nn, error_node);
 
         let mut dataset = vec![];
 
@@ -438,22 +443,24 @@ mod tests {
             dataset.push(sample);
         }
 
-        let eval = nn.evaluate(&dataset[0..1]);
+        let eval = nn.inference_mut().evaluate(&dataset[0..1]);
         println!("{eval:?}");
 
         let option = TrainOption::StochasticGradientDescent;
         nn.train(&dataset, 0.1, 1024 * 2, option);
 
-        let eval = nn.evaluate(&dataset[0..1]);
+        let eval = nn.inference_mut().evaluate(&dataset[0..1]);
         println!("{eval:?}");
-        let eval = nn.evaluate(&dataset[1..2]);
+        let eval = nn.inference_mut().evaluate(&dataset[1..2]);
         println!("{eval:?}");
 
         let acc_config = SeqAcc {
             word_len: 3,
             words: 3,
         };
-        let acc = nn.accuracy(&dataset[0..1], |x| accurate(x, &acc_config));
+        let acc = nn
+            .inference_mut()
+            .accuracy(&dataset[0..1], |x| accurate(x, &acc_config));
         assert_eq!(acc, 1.);
     }
 

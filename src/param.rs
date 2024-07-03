@@ -131,11 +131,12 @@ impl Params {
         let params = self
             .iter_name_slice()
             .map(|(name, slice)| (name.to_string(), slice.to_vec()));
-        HashMap::from_iter(params)
+        let params = HashMap::from_iter(params);
+        CollectedParams { params }
     }
     pub fn overridden_by(&mut self, params: &CollectedParams) {
         self.iter_name_slice_mut(&mut |name, slice| {
-            let params = params.get(name).unwrap();
+            let params = params.params.get(name).unwrap();
             slice.copy_from_slice(params);
         });
     }
@@ -146,7 +147,15 @@ impl Default for Params {
     }
 }
 
-pub type CollectedParams = HashMap<String, Vec<f64>>;
+#[derive(Debug, Clone)]
+pub struct CollectedParams {
+    pub params: HashMap<String, Vec<f64>>,
+}
+impl genetic_algorithm::Dna for CollectedParams {
+    fn mutate(&mut self, rate: NormalizedF64) {
+        mutate(self, rate);
+    }
+}
 
 pub fn crossover(a: &Params, b: &Params) -> CollectedParams {
     let mut collected = HashMap::new();
@@ -162,12 +171,12 @@ pub fn crossover(a: &Params, b: &Params) -> CollectedParams {
         }
         collected.insert(name.to_owned(), params);
     }
-    collected
+    CollectedParams { params: collected }
 }
 
 pub fn mutate(params: &mut CollectedParams, rate: NormalizedF64) {
     let mut rng = rand::thread_rng();
-    for params in params.values_mut() {
+    for params in params.params.values_mut() {
         for param in params {
             *param = genetic_algorithm::mutate(*param, rate, &mut rng);
         }
@@ -183,7 +192,7 @@ pub mod tests {
     pub fn read_params(path: impl AsRef<Path>) -> Option<CollectedParams> {
         let params_bin = std::fs::File::options().read(true).open(path).ok()?;
         let params: HashMap<String, Vec<f64>> = bincode::deserialize_from(params_bin).ok()?;
-        Some(params)
+        Some(CollectedParams { params })
     }
 
     pub fn save_params(
@@ -191,7 +200,7 @@ pub mod tests {
         bin_path: impl AsRef<Path>,
         txt_path: impl AsRef<Path>,
     ) -> std::io::Result<()> {
-        let txt = ron::to_string(params).unwrap();
+        let txt = ron::to_string(&params.params).unwrap();
         let mut file = std::fs::File::options()
             .write(true)
             .create(true)
@@ -199,7 +208,7 @@ pub mod tests {
             .open(txt_path)?;
         file.write_all(txt.as_bytes())?;
 
-        let bin = bincode::serialize(params).unwrap();
+        let bin = bincode::serialize(&params.params).unwrap();
         let mut file = std::fs::File::options()
             .write(true)
             .create(true)

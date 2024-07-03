@@ -43,6 +43,9 @@ impl NeuralNetwork {
     pub fn params_mut(&mut self) -> &mut Params {
         &mut self.params
     }
+    pub fn cx_mut(&mut self) -> &mut NodeContext {
+        &mut self.cx
+    }
 
     /// `step_size`: learning rate
     pub fn compute_error_and_backpropagate<I>(

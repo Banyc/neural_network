@@ -1,5 +1,7 @@
 use graph::NodeIdx;
 
+use crate::param::{crossover, CollectedParams};
+
 use super::{AccurateFnParams, GraphOrder, NeuralNetwork};
 
 #[derive(Debug)]
@@ -46,3 +48,16 @@ impl InferenceNetwork {
         self.network.accuracy(&self.terminals, dataset, accurate)
     }
 }
+impl genetic_algorithm::Agent for InferenceNetwork {
+    type Dna = CollectedParams;
+    fn crossover(&self, other: &Self) -> Self::Dna {
+        let a = self.network().params();
+        let b = other.network().params();
+        crossover(a, b)
+    }
+    fn override_dna(&mut self, dna: Self::Dna) {
+        self.network_mut().params_mut().overridden_by(&dna);
+    }
+}
+
+pub type BrainPool = genetic_algorithm::Population<InferenceNetwork, CollectedParams>;

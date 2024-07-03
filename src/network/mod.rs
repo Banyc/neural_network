@@ -94,7 +94,7 @@ impl NeuralNetwork {
             let output = terminal_node.output().unwrap();
             outputs.push(output.to_vec());
         }
-        delete_cache(&mut self.graph, terminals.forward());
+        delete_cache(&mut self.graph, terminals.forward(), &mut self.cx);
         self.check_rep();
         outputs
     }
@@ -144,7 +144,7 @@ impl NeuralNetwork {
         match option {
             EvalOption::KeepCache => (),
             EvalOption::ClearCache => {
-                delete_cache(&mut self.graph, error.forward());
+                delete_cache(&mut self.graph, error.forward(), &mut self.cx);
             }
         }
         self.check_rep();

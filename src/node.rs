@@ -119,8 +119,8 @@ impl CompNode {
     pub fn set_cache(&mut self, cache: NodeCache) {
         self.batch_cache = Some(cache);
     }
-    pub fn clear_cache(&mut self) {
-        self.batch_cache = None;
+    pub fn clear_cache(&mut self, cx: &mut NodeContext) {
+        self.batch_cache.take().unwrap().put_buf(cx);
     }
     pub fn has_evaluated(&self) -> bool {
         self.batch_cache.is_some()
@@ -256,7 +256,7 @@ impl CompNode {
         }
         cx.buf().put(partial_derivative_of_root_at_parameter);
         // Clear batch cache
-        self.batch_cache.take().unwrap().put_buf(cx);
+        self.clear_cache(cx);
         self.check_rep();
     }
 
@@ -457,9 +457,9 @@ pub fn evaluate_once<I>(
         node.evaluate_once(params, inputs_batch, operand_outputs, cx, mode);
     }
 }
-pub fn delete_cache(graph: &mut Graph<CompNode>, nodes_forward: &[NodeIdx]) {
+pub fn delete_cache(graph: &mut Graph<CompNode>, nodes_forward: &[NodeIdx], cx: &mut NodeContext) {
     for &node in nodes_forward {
-        graph.nodes_mut().get_mut(node).unwrap().clear_cache();
+        graph.nodes_mut().get_mut(node).unwrap().clear_cache(cx);
     }
 }
 

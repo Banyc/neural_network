@@ -63,7 +63,7 @@ impl genetic_algorithm::Agent for InferenceNetwork {
 pub type BrainPool = genetic_algorithm::Population<InferenceNetwork, CollectedParams>;
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use std::{
         num::NonZeroUsize,
         time::{Duration, Instant},
@@ -81,7 +81,11 @@ mod tests {
 
     use super::*;
 
-    fn hidden_network(inputs: NonZeroUsize, outputs: NonZeroUsize) -> InferenceNetwork {
+    pub fn hidden_network(
+        inputs: NonZeroUsize,
+        outputs: NonZeroUsize,
+        depths: &[NonZeroUsize],
+    ) -> InferenceNetwork {
         let mut params_injector = ParamInjector::new();
         let mut params = ParamInjection {
             injector: &mut params_injector,
@@ -89,33 +93,27 @@ mod tests {
         };
         let mut graph = GraphBuilder::new();
         let mut input_gen = InputNodeGen::new();
-        let inputs = graph.insert_nodes(input_gen.gen(inputs.get()));
+        let mut layer = graph.insert_nodes(input_gen.gen(inputs.get()));
         let activation = Activation::ReLu;
-        let dense = {
-            let config = LinearLayerConfig {
-                depth: NonZeroUsize::new(16).unwrap(),
-                lambda: None,
+        for (i, &depth) in depths.iter().enumerate() {
+            let dense = {
+                let config = LinearLayerConfig {
+                    depth,
+                    lambda: None,
+                };
+                let params = params.name_append(&format!(":hidden.{i}"));
+                let layer = dense_layer(&mut graph, layer, config, &activation, params);
+                graph.insert_nodes(layer)
             };
-            let params = params.name_append(":hidden.0");
-            let layer = dense_layer(&mut graph, inputs, config, &activation, params);
-            graph.insert_nodes(layer)
-        };
-        let dense = {
-            let config = LinearLayerConfig {
-                depth: NonZeroUsize::new(8).unwrap(),
-                lambda: None,
-            };
-            let params = params.name_append(":hidden.1");
-            let layer = dense_layer(&mut graph, dense, config, &activation, params);
-            graph.insert_nodes(layer)
-        };
+            layer = dense;
+        }
         let outputs = {
             let config = LinearLayerConfig {
                 depth: outputs,
                 lambda: None,
             };
             let params = params.name_append(":outputs");
-            let layer = dense_layer(&mut graph, dense, config, &activation, params);
+            let layer = dense_layer(&mut graph, layer, config, &activation, params);
             graph.insert_nodes(layer)
         };
         let graph = graph.build();
@@ -133,39 +131,47 @@ mod tests {
         let mut individuals = vec![];
         let num_individuals = 128;
         for _ in 0..num_individuals {
-            let nn = hidden_network(inputs, outputs);
+            let nn = hidden_network(
+                inputs,
+                outputs,
+                &[16, 8]
+                    .into_iter()
+                    .map(|x| NonZeroUsize::new(x).unwrap())
+                    .collect::<Vec<NonZeroUsize>>(),
+            );
             individuals.push(nn);
         }
         let mut brain_pool = BrainPool::new(individuals);
         let mut scores = vec![];
         let mut rng = rand::thread_rng();
         let mut last_print_time = Instant::now();
+        let mut run_episode = |brain: &mut InferenceNetwork| {
+            let mut score = 0.;
+            let steps = 32;
+            for _ in 0..steps {
+                let a: bool = rng.gen();
+                let b: bool = rng.gen();
+                let expected = a ^ b;
+                let buf = brain
+                    .evaluate(&[&[a as u8 as f64, b as u8 as f64]])
+                    .pop()
+                    .unwrap();
+                let c = buf[0];
+                brain.network_mut().cx_mut().buf().put(buf);
+                let mse = (c - expected as u8 as f64).powi(2);
+                let s = if mse < 1. { 1. - mse } else { 0. };
+                score += s / steps as f64;
+            }
+            FiniteF64::new(score).unwrap()
+        };
         loop {
             scores.clear();
             for brain in brain_pool.individuals_mut() {
-                let mut score = 0.;
-                let steps = 32;
-                for _ in 0..steps {
-                    let a: bool = rng.gen();
-                    let b: bool = rng.gen();
-                    let expected = a ^ b;
-                    let buf = brain
-                        .evaluate(&[&[a as u8 as f64, b as u8 as f64]])
-                        .pop()
-                        .unwrap();
-                    let c = buf[0];
-                    brain.network_mut().cx_mut().buf().put(buf);
-                    let mse = (c - expected as u8 as f64).powi(2);
-                    let s = if mse < 1. { 1. - mse } else { 0. };
-                    score += s / steps as f64;
-                }
+                let score = run_episode(brain);
                 scores.push(score);
             }
             if Duration::from_secs(1) < last_print_time.elapsed() {
-                let mut sorted = scores
-                    .iter()
-                    .map(|&x| FiniteF64::new(x).unwrap())
-                    .collect::<Vec<FiniteF64>>();
+                let mut sorted = scores.clone();
                 sorted.sort_unstable();
                 println!();
                 for score in sorted.iter().rev() {

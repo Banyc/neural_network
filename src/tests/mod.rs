@@ -3,6 +3,7 @@ use strict_num::FiniteF64;
 use crate::network::AccurateFnParams;
 
 mod mnist;
+mod nasdaq;
 mod neural_network;
 
 pub fn multi_class_one_hot_accurate(params: AccurateFnParams<'_>, classes: usize) -> bool {

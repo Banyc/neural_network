@@ -10,7 +10,7 @@
 
 use graph::{Graph, Node, NodeArray, NodeIdx};
 use thiserror::Error;
-use vec_seg::SegKey;
+use vec_seg::{SegKey, VecSeg};
 
 use crate::{
     cache::{GradRootThis, NodeCache, NodeCacheBuilder, OperandOutputs},
@@ -138,16 +138,16 @@ impl CompNode {
     {
         assert!(!self.has_evaluated());
 
-        let operand_outputs_len = operand_outputs.len();
-        let mut eval_buf = operand_outputs;
+        let (mut cache_buf, operand_outputs) = VecSeg::from_vec(operand_outputs);
+        let outputs_start = cache_buf.open_seg();
 
         // Compute outputs
-        match &mut self.computation {
+        let output = match &mut self.computation {
             NodeComputation::Scalar(comp) => {
                 let parameters = params.seg().slice(self.parameters);
                 for (batch_index, inputs) in inputs_batch.iter().enumerate() {
                     let operand_outputs = OperandOutputs {
-                        slice: &eval_buf[..operand_outputs_len],
+                        slice: cache_buf.slice(operand_outputs),
                         num_operands: self.operands.len(),
                     }
                     .get(batch_index);
@@ -160,24 +160,28 @@ impl CompNode {
                         );
                         panic!("{e}");
                     }
-                    eval_buf.push(o);
+                    cache_buf.push(o);
                 }
+                cache_buf.seal_seg(outputs_start)
             }
             NodeComputation::Batch(bat) => {
                 let buf = cx.buf().take();
-                let operand_outputs = &eval_buf;
+                let operand_outputs = cache_buf.slice(operand_outputs);
                 let shape = &[self.operands.len(), inputs_batch.len()];
                 let o =
                     bat.compute_output(params, self.parameters, operand_outputs, shape, buf, mode);
-                eval_buf.extend(o.iter().copied());
+                let key = cache_buf.extend(o.iter().copied());
                 cx.buf().put(o);
+                key
             }
-        }
+        };
 
         let cache = NodeCacheBuilder {
             batch_size: inputs_batch.len(),
             num_operands: self.operands.len(),
-            buf: eval_buf,
+            buf: cache_buf,
+            operand_outputs,
+            output,
         }
         .build();
         self.batch_cache = Some(cache);

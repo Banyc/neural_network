@@ -14,4 +14,3 @@ pub mod tensor;
 #[cfg(test)]
 mod tests;
 mod two_d_slice;
-mod vec_segmenter;

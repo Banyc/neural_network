@@ -1,4 +1,6 @@
-use crate::{node::NodeContext, two_d_slice::TwoDSlice, vec_segmenter::VecSegmenter};
+use vec_seg::{SegKey, VecSeg};
+
+use crate::{node::NodeContext, two_d_slice::TwoDSlice};
 
 #[derive(Debug, Clone)]
 pub struct OperandOutputs<'a> {
@@ -17,25 +19,23 @@ pub struct NodeCacheBuilder {
     pub batch_size: usize,
     pub num_operands: usize,
     /// shape: (operands.len(), batch_size) : batch_size
-    pub buf: Vec<f64>,
+    pub buf: VecSeg<f64>,
+    pub operand_outputs: SegKey,
+    pub output: SegKey,
 }
 impl NodeCacheBuilder {
     pub fn build(mut self) -> NodeCache {
-        let operand_outputs = self.batch_size * self.num_operands;
-        let output = self.batch_size;
-        let gradient_of_root_at_this = self.batch_size;
-        assert_eq!(operand_outputs + output, self.buf.len());
-        self.buf
+        let sum_gradient_of_root_at_this = self
+            .buf
             .extend(core::iter::repeat(0.).take(self.batch_size));
-        let buf = VecSegmenter::new(
-            self.buf,
-            [operand_outputs, output, gradient_of_root_at_this],
-        );
         NodeCache {
-            buf,
+            buf: self.buf,
             batch_size: self.batch_size,
             num_operands: self.num_operands,
             num_successors_distributed: 0,
+            operand_outputs: self.operand_outputs,
+            output: self.output,
+            sum_gradient_of_root_at_this,
         }
     }
 }
@@ -47,7 +47,10 @@ pub struct NodeCache {
     ///   1.  operand_outputs
     ///   1.  output
     ///   1.  sum_gradient_of_root_at_this
-    buf: VecSegmenter<f64, 3>,
+    buf: VecSeg<f64>,
+    operand_outputs: SegKey,
+    output: SegKey,
+    sum_gradient_of_root_at_this: SegKey,
     batch_size: usize,
     num_operands: usize,
     num_successors_distributed: usize,
@@ -57,7 +60,7 @@ impl NodeCache {
         self.batch_size
     }
     pub fn operand_outputs(&self, batch_index: usize) -> &[f64] {
-        let slice = self.buf.segment(0).unwrap();
+        let slice = self.buf.slice(self.operand_outputs);
         OperandOutputs {
             slice,
             num_operands: self.num_operands,
@@ -65,17 +68,17 @@ impl NodeCache {
         .get(batch_index)
     }
     pub fn output(&self) -> &[f64] {
-        self.buf.segment(1).unwrap()
+        self.buf.slice(self.output)
     }
     pub fn backpropagate_mut(&mut self) -> BackpropagateCacheMut<'_> {
-        let slice = self.buf.segment_mut(2).unwrap();
+        let slice = self.buf.slice_mut(self.sum_gradient_of_root_at_this);
         BackpropagateCacheMut {
             sum_gradient_of_root_at_this: slice,
             num_successors_distributed: &mut self.num_successors_distributed,
         }
     }
     pub fn backpropagate(&self) -> BackpropagateCache<'_> {
-        let slice = self.buf.segment(2).unwrap();
+        let slice = self.buf.slice(self.sum_gradient_of_root_at_this);
         BackpropagateCache {
             sum_gradient_of_root_at_this: slice,
             num_successors_distributed: self.num_successors_distributed,

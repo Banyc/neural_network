@@ -1,7 +1,7 @@
 use std::num::NonZeroUsize;
 
 use graph::NodeIdx;
-use vec_seg::SegKey;
+use primitive::vec_seg::SegKey;
 
 use crate::{node::GraphBuilder, param::ParamInjection};
 

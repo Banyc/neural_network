@@ -1,4 +1,4 @@
-use vec_seg::{SegKey, VecSeg};
+use primitive::vec_seg::{SegKey, VecSeg};
 
 use crate::{node::NodeContext, two_d_slice::TwoDSlice};
 

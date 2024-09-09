@@ -1,5 +1,5 @@
 use graph::NodeIdx;
-use vec_seg::SegKey;
+use primitive::{vec_seg::SegKey, Len};
 
 use crate::{
     computation::{

@@ -1,7 +1,7 @@
 use graph::NodeIdx;
+use primitive::{vec_seg::SegKey, Len};
 use rand::Rng;
 use thiserror::Error;
-use vec_seg::SegKey;
 
 use crate::{
     computation::{NodeBackpropagationComputation, NodeComputation, NodeScalarComputation},

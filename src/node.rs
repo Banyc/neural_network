@@ -10,7 +10,7 @@
 
 use graph::{Graph, Node, NodeArray, NodeIdx};
 use thiserror::Error;
-use vec_seg::{SegKey, VecSeg};
+use primitive::vec_seg::{SegKey, VecSeg};
 
 use crate::{
     cache::{GradRootThis, NodeCache, NodeCacheBuilder, OperandOutputs},

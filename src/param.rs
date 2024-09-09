@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
+use primitive::vec_seg::{SegKey, VecSeg};
 use strict_num::NormalizedF64;
-use vec_seg::{SegKey, VecSeg};
 
 pub fn empty_shared_params() -> SegKey {
     SegKey::empty_slice()

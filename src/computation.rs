@@ -1,4 +1,4 @@
-use vec_seg::SegKey;
+use primitive::vec_seg::SegKey;
 
 use crate::{param::Params, tensor::Shape};
 

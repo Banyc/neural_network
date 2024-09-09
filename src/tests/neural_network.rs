@@ -1,5 +1,5 @@
 use graph::NodeIdx;
-use vec_seg::SegKey;
+use primitive::vec_seg::SegKey;
 
 use crate::{
     network::{

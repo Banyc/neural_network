@@ -1,6 +1,6 @@
 use primitive::vec_seg::{SegKey, VecSeg};
 
-use crate::{node::NodeContext, two_d_slice::TwoDSlice};
+use crate::node::NodeContext;
 
 #[derive(Debug, Clone)]
 pub struct OperandOutputs<'a> {
@@ -9,8 +9,13 @@ pub struct OperandOutputs<'a> {
 }
 impl<'a> OperandOutputs<'a> {
     pub fn get(self, batch_index: usize) -> &'a [f64] {
-        let two_d = TwoDSlice::new(self.slice, self.num_operands);
-        two_d.slice(batch_index)
+        if self.num_operands == 0 {
+            return &[];
+        }
+        self.slice
+            .chunks(self.num_operands)
+            .nth(batch_index)
+            .unwrap()
     }
 }
 

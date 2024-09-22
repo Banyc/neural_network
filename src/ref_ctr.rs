@@ -5,6 +5,7 @@ pub struct RefCtr<T> {
     referred: Rc<T>,
 }
 impl<T> RefCtr<T> {
+    #[allow(unused)]
     pub fn new(value: T) -> Self {
         let referred = Rc::new(value);
         Self { referred }

@@ -9,28 +9,30 @@
 //!   - "root" in code
 
 use graph::{Graph, Node, NodeArray, NodeIdx};
+use primitive::{
+    obj_pool::{buf_pool, ObjectPool},
+    vec_seg::{SegKey, VecSeg},
+};
 use thiserror::Error;
-use primitive::vec_seg::{SegKey, VecSeg};
 
 use crate::{
     cache::{GradRootThis, NodeCache, NodeCacheBuilder, OperandOutputs},
     computation::{ComputationMode, NodeBackpropagationComputation, NodeComputation},
     param::Params,
-    reused_buf::ReusedBuffers,
 };
 
 #[derive(Debug)]
 pub struct NodeContext {
-    buf: ReusedBuffers<f64>,
+    buf: ObjectPool<Vec<f64>>,
 }
 impl NodeContext {
     pub fn new() -> Self {
         Self {
-            buf: ReusedBuffers::new(u16::MAX.into()),
+            buf: buf_pool(u16::MAX.into()),
         }
     }
 
-    pub fn buf(&mut self) -> &mut ReusedBuffers<f64> {
+    pub fn buf(&mut self) -> &mut ObjectPool<Vec<f64>> {
         &mut self.buf
     }
 }

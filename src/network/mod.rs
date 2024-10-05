@@ -1,6 +1,7 @@
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use graph::{dependency_order, Graph, NodeIdx};
+use primitive::ops::unit::HumanDuration;
 use rand::Rng;
 
 use crate::{
@@ -273,33 +274,8 @@ impl ProgressPrinter {
             return;
         }
         let percentage = (100 * i) as f64 / len as f64;
-        let elapsed = human_duration(self.now.elapsed());
+        let elapsed = HumanDuration(self.now.elapsed());
         self.now = Instant::now();
-        println!("{percentage:.2}%; {elapsed}");
+        println!("{percentage:.2}%; {elapsed:.2}");
     }
-}
-
-fn human_duration(duration: Duration) -> String {
-    let seconds = duration.as_secs_f64();
-    let minutes = seconds / 60.;
-    let hours = minutes / 60.;
-    let milliseconds = seconds * 1_000.;
-    let microseconds = milliseconds * 1_000.;
-    let nanoseconds = microseconds * 1_000.;
-    if 1. < hours {
-        return format!("{hours:.2} h");
-    }
-    if 1. < minutes {
-        return format!("{minutes:.2} min");
-    }
-    if 1. < seconds {
-        return format!("{seconds:.2} s");
-    }
-    if 1. < milliseconds {
-        return format!("{milliseconds:.2} ms");
-    }
-    if 1. < microseconds {
-        return format!("{microseconds:.2} us");
-    }
-    format!("{nanoseconds:.2} ns")
 }
